@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:16
+    container_name: melog-db
+    restart: always
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${PASSWD}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_DB=${DBNAME}
+volumes:
+  pgdata:
