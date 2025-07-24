@@ -102,7 +102,16 @@ public class Post {
         inverseJoinColumns = @JoinColumn(name = "user_id")
     )
     private List<User> likedUsers = new ArrayList<>();
-
+    /**
+     * 이 게시물을 숨김 처리한 사용자 목록
+     */
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "post_hidden_users",
+        joinColumns = @JoinColumn(name = "post_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    private List<User> hiddenUsers = new ArrayList<>();
     /**
      * 게시물 생성자
      */
@@ -114,6 +123,8 @@ public class Post {
         this.mediaLink = mediaLink;
         this.tags = tags != null ? tags : new ArrayList<>();
         this.createdAt = LocalDate.now();
+        this.likedUsers = new ArrayList<>();
+        this.hiddenUsers = new ArrayList<>();
     }
 
     /**
