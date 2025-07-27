@@ -2,11 +2,10 @@ package com.osunji.melog.review;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
-import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -24,11 +23,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import com.osunji.melog.user.User;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
-@Table(name = "posts")
+@Table(name = "post")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -39,57 +37,47 @@ public class Post {
      */
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id")
     private String id;
 
     /**
      * 게시물 작성자
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(nullable = false)
     private User user;
 
     /**
      * 게시물 제목
      */
     @Lob
-    @Column(name = "title")
     private String title;
 
     /**
      * 게시물 내용
      */
     @Lob
-    @Column(name = "content")
     private String content;
 
     /**
      * 미디어 타입
      */
-    @Column(name = "media_type")
     private String mediaType;
 
     /**
      * 미디어 링크
      */
-    @Column(name = "media_link")
     private String mediaLink;
 
     /**
      * 게시물 태그 목록
      */
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(
-        name = "post_tags",
-        joinColumns = @JoinColumn(name = "post_id")
-    )
-    @Column(name = "tag")
-    private List<String> tags = new ArrayList<>();
+    @Column(columnDefinition = "TEXT")
+    private String tags;
 
     /**
      * 게시물 생성 일시
      */
-    @Column(name = "created_at", nullable = false)
+    @Column(nullable = false)
     private LocalDate createdAt;
 
     /**
@@ -97,34 +85,33 @@ public class Post {
      */
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-        name = "post_likes",
-        joinColumns = @JoinColumn(name = "post_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
+        name = "like",
+        joinColumns = @JoinColumn(name = "postId"),
+        inverseJoinColumns = @JoinColumn(name = "userId")
     )
-    private List<User> likedUsers = new ArrayList<>();
-    /**
-     * 이 게시물을 숨김 처리한 사용자 목록
+    private List<User> like= new ArrayList<>();
+    /*** 이 게시물을 숨김 처리한 사용자 목록
      */
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-        name = "post_hidden_users",
-        joinColumns = @JoinColumn(name = "post_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
+        name = "hiddenUser",
+        joinColumns = @JoinColumn(name = "postId"),
+        inverseJoinColumns = @JoinColumn(name = "userId")
     )
-    private List<User> hiddenUsers = new ArrayList<>();
+    private List<User> hiddenUser = new ArrayList<>();
     /**
      * 게시물 생성자
      */
-    public Post(User user, String title, String content, String mediaType, String mediaLink, List<String> tags) {
+    public Post(User user, String title, String content, String mediaType, String mediaLink, List<String> tagList) {
         this.user = user;
         this.title = title;
         this.content = content;
         this.mediaType = mediaType;
         this.mediaLink = mediaLink;
-        this.tags = tags != null ? tags : new ArrayList<>();
+        this.tags = tagList != null && !tagList.isEmpty() ? String.join(",", tagList) : ""; // ✅ List를 문자열로 변환
         this.createdAt = LocalDate.now();
-        this.likedUsers = new ArrayList<>();
-        this.hiddenUsers = new ArrayList<>();
+        this.like = new ArrayList<>();
+        this.hiddenUser = new ArrayList<>();
     }
 
     /**
@@ -133,5 +120,22 @@ public class Post {
     public static Post createPost(User user, String title, String content) {
         return new Post(user, title, content, null, null, new ArrayList<>());
     }
+    /**
+     * 태그 문자열을 List<String>으로 변환해서 반환
+     */
+    public List<String> getTagList() {
+        if (tags == null || tags.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+        return Arrays.asList(tags.split(","));
+    }
+
+    /**
+     * List<String>을 받아서 쉼표로 구분된 문자열로 저장
+     */
+    public void setTagList(List<String> tagList) {
+        this.tags = tagList != null && !tagList.isEmpty() ? String.join(",", tagList) : "";
+    }
+
 
 }

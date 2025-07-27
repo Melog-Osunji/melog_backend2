@@ -20,7 +20,7 @@ import lombok.NoArgsConstructor;
 import com.osunji.melog.user.User;
 
 @Entity
-@Table(name = "post_bookmarks")
+@Table(name = "postBookmark")
 @IdClass(PostBookmark.PostBookmarkId.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -31,7 +31,7 @@ public class PostBookmark {
      */
     @Id
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @JoinColumn
     private User user;
 
     /**
@@ -39,13 +39,13 @@ public class PostBookmark {
      */
     @Id
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id")
+    @JoinColumn
     private Post post;
 
     /**
      * 북마크 생성 일시
      */
-    @Column(name = "created_at", nullable = false)
+    @Column(nullable = false)
     private LocalDate createdAt;
 
     /**
