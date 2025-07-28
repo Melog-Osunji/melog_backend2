@@ -1,61 +1,62 @@
 package com.osunji.melog.user;
 
-import java.io.Serializable;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.IdClass;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import lombok.AccessLevel;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
 @Entity
-@Table(name = "follows")
-@IdClass(Follow.FollowId.class)
+@Table(name = "follow",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"follower", "following"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Follow {
-
+    /**
+     * 기술적 ID (JPA 요구사항)
+     */
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private String id;
     /**
      * 팔로우 하는 사람 == 나
      */
-    @Id
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "follower_id")
+    @JoinColumn(name = "follower")
     private User follower;
-
     /**
      * 팔로우 당하는 사람 == 상대
      */
-    @Id
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "following_id")
+    @JoinColumn(name = "following")
     private User following;
 
     /**
      * 팔로우 시작 시각
      */
-    @Column(name = "followed_at", nullable = false)
+    @Column(nullable = false)
     private LocalDateTime followedAt;
 
     /**
      * 팔로우 상태
      */
     @Column(nullable = false)
-    private String status;
+    private Boolean status;
 
     /**
      * 팔로우 관계 생성자
      */
-    public Follow(User follower, User following, String status) {
+    public Follow(User follower, User following, Boolean status) {
         this.follower = follower;
         this.following = following;
         this.status = status;
@@ -63,21 +64,7 @@ public class Follow {
     }
 
     public static Follow createFollow(User follower, User following) {
-        return new Follow(follower, following, "ACTIVE");
+        return new Follow(follower, following,true);
     }
 
-    /**
-     * 팔로우 관계의 복합
-     */
-    @NoArgsConstructor
-    @EqualsAndHashCode
-    public static class FollowId implements Serializable {
-        private String follower;
-        private String following;
-
-        public FollowId(String follower, String following) {
-            this.follower = follower;
-            this.following = following;
-        }
-    }
 }

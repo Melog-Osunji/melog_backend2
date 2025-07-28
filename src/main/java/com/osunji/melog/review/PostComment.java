@@ -24,7 +24,7 @@ import lombok.NoArgsConstructor;
 import com.osunji.melog.user.User;
 
 @Entity
-@Table(name = "post_comments")
+@Table(name = "postComment")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PostComment {
@@ -34,40 +34,39 @@ public class PostComment {
      */
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "comment_id")
     private String id;
 
     /**
      * 댓글 작성자
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn( nullable = false)
     private User user;
 
     /**
      * 댓글이 속한 게시물
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id", nullable = false)
+    @JoinColumn( nullable = false)
     private Post post;
 
     /**
      * 댓글 내용
      */
-    @Column(name = "content", nullable = false)
+    @Column( nullable = false)
     private String content;
 
     /**
      * 댓글 작성 일시
      */
-    @Column(name = "created_at", nullable = false)
+    @Column( nullable = false)
     private LocalDate createdAt;
 
     /**
      * 부모 댓글 (대댓글인 경우)
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_comment_id")
+    @JoinColumn
     private PostComment parentComment;
 
     /**
@@ -81,9 +80,9 @@ public class PostComment {
      */
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-        name = "post_comment_likes",
-        joinColumns = @JoinColumn(name = "comment_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
+        name = "commentLike",
+        joinColumns = @JoinColumn(name = "commentId"),
+        inverseJoinColumns = @JoinColumn(name = "userId")
     )
     private List<User> likedUsers = new ArrayList<>();
 
@@ -96,6 +95,8 @@ public class PostComment {
         this.content = content;
         this.createdAt = LocalDate.now();
         this.parentComment = null;
+        this.likedUsers = new ArrayList<>();
+        this.childComments = new ArrayList<>();
     }
 
     /**
@@ -107,8 +108,9 @@ public class PostComment {
         this.content = content;
         this.createdAt = LocalDate.now();
         this.parentComment = parentComment;
+        this.likedUsers = new ArrayList<>();
+        this.childComments = new ArrayList<>();
     }
-
     /**
      * 일반 댓글 생성 메서드
      */

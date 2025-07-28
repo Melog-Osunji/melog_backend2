@@ -7,6 +7,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.MapsId;
@@ -24,18 +26,17 @@ import lombok.NoArgsConstructor;
 public class Onboarding {
 
     /**
-     * 온보딩 ID (User ID와 동일)
+     * 온보딩 ID (UUID)
      */
     @Id
-    @Column(name = "user_id")
-    private String userId;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private String onboardingId;
 
     /**
-     * 연관된 사용자
+     * 연관된 사용자 (FK) / userId = 온보딩 테이블에서의 userID컬럼명
      */
     @OneToOne(fetch = FetchType.LAZY)
-    @MapsId
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "userId",unique = true)
     private User user;
 
     /**
@@ -44,9 +45,8 @@ public class Onboarding {
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
         name = "composers",
-        joinColumns = @JoinColumn(name = "user_id")
+        joinColumns = @JoinColumn(name = "onboardingId")
     )
-    @Column(name = "composer")
     private List<String> composers;
 
     /**
@@ -54,11 +54,10 @@ public class Onboarding {
      */
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
-        name = "eras",
-        joinColumns = @JoinColumn(name = "user_id")
+        name = "periods",
+        joinColumns = @JoinColumn(name = "onboardingId")
     )
-    @Column(name = "era")
-    private List<String> eras;
+    private List<String> periods;
 
     /**
      * 선호 악기 목록
@@ -66,23 +65,21 @@ public class Onboarding {
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
         name = "instruments",
-        joinColumns = @JoinColumn(name = "user_id")
+        joinColumns = @JoinColumn(name = "onboardingId")
     )
-    @Column(name = "instrument")
     private List<String> instruments;
 
 
 
-    public Onboarding(User user, List<String> composers, List<String> eras, List<String> instruments) {
+    public Onboarding(User user, List<String> composers, List<String> periods, List<String> instruments) {
         this.user = user;
-        this.userId = user.getUserId();
         this.composers = composers;
-        this.eras = eras;
+        this.periods = periods;
         this.instruments = instruments;
     }
 
-    public static Onboarding createOnboarding(User user, List<String> composers, List<String> eras, List<String> instruments) {
-        return new Onboarding(user, composers, eras, instruments);
+    public static Onboarding createOnboarding(User user, List<String> composers, List<String> periods, List<String> instruments) {
+        return new Onboarding(user, composers, periods, instruments);
     }
 
 

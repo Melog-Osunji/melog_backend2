@@ -22,10 +22,9 @@ import lombok.NoArgsConstructor;
 public class Agreement {
 
     /**
-     * 사용자 ID (User ID와 동일)
+     * 사용자 ID (uuid fk)
      */
     @Id
-    @Column(name = "user_id")
     private String userId;
 
     /**
@@ -33,19 +32,19 @@ public class Agreement {
      */
     @OneToOne(fetch = FetchType.LAZY)
     @MapsId
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "userId")
     private User user;
 
     /**
      * 마케팅 이용약관 동의 여부
      */
-    @Column(name = "marketing", nullable = false)
+    @Column(nullable = false)
     private Boolean marketing;
 
     /**
      * 약관 동의 일시
      */
-    @Column(name = "created_at", nullable = false)
+    @Column(nullable = false)
     private LocalDate createdAt;
 
     /**
@@ -53,7 +52,7 @@ public class Agreement {
      */
     public Agreement(User user, Boolean marketing, LocalDate createdAt) {
         this.user = user;
-        this.userId = user.getUserId();
+        this.userId = user.getId();
         this.marketing = marketing;
         this.createdAt = createdAt;
     }
