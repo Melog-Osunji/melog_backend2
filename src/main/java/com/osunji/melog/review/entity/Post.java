@@ -1,4 +1,4 @@
-package com.osunji.melog.review;
+package com.osunji.melog.review.entity;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -21,6 +21,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import com.osunji.melog.user.User;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -29,6 +30,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @Table(name = "post")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Post {
 
@@ -136,6 +138,12 @@ public class Post {
     public void setTagList(List<String> tagList) {
         this.tags = tagList != null && !tagList.isEmpty() ? String.join(",", tagList) : "";
     }
-
+    public void updatePost(String title, String content, String mediaType, String mediaLink, List<String> tagList) {
+        if (title != null) this.title = title;
+        if (content != null) this.content = content;
+        if (mediaType != null) this.mediaType = mediaType;
+        if (mediaLink != null) this.mediaLink = mediaLink;
+        if (tagList != null) this.setTagList(tagList);
+    }
 
 }

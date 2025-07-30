@@ -1,9 +1,10 @@
-package com.osunji.melog.review;
+package com.osunji.melog.review.entity;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import ch.qos.logback.core.joran.spi.HttpUtil;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -124,5 +125,6 @@ public class PostComment {
     public static PostComment createReply(User user, Post post, String content, PostComment parentComment) {
         return new PostComment(user, post, content, parentComment);
     }
+
 
 }

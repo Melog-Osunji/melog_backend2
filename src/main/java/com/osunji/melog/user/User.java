@@ -13,6 +13,7 @@ import jakarta.persistence.GenerationType;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
@@ -20,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @Table(name = "user")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
     /**
@@ -81,7 +83,6 @@ public class User {
     }
 
     // 팩토리 메서드 2 - 닉넴 설정 끝나고 회원가입로직을 짠다면... (전체 정보)
-
     public static User createUserWithProfile(String email, String platform, String nickname,
         String profileImageUrl, String intro) {
         return new User(email, platform, nickname, profileImageUrl, intro);
