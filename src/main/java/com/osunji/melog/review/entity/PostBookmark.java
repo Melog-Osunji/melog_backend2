@@ -1,4 +1,4 @@
-package com.osunji.melog.review;
+package com.osunji.melog.review.entity;
 
 import java.io.Serializable;
 import java.time.LocalDate;
