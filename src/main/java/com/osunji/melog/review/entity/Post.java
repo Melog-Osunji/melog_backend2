@@ -23,7 +23,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import com.osunji.melog.user.User;
+import com.osunji.melog.user.domain.User;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity

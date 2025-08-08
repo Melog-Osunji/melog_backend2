@@ -5,13 +5,11 @@ import com.osunji.melog.review.dto.response.PostResponse;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
 import com.osunji.melog.review.entity.Post;
 import com.osunji.melog.review.entity.PostComment;
-import com.osunji.melog.user.User;
+import com.osunji.melog.user.domain.User;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.stream.Collectors;
 
 @Component

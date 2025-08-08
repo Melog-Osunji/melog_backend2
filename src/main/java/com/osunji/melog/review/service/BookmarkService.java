@@ -9,7 +9,7 @@ import com.osunji.melog.review.entity.Post;
 import com.osunji.melog.review.entity.PostBookmark;
 import com.osunji.melog.review.repository.BookmarkRepository;
 import com.osunji.melog.review.repository.PostRepository;
-import com.osunji.melog.user.User;
+import com.osunji.melog.user.domain.User;
 import com.osunji.melog.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

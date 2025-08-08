@@ -1,6 +1,6 @@
 package com.osunji.melog.global.config;
 
-import com.osunji.melog.global.security.JWTUtil;
+import com.osunji.melog.global.util.JWTUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;

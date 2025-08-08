@@ -17,7 +17,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import com.osunji.melog.user.User;
+import com.osunji.melog.user.domain.User;
 
 @Entity
 @Table(name = "postBookmark")

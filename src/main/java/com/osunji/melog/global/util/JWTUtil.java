@@ -1,4 +1,4 @@
-package com.osunji.melog.global.security;
+package com.osunji.melog.global.util;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;

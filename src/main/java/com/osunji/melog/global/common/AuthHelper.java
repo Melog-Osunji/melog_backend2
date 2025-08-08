@@ -1,6 +1,6 @@
 package com.osunji.melog.global.common;
 
-import com.osunji.melog.global.security.JWTUtil;
+import com.osunji.melog.global.util.JWTUtil;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 

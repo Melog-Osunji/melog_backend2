@@ -1,7 +1,8 @@
 package com.osunji.melog.user.controller;
 
-import com.osunji.melog.user.OauthLoginRequestDTO;
-import com.osunji.melog.user.repository.UserRepository;
+import com.osunji.melog.user.dto.OauthLoginRequestDTO;
+import com.osunji.melog.user.dto.OauthLoginResponseDTO;
+import com.osunji.melog.user.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,13 +14,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 public class UserController {
-    private final UserRepository userRepository;
+
+    private final AuthService authService;
 
     @PostMapping("/kakao")
     public ResponseEntity<?> kakaoLoginUser(
             @RequestBody OauthLoginRequestDTO request){
-        
-        return null;
+        OauthLoginResponseDTO response = authService.login(request);
+        return ResponseEntity.ok(response);
     }
 
 
