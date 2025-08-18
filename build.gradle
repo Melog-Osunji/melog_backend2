@@ -53,7 +53,8 @@ dependencies {
 
 	// elasticSearch
 	implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
-	implementation 'co.elastic.clients:elasticsearch-java:8.15.0'
+	implementation 'co.elastic.clients:elasticsearch-java:8.11.1'
+
 }
 
 tasks.named('test') {
