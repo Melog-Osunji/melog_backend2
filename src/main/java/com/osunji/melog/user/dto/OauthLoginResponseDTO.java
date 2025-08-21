@@ -10,7 +10,7 @@ public record OauthLoginResponseDTO(
     public record UserInfo(
             String id,
             String email,
-            String platform,
+            com.osunji.melog.user.domain.enums.Platform platform,
             String nickName,
             String profileImg,
             String intro

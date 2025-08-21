@@ -10,16 +10,13 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
-// 0.12.3 토큰
 @Component
 public class JWTUtil {
     private final SecretKey secretKey;
     private final SecretKey refreshSecretKey;
 
-
-    // 토큰 생성 시 key값 주입
-    public JWTUtil(@Value("${jwt.secret}")String secret
-    , @Value("${jwt.refresh}")String refresh) {
+    public JWTUtil(@Value("${jwt.secret}") String secret,
+                   @Value("${jwt.refresh}") String refresh) {
         this.secretKey = new SecretKeySpec(
                 secret.getBytes(StandardCharsets.UTF_8),
                 Jwts.SIG.HS256.key().build().getAlgorithm());
@@ -28,44 +25,88 @@ public class JWTUtil {
                 Jwts.SIG.HS256.key().build().getAlgorithm());
     }
 
-    // 토큰에서 UserId 추출
-    public String getUserIdFromToken(String token) {
-        return Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token).getPayload().get("userId", String.class);
+    /* ===================== Access Token ===================== */
+
+    /** (이전 getUserIdFromToken을 보다 명확히) */
+    public String getUserIdFromAccess(String accessToken) {
+        return Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(accessToken)
+                .getPayload()
+                .get("userId", String.class);
     }
 
-    // 토큰 만료 여부 확인
-    public Boolean isTokenExpired(String token) {
-        try{ // 토큰 검증
-            return Jwts.parser()
+    /** 액세스 토큰 검증(서명/만료) — 유효하면 조용히 통과, 아니면 예외 */
+    public void validateAccess(String accessToken) {
+        // parse 과정에서 서명/만료/형식 오류가 예외로 터짐
+        Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(accessToken);
+
+        // 추가 clock skew 허용/iss, aud 검증이 필요하면 여기서 더 체크
+    }
+
+    /** (이전 isTokenExpired 대체/호환) */
+    public Boolean isAccessExpired(String accessToken) {
+        try {
+            Date exp = Jwts.parser()
                     .verifyWith(secretKey)
                     .build()
-                    .parseSignedClaims(token)
-                    .getPayload().getExpiration()
-                    .before(new Date());
-
-        } catch (ExpiredJwtException e) { // 파싱 단계에서부터 오류 발생시 바로 true 반환
+                    .parseSignedClaims(accessToken)
+                    .getPayload()
+                    .getExpiration();
+            return exp.before(new Date());
+        } catch (ExpiredJwtException e) {
             return true;
         }
     }
 
-    // jwt 토큰 생성
     public String createJWT(String userId, Long expiredMillis) {
         return Jwts.builder()
                 .claim("userId", userId)
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis()+ expiredMillis))
+                .expiration(new Date(System.currentTimeMillis() + expiredMillis))
                 .signWith(secretKey)
                 .compact();
     }
 
-    // refresh 토큰 생성
+    /* ===================== Refresh Token ===================== */
+
+    public String getUserIdFromRefresh(String refreshToken) {
+        return Jwts.parser()
+                .verifyWith(refreshSecretKey)
+                .build()
+                .parseSignedClaims(refreshToken)
+                .getPayload()
+                .get("userId", String.class);
+    }
+
+    public void validateRefresh(String refreshToken) {
+        Jwts.parser()
+                .verifyWith(refreshSecretKey)
+                .build()
+                .parseSignedClaims(refreshToken);
+    }
+
     public String createRefreshJWT(String userId, Long refreshMillis) {
         return Jwts.builder()
                 .claim("userId", userId)
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis()+ refreshMillis))
+                .expiration(new Date(System.currentTimeMillis() + refreshMillis))
                 .signWith(refreshSecretKey)
                 .compact();
     }
 
+    /* ===================== (구 메서드 호환용) ===================== */
+
+    /** 기존 이름 유지가 필요하면 wrapper로 연결 */
+    public String getUserIdFromToken(String token) {
+        return getUserIdFromAccess(token);
+    }
+
+    public Boolean isTokenExpired(String token) {
+        return isAccessExpired(token);
+    }
 }

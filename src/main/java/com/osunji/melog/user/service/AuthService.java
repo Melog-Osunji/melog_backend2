@@ -18,7 +18,7 @@ public class AuthService {
         String oidc = request.getOcid();
         String accessToken = request.getAccessToken();
 
-        // 1. OCID 유효성 검증
+        // 1. OIDC 유효성 검증
 
 
         // 2. 유저 회원가입 여부 확인 -> 미가입일시 DB 저장(orElseGet() 안 부분)
