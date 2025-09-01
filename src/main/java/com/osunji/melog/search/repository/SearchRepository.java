@@ -1,8 +1,13 @@
 package com.osunji.melog.search.repository;
-
+import com.osunji.melog.review.service.PostService;
 import com.osunji.melog.elk.repository.ELKSearchRepository;
+import com.osunji.melog.elk.service.SearchLogService;
 import com.osunji.melog.search.dto.response.SearchResponse;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -17,6 +22,9 @@ import java.util.stream.Collectors;
 public class SearchRepository {
 	// ELK Repository 주입
 	private final ELKSearchRepository elkSearchRepository;
+	private final SearchLogService searchLogService;
+	private final PostService postService;
+	//private final UserService userService;
 
 	/** 31번 통합 검색 데이터 조회	 */
 	public SearchResponse.AllSearch getAllSearchData() {
@@ -100,8 +108,6 @@ public class SearchRepository {
 			);
 		}
 	}
-
-
 	/**
 	 * 34번 장르 + 관련 키워드 조회 (사전 설정)
 	 */
@@ -185,23 +191,42 @@ public class SearchRepository {
 		}
 	}
 
+
+
+
+
+	private String getCurrentUserId() {
+		try {
+			Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+			if (auth == null || !auth.isAuthenticated()) {
+				return "anonymous";
+			}
+
+			Object principal = auth.getPrincipal();
+			if (principal instanceof UserDetails) {
+				return ((UserDetails) principal).getUsername();
+			} else if (principal instanceof String) {
+				return (String) principal;
+			} else {
+				return "anonymous";
+			}
+		} catch (Exception e) {
+			return "anonymous";
+		}
+	}
 	/**
 	 * 37번 검색결과 - 게시글 + 인기미디어
 	 */
 	public SearchResponse.SearchResultAll searchAll(String query) {
-		// TODO:
+		// 일반 검색 로그 저장 (카테고리 null)
+		searchLogService.logGeneralSearch(query, getCurrentUserId());
+
 		try {
-			// Elasticsearch에서 게시글 검색
 			List<String> postIds = elkSearchRepository.searchPosts(query);
-
-			// TODO: postIds를 실제 Post 객체로 변환하는 로직 추가
-			// 현재는 임시로 빈 리스트 반환
-
 			return SearchResponse.SearchResultAll.builder()
-				.results(Arrays.asList())  // TODO: 실제 Post 객체로 변환
+				.results(Arrays.asList())
 				.popularMedia(Arrays.asList())
 				.build();
-
 		} catch (Exception e) {
 			return SearchResponse.SearchResultAll.builder()
 				.results(Arrays.asList())
@@ -209,21 +234,19 @@ public class SearchRepository {
 				.build();
 		}
 	}
+
 	/**
 	 * 38번 검색결과 - 프로필
 	 */
 	public SearchResponse.SearchProfile searchProfile(String query) {
-		// TODO:
+		// 프로필 검색 로그 저장
+		searchLogService.logSearch(query, "profile", getCurrentUserId());
+
 		try {
-			// Elasticsearch에서 사용자 검색
 			List<String> userIds = elkSearchRepository.searchUsers(query);
-
-			// TODO: userIds를 실제 User 객체로 변환하는 로직 추가
-
 			return SearchResponse.SearchProfile.builder()
 				.user(Arrays.asList())
 				.build();
-
 		} catch (Exception e) {
 			return SearchResponse.SearchProfile.builder()
 				.user(Arrays.asList())
@@ -231,29 +254,25 @@ public class SearchRepository {
 		}
 	}
 
-
 	/**
 	 * 39번 검색결과 - 피드
 	 */
 	public SearchResponse.SearchFeed searchFeed(String query) {
-		// TODO: Elasticsearch에서 최신순 + 인기순 피드 검색
-		try {
-			// Elasticsearch에서 최신순 + 인기순 검색
-			List<String> recentPostIds = elkSearchRepository.searchPosts(query);
-			// TODO: 인기순 정렬 로직 추가
+		// 피드 검색 로그 저장
+		searchLogService.logSearch(query, "feed", getCurrentUserId());
 
+		try {
+			List<String> recentPostIds = elkSearchRepository.searchPosts(query);
 			return SearchResponse.SearchFeed.builder()
-				.resultsRecent(Arrays.asList())  // TODO: 실제 Post 객체로 변환
+				.resultsRecent(Arrays.asList())
 				.resultPopular(Arrays.asList())
 				.build();
-
 		} catch (Exception e) {
 			return SearchResponse.SearchFeed.builder()
 				.resultsRecent(Arrays.asList())
 				.resultPopular(Arrays.asList())
 				.build();
 		}
-
 	}
 
 }
