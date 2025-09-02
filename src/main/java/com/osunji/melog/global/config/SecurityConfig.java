@@ -19,13 +19,13 @@ import org.springframework.web.cors.CorsConfigurationSource;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final JWTUtil jwtUtil;
-    private final JwtAuthFilter jwtAuthFilter; // Bean 주입
-
-    public SecurityConfig(JWTUtil jwtUtil, JwtAuthFilter jwtAuthFilter) {
-        this.jwtUtil = jwtUtil;
-        this.jwtAuthFilter = jwtAuthFilter;
-    }
+//    private final JWTUtil jwtUtil;
+//    private final JwtAuthFilter jwtAuthFilter; // Bean 주입
+//
+//    public SecurityConfig(JWTUtil jwtUtil, JwtAuthFilter jwtAuthFilter) {
+//        this.jwtUtil = jwtUtil;
+//        this.jwtAuthFilter = jwtAuthFilter;
+//    }
 
     // 컨테이너 자동 등록 방지(중요)
     @Bean
@@ -49,7 +49,7 @@ public class SecurityConfig {
                 })
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // 프리플라이트
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(AUTH_WHITELIST).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -61,7 +61,7 @@ public class SecurityConfig {
                 );
 
         // \ UsernamePasswordAuthenticationFilter "앞"
-        http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+//        http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
