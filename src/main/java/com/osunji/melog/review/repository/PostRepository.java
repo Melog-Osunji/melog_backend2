@@ -37,7 +37,7 @@ public interface PostRepository extends JpaRepository<Post, String> {
 	/** 인기피드 - 좋아요 수 기준 내림차순 + hiddenUser 제외 */
 	@Query("SELECT p FROM Post p JOIN FETCH p.user " +
 		"WHERE :userId IS NULL OR :userId NOT MEMBER OF p.hiddenUser " +
-		"ORDER BY SIZE(p.like) DESC")
+		"ORDER BY SIZE(p.likes) DESC")
 	List<Post> findPopularPosts(@Param("userId") String userId);
 
 	/** 최신순 게시글 조회 (추천 시스템에서 사용할 기본 데이터) */
@@ -75,7 +75,7 @@ public interface PostRepository extends JpaRepository<Post, String> {
 	@Query("SELECT p FROM Post p JOIN FETCH p.user " +
 		"WHERE (p.title LIKE %:keyword% OR p.content LIKE %:keyword%) " +
 		"AND (:userId IS NULL OR :userId NOT MEMBER OF p.hiddenUser) " +
-		"ORDER BY SIZE(p.like) DESC")
+		"ORDER BY SIZE(p.likes) DESC")
 	List<Post> findByKeywordPopular(@Param("keyword") String keyword,
 		@Param("userId") String userId);
 
@@ -97,6 +97,6 @@ public interface PostRepository extends JpaRepository<Post, String> {
 	@Query("SELECT p FROM Post p JOIN FETCH p.user " +
 		"WHERE p.mediaLink IS NOT NULL " +
 		"AND (:userId IS NULL OR :userId NOT MEMBER OF p.hiddenUser) " +
-		"ORDER BY SIZE(p.like) DESC")
+		"ORDER BY SIZE(p.likes) DESC")
 	List<Post> findPopularMedia(@Param("userId") String userId);
 }

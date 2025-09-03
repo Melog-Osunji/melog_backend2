@@ -170,7 +170,7 @@ public class PostController {
 		// TODO: 관련 게시글 로직 구현 예정
 		return ResponseEntity.ok(FilterPostResponse.FeedList.builder().build());
 	}
-	/** 22. 특정 유저 - 모든 게시글 조회         GET        /api/users/{userID}/posts        */
+	/** 22. 특정 유저 - 모든 게시글 조회         GET        /api/user/{userID}/posts        */
 	@GetMapping("/users/{userId}/posts")
 	public ResponseEntity<ApiMessage<FilterPostResponse.UserPostList>> getUserPosts(
 		@PathVariable String userId,

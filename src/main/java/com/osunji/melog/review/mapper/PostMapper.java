@@ -20,7 +20,7 @@ public class PostMapper {
 	/** Create                  DTO > Entity */
 	public Post toEntity(PostRequest.Create req, User user) {
 		return new Post(
-			user,
+				user,
 			req.getTitle(),
 			req.getContent(),
 			req.getMediaType(),
@@ -58,7 +58,7 @@ public class PostMapper {
 			.mediaUrl(post.getMediaLink())
 			.tags(post.getTagList())
 			.createdAgo(calcHoursAgo(post.getCreatedAt()))
-			.likeCount(post.getLike().size())
+			.likeCount(post.getLikes().size())
 			.hiddenUser(post.getHiddenUser().stream().map(User::getId).collect(Collectors.toList()))
 			.commentCount(commentCount)
 			.bestComment(bestCommentData)
@@ -87,7 +87,7 @@ public class PostMapper {
 			.mediaUrl(post.getMediaLink())
 			.tags(post.getTagList())
 			.createdAgo(calcHoursAgo(post.getCreatedAt()))
-			.likeCount(post.getLike().size())
+			.likeCount(post.getLikes().size())
 			.hiddenUser(post.getHiddenUser().stream().map(User::getId).collect(Collectors.toList()))
 			.commentCount(commentCount)
 			.bestComment(best != null ? PostResponse.BestCommentData.builder()
@@ -121,7 +121,7 @@ public class PostMapper {
 			.mediaUrl(post.getMediaLink())
 			.tags(post.getTagList())
 			.createdAgo(calcHoursAgo(post.getCreatedAt()))
-			.likeCount(post.getLike().size())
+			.likeCount(post.getLikes().size())
 			.hiddenUser(post.getHiddenUser().stream().map(User::getId).collect(Collectors.toList()))
 			.commentCount(commentCount)
 			.bestComment(bestComment == null ? null : FilterPostResponse.BestCommentData.builder()

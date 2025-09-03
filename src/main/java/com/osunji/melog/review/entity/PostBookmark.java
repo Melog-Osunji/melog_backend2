@@ -3,6 +3,7 @@ package com.osunji.melog.review.entity;
 import java.io.Serializable;
 import java.time.LocalDate;
 
+import com.osunji.melog.user.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -16,8 +17,6 @@ import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import com.osunji.melog.user.domain.User;
 
 @Entity
 @Table(name = "postBookmark")
