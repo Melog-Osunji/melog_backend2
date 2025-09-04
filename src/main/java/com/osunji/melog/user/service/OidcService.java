@@ -1,4 +1,4 @@
-package com.osunji.melog.user;
+package com.osunji.melog.user.service;
 
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.source.JWKSource;
@@ -9,8 +9,12 @@ import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
+import com.osunji.melog.global.common.OidcProviders;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -38,21 +42,21 @@ public class OidcService {
         OidcProviders.Provider cfg = providers.get(providerKey);
         if (cfg == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown_provider");
 
-        // 1) 교환 요청
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
-        String body = "grant_type=authorization_code"
-                + "&code=" + url(code)
-                + "&client_id=" + url(cfg.clientId())
-                + "&redirect_uri=" + url(cfg.redirectUri())
-                + "&code_verifier=" + url(codeVerifier);
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "authorization_code");
+        form.add("code", code);
+        form.add("client_id", cfg.clientId());
+        form.add("redirect_uri", cfg.redirectUri());
+        form.add("code_verifier", codeVerifier);
 
-        ResponseEntity<Map> resp = restTemplate.exchange(
+        ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
                 cfg.tokenEndpoint(),
                 HttpMethod.POST,
-                new HttpEntity<>(body, headers),
-                Map.class
+                new HttpEntity<>(form, headers),
+                new ParameterizedTypeReference<Map<String, Object>>() {}
         );
 
         if (!resp.getStatusCode().is2xxSuccessful()) {
@@ -65,14 +69,7 @@ public class OidcService {
         }
 
         String idToken = (String) tokenResp.get("id_token");
-
-        // 2) id_token 검증
         JWTClaimsSet claims = verifyIdToken(idToken, cfg);
-
-        // (선택) state/nonce 확인을 하려면, 별도 저장소(예: Redis)에 저장해둔 값과 비교
-        // String nonce = claims.getStringClaim("nonce");
-        // state는 교환 직전 서버에 저장 후 /callback에서 body로 받아 확인
-
         return claims.toJSONObject();
     }
 

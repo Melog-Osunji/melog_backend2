@@ -4,7 +4,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class OidcUtil {
-    /**
+    /** Oicd Service로 분리 (본 파일은 추후 삭제 예정)
      * 페이로드 검증
      * ID 토큰의 영역 구분자인 온점(.)을 기준으로 헤더, 페이로드, 서명을 분리
      * 페이로드를 Base64 방식으로 디코딩

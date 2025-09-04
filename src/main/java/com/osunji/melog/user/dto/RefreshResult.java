@@ -1,4 +1,4 @@
-package com.osunji.melog.user;
+package com.osunji.melog.user.dto;
 
 /** 서비스 ↔ 컨트롤러 간 토큰 전달 DTO */
 public class RefreshResult {

@@ -1,6 +1,8 @@
-package com.osunji.melog.user;
+package com.osunji.melog.user.service;
 
 import com.osunji.melog.global.util.JWTUtil;
+import com.osunji.melog.user.dto.RefreshResult;
+import com.osunji.melog.user.repository.RefreshTokenRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,41 +18,51 @@ public class AuthService {
 
     private final OidcService oidcService;
     private final JWTUtil jwtUtil;
+    private final RefreshTokenRepository refreshRepo;
 
+    // 나중에 properties로 옮길 예정
     private static final long ACCESS_TTL_MS  = 1000L * 60 * 15;           // 15분
     private static final long REFRESH_TTL_MS = 1000L * 60 * 60 * 24 * 14; // 14일
 
-    public AuthService(OidcService oidcService, JWTUtil jwtUtil) {
+    public AuthService(OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo) {
         this.oidcService = oidcService;
         this.jwtUtil = jwtUtil;
+        this.refreshRepo = refreshRepo;
     }
 
-    /** 컨트롤러에서 호출: PKCE 교환 + id_token 검증 → 우리 토큰 발급 */
+    /** 컨트롤러 시그니처: provider, code, state, code_verifier */
     public RefreshResult handleOidcCallback(String provider, String code, String state, String codeVerifier) {
         if (provider == null || code == null || state == null || codeVerifier == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing_fields");
         }
 
+        // 1) OIDC 교환 + id_token 검증 → claims
         Map<String, Object> claims = oidcService.exchangeAndVerify(provider, code, state, codeVerifier);
 
+        // 2) 내부 유저 식별 (예: provider + sub)
         String sub = (String) claims.get("sub");
         if (sub == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_sub");
+        String userId = provider + ":" + sub; // TODO: 실제 유저 매핑/생성 로직 연결
 
-        // TODO: provider + sub/email로 유저 조회/생성
-        String userId = provider + ":" + sub; // DEMO
+        // 3) 우리 서비스 토큰 발급
+        String access  = jwtUtil.createAccessToken(userId, ACCESS_TTL_MS);
+        String refresh = jwtUtil.createRefreshToken(userId, REFRESH_TTL_MS);
 
-        String access  = jwtUtil.createJWT(userId, ACCESS_TTL_MS);
-        String refresh = jwtUtil.createRefreshJWT(userId, REFRESH_TTL_MS);
-        return new RefreshResult(access, refresh, REFRESH_TTL_MS / 1000);
+        // 4) Redis에 refresh 저장 (jti 기반, TTL 적용)
+        String jti = jwtUtil.getJtiFromRefresh(refresh);
+        long ttlSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(refresh));
+        refreshRepo.save(userId, jti, refresh, ttlSec);
+
+        return new RefreshResult(access, refresh, ttlSec);
     }
 
-    /** 컨트롤러에서 호출: Refresh 회전 */
+    /** 컨트롤러 시그니처: rotateTokens(String refreshCookie, HttpServletRequest req) */
     public RefreshResult rotateTokens(String refreshCookie, HttpServletRequest req) {
         if (refreshCookie == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_refresh_cookie");
         }
 
-        // CSRF 완화(필요 시 강화)
+        // (선택) CSRF 완화: Origin / Custom Header 확인
         String origin = req.getHeader("Origin");
         if (!isAllowedOrigin(origin)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "invalid_origin");
@@ -60,24 +72,53 @@ public class AuthService {
         }
 
         try {
+            // 1) 토큰 검증
             jwtUtil.validateRefresh(refreshCookie);
             String userId = jwtUtil.getUserIdFromRefresh(refreshCookie);
+            String oldJti = jwtUtil.getJtiFromRefresh(refreshCookie);
 
-            String newAccess  = jwtUtil.createJWT(userId, ACCESS_TTL_MS);
-            String newRefresh = jwtUtil.createRefreshJWT(userId, REFRESH_TTL_MS);
-            return new RefreshResult(newAccess, newRefresh, REFRESH_TTL_MS / 1000);
+            // 2) 재사용/위조 탐지: 저장소에 없거나 해시 미일치면 거부
+            if (!refreshRepo.existsAndMatch(userId, oldJti, refreshCookie)) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "refresh_reuse_or_revoked");
+            }
 
+            // 3) 새 토큰 발급
+            String newAccess  = jwtUtil.createAccessToken(userId, ACCESS_TTL_MS);
+            String newRefresh = jwtUtil.createRefreshToken(userId, REFRESH_TTL_MS);
+
+            // 4) 새 토큰 저장 → 옛 토큰 삭제(회전)
+            String newJti = jwtUtil.getJtiFromRefresh(newRefresh);
+            long newTtlSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(newRefresh));
+            refreshRepo.save(userId, newJti, newRefresh, newTtlSec);
+            refreshRepo.delete(userId, oldJti);
+
+            return new RefreshResult(newAccess, newRefresh, newTtlSec);
+
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid_refresh");
         }
     }
 
-    /** 컨트롤러에서 호출: 로그아웃 */
+    /** 컨트롤러 시그니처: logout(String refreshCookie) */
     public void logout(String refreshCookie) {
-        // TODO: jti 저장소 쓰면 여기서 revoke
+        if (refreshCookie == null) return;
+        try {
+            String userId = jwtUtil.getUserIdFromRefresh(refreshCookie);
+            String jti = jwtUtil.getJtiFromRefresh(refreshCookie);
+            refreshRepo.delete(userId, jti);
+        } catch (Exception ignored) {
+            // 이미 만료/삭제 등
+        }
     }
 
-    // ---- 내부 유틸 ----
+    // ===== 내부 유틸 =====
+    private static long ttlSecondsFromNow(long expEpochMillis) {
+        long now = System.currentTimeMillis();
+        return Math.max(0, (expEpochMillis - now) / 1000);
+    }
+
     private boolean isAllowedOrigin(String origin) {
         if (origin == null) return false;
         return List.of(

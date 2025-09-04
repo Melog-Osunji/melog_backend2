@@ -39,15 +39,19 @@ dependencies {
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testImplementation "com.h2database:h2"
+	implementation 'com.nimbusds:nimbus-jose-jwt:9.37'
+	implementation "org.springframework.boot:spring-boot-starter-data-redis"
 
 
-	// jwt 테스트용
+	// 보안 테스트용
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'io.jsonwebtoken:jjwt-api:0.12.3'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 
+	testImplementation 'org.testcontainers:junit-jupiter:1.20.1'
+	testImplementation 'org.testcontainers:testcontainers:1.20.1'
 	// YouTube API
 	implementation 'com.google.apis:google-api-services-youtube:v3-rev20220926-2.0.0'
 	implementation 'com.google.api-client:google-api-client:2.0.0'

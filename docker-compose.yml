@@ -16,6 +16,18 @@ services:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_DB=${DBNAME}
 
+  redis:
+      image: redis:7.2-alpine   # 가볍고 최신 안정판
+      container_name: melog-redis
+      restart: always
+      ports:
+        - "6379:6379"           # 로컬에서 접근할 수 있도록 개방
+      volumes:
+        - redis_data:/data      # AOF/RDB 파일 저장
+      command: [ "redis-server", "--appendonly", "yes" ]
+      # AOF(Append Only File) 모드 켜기 -> 영속성 보장
+
+
   setup:
     image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
     volumes:
@@ -153,8 +165,10 @@ volumes:
     driver: local
   kibanadata:
     driver: local
-
+  redis_data:
+    driver: local
 networks:
   default:
     name: elastic
     external: false
+
