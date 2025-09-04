@@ -4,7 +4,7 @@ import com.osunji.melog.review.dto.request.CommentRequest;
 import com.osunji.melog.review.dto.response.CommentResponse;
 import com.osunji.melog.review.entity.Post;
 import com.osunji.melog.review.entity.PostComment;
-import com.osunji.melog.user.User;
+import com.osunji.melog.user.domain.User;
 
 import org.springframework.stereotype.Component;
 

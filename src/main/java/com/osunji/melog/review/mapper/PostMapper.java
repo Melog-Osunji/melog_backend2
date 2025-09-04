@@ -5,13 +5,11 @@ import com.osunji.melog.review.dto.response.PostResponse;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
 import com.osunji.melog.review.entity.Post;
 import com.osunji.melog.review.entity.PostComment;
-import com.osunji.melog.user.User;
+import com.osunji.melog.user.domain.User;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
@@ -22,7 +20,7 @@ public class PostMapper {
 	/** Create                  DTO > Entity */
 	public Post toEntity(PostRequest.Create req, User user) {
 		return new Post(
-			user,
+				user,
 			req.getTitle(),
 			req.getContent(),
 			req.getMediaType(),
@@ -60,7 +58,7 @@ public class PostMapper {
 			.mediaUrl(post.getMediaLink())
 			.tags(post.getTagList())
 			.createdAgo(calcHoursAgo(post.getCreatedAt()))
-			.likeCount(post.getLike().size())
+			.likeCount(post.getLikes().size())
 			.hiddenUser(post.getHiddenUser().stream().map(User::getId).collect(Collectors.toList()))
 			.commentCount(commentCount)
 			.bestComment(bestCommentData)
@@ -89,7 +87,7 @@ public class PostMapper {
 			.mediaUrl(post.getMediaLink())
 			.tags(post.getTagList())
 			.createdAgo(calcHoursAgo(post.getCreatedAt()))
-			.likeCount(post.getLike().size())
+			.likeCount(post.getLikes().size())
 			.hiddenUser(post.getHiddenUser().stream().map(User::getId).collect(Collectors.toList()))
 			.commentCount(commentCount)
 			.bestComment(best != null ? PostResponse.BestCommentData.builder()
@@ -123,7 +121,7 @@ public class PostMapper {
 			.mediaUrl(post.getMediaLink())
 			.tags(post.getTagList())
 			.createdAgo(calcHoursAgo(post.getCreatedAt()))
-			.likeCount(post.getLike().size())
+			.likeCount(post.getLikes().size())
 			.hiddenUser(post.getHiddenUser().stream().map(User::getId).collect(Collectors.toList()))
 			.commentCount(commentCount)
 			.bestComment(bestComment == null ? null : FilterPostResponse.BestCommentData.builder()

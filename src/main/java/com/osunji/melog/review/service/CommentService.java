@@ -5,7 +5,6 @@ import com.osunji.melog.global.common.AuthHelper;
 import com.osunji.melog.global.dto.ApiMessage;
 
 // entity
-import com.osunji.melog.global.security.JWTUtil;
 import com.osunji.melog.review.entity.Post;
 import com.osunji.melog.review.entity.PostComment;
 
@@ -21,7 +20,7 @@ import com.osunji.melog.review.dto.request.CommentRequest;
 import com.osunji.melog.review.dto.response.CommentResponse;
 
 //user
-import com.osunji.melog.user.User;
+import com.osunji.melog.user.domain.User;
 import com.osunji.melog.user.UserRepository;
 
 import lombok.RequiredArgsConstructor;

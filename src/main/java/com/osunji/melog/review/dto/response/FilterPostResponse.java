@@ -19,7 +19,7 @@ public class FilterPostResponse {
 	@Getter
 	@Setter
 	@Builder
-	//---------------특정 유저의 모든 게시글 (GET /api/users/{userID}/posts)-----------------//
+	//---------------특정 유저의 모든 게시글 (GET /api/user/{userID}/posts)-----------------//
 	public static class UserPostList {
 		private List<UserPostData> results;
 	}

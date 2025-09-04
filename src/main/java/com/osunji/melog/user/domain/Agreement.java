@@ -1,4 +1,4 @@
-package com.osunji.melog.user;
+package com.osunji.melog.user.domain;
 
 import java.time.LocalDate;
 

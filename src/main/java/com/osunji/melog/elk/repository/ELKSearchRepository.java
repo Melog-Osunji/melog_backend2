@@ -250,10 +250,10 @@ public class ELKSearchRepository {
 	 */
 	public List<String> searchUsers(String query) {
 		try {
-			ensureIndexExists("users");
+			ensureIndexExists("user");
 
 			SearchRequest searchRequest = SearchRequest.of(s -> s
-				.index("users")
+				.index("user")
 				.query(q -> q
 					.multiMatch(m -> m
 						.query(query)

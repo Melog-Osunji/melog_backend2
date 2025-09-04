@@ -1,8 +1,7 @@
 package com.osunji.melog.search.dto.response;
-import com.osunji.melog.review.dto.response.PostResponse;
 import com.osunji.melog.review.entity.Post;
-import com.osunji.melog.user.User;
 
+import com.osunji.melog.user.domain.User;
 import lombok.Builder;
 import lombok.Data;
 import java.util.List;

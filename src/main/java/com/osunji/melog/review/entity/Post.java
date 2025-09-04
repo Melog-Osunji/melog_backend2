@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import com.osunji.melog.user.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -23,7 +24,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import com.osunji.melog.user.User;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
@@ -87,11 +87,11 @@ public class Post {
      */
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-        name = "like",
+        name = "likes",
         joinColumns = @JoinColumn(name = "postId"),
         inverseJoinColumns = @JoinColumn(name = "userId")
     )
-    private List<User> like= new ArrayList<>();
+    private List<User> likes = new ArrayList<>();
     /*** 이 게시물을 숨김 처리한 사용자 목록
      */
     @ManyToMany(fetch = FetchType.LAZY)
@@ -112,7 +112,7 @@ public class Post {
         this.mediaLink = mediaLink;
         this.tags = tagList != null && !tagList.isEmpty() ? String.join(",", tagList) : ""; // ✅ List를 문자열로 변환
         this.createdAt = LocalDate.now();
-        this.like = new ArrayList<>();
+        this.likes = new ArrayList<>();
         this.hiddenUser = new ArrayList<>();
     }
 
