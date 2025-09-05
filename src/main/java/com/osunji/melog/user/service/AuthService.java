@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 
 
-
 @Service
 public class AuthService {
 
@@ -23,6 +22,9 @@ public class AuthService {
     // 나중에 properties로 옮길 예정
     private static final long ACCESS_TTL_MS  = 1000L * 60 * 15;           // 15분
     private static final long REFRESH_TTL_MS = 1000L * 60 * 60 * 24 * 14; // 14일
+
+    // 남은 TTL이 이 값 이하일 때만 refresh 교체 3일
+    private static final long REFRESH_ROTATE_BELOW_SEC = 60L * 60 * 24 * 3;
 
     public AuthService(OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo) {
         this.oidcService = oidcService;
@@ -36,19 +38,15 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing_fields");
         }
 
-        // 1) OIDC 교환 + id_token 검증 → claims
         Map<String, Object> claims = oidcService.exchangeAndVerify(provider, code, state, codeVerifier);
 
-        // 2) 내부 유저 식별 (예: provider + sub)
         String sub = (String) claims.get("sub");
         if (sub == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_sub");
         String userId = provider + ":" + sub; // TODO: 실제 유저 매핑/생성 로직 연결
 
-        // 3) 우리 서비스 토큰 발급
         String access  = jwtUtil.createAccessToken(userId, ACCESS_TTL_MS);
         String refresh = jwtUtil.createRefreshToken(userId, REFRESH_TTL_MS);
 
-        // 4) Redis에 refresh 저장 (jti 기반, TTL 적용)
         String jti = jwtUtil.getJtiFromRefresh(refresh);
         long ttlSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(refresh));
         refreshRepo.save(userId, jti, refresh, ttlSec);
@@ -77,18 +75,29 @@ public class AuthService {
             String userId = jwtUtil.getUserIdFromRefresh(refreshCookie);
             String oldJti = jwtUtil.getJtiFromRefresh(refreshCookie);
 
-            // 2) 재사용/위조 탐지: 저장소에 없거나 해시 미일치면 거부
+            // 2) 재사용/위조 탐지
             if (!refreshRepo.existsAndMatch(userId, oldJti, refreshCookie)) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "refresh_reuse_or_revoked");
             }
 
-            // 3) 새 토큰 발급
+            // 3) 남은 TTL 계산
+            long remainingSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(refreshCookie));
+
+            // 4) 액세스만 재발급 (리프레시 충분히 남음)
+            if (remainingSec > REFRESH_ROTATE_BELOW_SEC) {
+                String newAccess = jwtUtil.createAccessToken(userId, ACCESS_TTL_MS);
+                // 저장소 변경 없음, 기존 refresh 그대로 사용
+                return new RefreshResult(newAccess, refreshCookie, remainingSec);
+            }
+
+            // 5) 리프레시 교체 (만료 임박)
             String newAccess  = jwtUtil.createAccessToken(userId, ACCESS_TTL_MS);
             String newRefresh = jwtUtil.createRefreshToken(userId, REFRESH_TTL_MS);
 
-            // 4) 새 토큰 저장 → 옛 토큰 삭제(회전)
             String newJti = jwtUtil.getJtiFromRefresh(newRefresh);
             long newTtlSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(newRefresh));
+
+            // 저장은 새 키를 먼저, 그 다음 기존 키 삭제(짧은 경합 윈도우 최소화)
             refreshRepo.save(userId, newJti, newRefresh, newTtlSec);
             refreshRepo.delete(userId, oldJti);
 
@@ -101,7 +110,6 @@ public class AuthService {
         }
     }
 
-    /** 컨트롤러 시그니처: logout(String refreshCookie) */
     public void logout(String refreshCookie) {
         if (refreshCookie == null) return;
         try {
@@ -129,3 +137,4 @@ public class AuthService {
         ).contains(origin);
     }
 }
+
