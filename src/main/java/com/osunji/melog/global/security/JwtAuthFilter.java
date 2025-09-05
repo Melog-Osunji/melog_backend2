@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -28,16 +29,23 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         final String uri = request.getRequestURI();
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true; // preflight
 
-        // 공개 엔드포인트만 정확 매칭 (SecurityConfig.AUTH_WHITELIST와 동기화)
-        return uri.equals("/auth/oidc/start")
-                || uri.equals("/auth/oidc/callback")
-                || uri.equals("/auth/refresh")
-                || uri.equals("/auth/logout")
-                || uri.equals("/health")
-                || uri.startsWith("/docs/")
-                || uri.startsWith("/v3/api-docs/")
-                || uri.startsWith("**")
-                || uri.startsWith("/swagger-ui/");
+        var m = new org.springframework.util.AntPathMatcher();
+        String[] skip = {
+                "/auth/oidc/start",
+                "/auth/oidc/callback",
+                "/auth/refresh",
+                "/auth/logout",
+                "/health",
+                "/api/dev/**",      // 개발용 (있다면)
+                "/docs/**",
+                "/v3/api-docs/**",
+                "/swagger-ui/**",
+                "/swagger-ui.html"
+        };
+        for (String p : skip) {
+            if (m.match(p, uri)) return true;
+        }
+        return false;
     }
 
     @Override
@@ -76,4 +84,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             res.getWriter().write("{\"error\":\"unauthorized\",\"message\":\"Invalid or expired token\"}");
         }
     }
+
+
 }

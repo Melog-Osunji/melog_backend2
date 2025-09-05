@@ -45,11 +45,11 @@ public class SecurityConfig {
             "/auth/refresh",
             "/auth/logout",
             "/health",
-            "**"
-//            "/docs/**",
-//            "/v3/api-docs/**",
-//            "/swagger-ui/**",
-//            "/swagger-ui.html"
+            "/api/dev/**",      // 개발용 (있다면)
+            "/docs/**",
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html"
     };
 
     @Bean
@@ -61,7 +61,7 @@ public class SecurityConfig {
                 .httpBasic(b -> b.disable())
                 .cors(c -> c.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // preflight
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(AUTH_WHITELIST).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -73,11 +73,10 @@ public class SecurityConfig {
                         .accessDeniedHandler((req, res, e) -> res.setStatus(HttpServletResponse.SC_FORBIDDEN))
                 );
 
-        // JWT 필터를 UsernamePasswordAuthenticationFilter "앞"에 추가
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
+
 
     /**
      * 네이티브 앱이 쿠키(리프레시)를 사용하므로 credentials 허용 + 정확한 오리진만 화이트리스트.
