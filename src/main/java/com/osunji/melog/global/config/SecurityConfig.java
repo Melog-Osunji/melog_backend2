@@ -45,7 +45,7 @@ public class SecurityConfig {
             "/auth/refresh",
             "/auth/logout",
             "/health",
-            "/api/dev/**",      // 개발용 (있다면)
+            "/api/dev/**",
             "/docs/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
