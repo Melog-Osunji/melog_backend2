@@ -1,8 +1,11 @@
 package com.osunji.melog.user.service;
 
 import com.osunji.melog.global.util.JWTUtil;
+import com.osunji.melog.user.domain.User;
+import com.osunji.melog.user.domain.enums.Platform;
 import com.osunji.melog.user.dto.RefreshResult;
 import com.osunji.melog.user.repository.RefreshTokenRepository;
+import com.osunji.melog.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,6 +21,7 @@ public class AuthService {
     private final OidcService oidcService;
     private final JWTUtil jwtUtil;
     private final RefreshTokenRepository refreshRepo;
+    private final UserRepository userRepository;
 
     // 나중에 properties로 옮길 예정
     private static final long ACCESS_TTL_MS  = 1000L * 60 * 15;           // 15분
@@ -26,10 +30,11 @@ public class AuthService {
     // 남은 TTL이 이 값 이하일 때만 refresh 교체 3일
     private static final long REFRESH_ROTATE_BELOW_SEC = 60L * 60 * 24 * 3;
 
-    public AuthService(OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo) {
+    public AuthService(OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo, UserRepository userRepository) {
         this.oidcService = oidcService;
         this.jwtUtil = jwtUtil;
         this.refreshRepo = refreshRepo;
+        this.userRepository = userRepository;
     }
 
     /** 컨트롤러 시그니처: provider, code, state, code_verifier */
@@ -42,8 +47,21 @@ public class AuthService {
 
         String sub = (String) claims.get("sub");
         if (sub == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_sub");
-        String userId = provider + ":" + sub; // TODO: 실제 유저 매핑/생성 로직 연결
+        String email = (String) claims.get("email");
+        String nickname = (String) claims.get("name");
+        String picture = (String) claims.get("picture");
 
+        // 1. DB 조회
+        User user = userRepository.findByOidcAndPlatform(sub, Platform.valueOf(provider.toUpperCase()))
+                .orElseGet(() -> {
+                    // 2. 없으면 새 유저 생성
+                    User newUser = new User(email, Platform.valueOf(provider.toUpperCase()), nickname, picture, null);
+                    newUser.setOidc(sub);
+                    return userRepository.save(newUser);
+                });
+
+        // 토큰 생성
+        String userId = user.getId();
         String access  = jwtUtil.createAccessToken(userId, ACCESS_TTL_MS);
         String refresh = jwtUtil.createRefreshToken(userId, REFRESH_TTL_MS);
 
