@@ -2,16 +2,12 @@ package com.osunji.melog.feed;
 
 
 
-import java.time.*;
-import java.util.*;
-import java.util.stream.Collectors;
-
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.query_dsl.*;
-import co.elastic.clients.elasticsearch.core.search.ScoreMode;
 import co.elastic.clients.json.JsonData;
+import org.springframework.beans.factory.annotation.Value;     // ✅ 스프링 @Value 로 교체
+
 import lombok.AllArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.stereotype.Service;
@@ -35,21 +31,30 @@ import co.elastic.clients.elasticsearch._types.query_dsl.TermsQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.FieldValueFactorModifier;
 import org.springframework.data.elasticsearch.core.SearchHit;
 
-
 @Service
-@RequiredArgsConstructor
 public class FeedService {
-
     private static final String POSTS_INDEX = "posts";
-
-    // 부스트 가중치(초기값) — 필요시 환경변수/설정으로 뺄 수 있음
-    private static final double BOOST_TAG       = 2.0;
-    private static final double BOOST_FOLLOWEE  = 3.0;
-    private static final String FRESH_SCALE     = "7d"; // 최신성 감쇠 스케일
 
     private final ElasticsearchOperations esOps;
     private final UserSignalService signalService;
+    private final Double tag;
+    private final Double followee;
+    private final Double scale;
+    public FeedService(
+            ElasticsearchOperations esOps,
+            UserSignalService signalService,
+            @Value("${recommend.boost.tag}") Double tag,
+            @Value("${recommend.boost.tag}") Double followee,
+            @Value("${recommend.fresh.scale}") Double scale
 
+
+    ) {
+        this.esOps = esOps;
+        this.signalService = signalService;
+        this.tag = tag;
+        this.followee = followee;
+        this.scale = scale;
+    }
     public List<FeedItem> recommend(String userId, int size, List<String> seenIds) {
         var sig       = signalService.build(userId);
         var tags      = sig.getTopTags();
@@ -68,21 +73,21 @@ public class FeedService {
             Query tagsFilter = TermsQuery.of(t -> t.field("tags")
                     .terms(v -> v.value(tags.stream().map(FieldValue::of).toList()))
             )._toQuery();
-            functions.add(FunctionScore.of(fs -> fs.filter(tagsFilter).weight(BOOST_TAG)));
+            functions.add(FunctionScore.of(fs -> fs.filter(tagsFilter).weight(tag)));
         }
 
         if (followees != null && !followees.isEmpty()) {
             Query followeesFilter = TermsQuery.of(t -> t.field("userId")
                     .terms(v -> v.value(followees.stream().map(FieldValue::of).toList()))
             )._toQuery();
-            functions.add(FunctionScore.of(fs -> fs.filter(followeesFilter).weight(BOOST_FOLLOWEE)));
+            functions.add(FunctionScore.of(fs -> fs.filter(followeesFilter).weight(followee)));
         }
 
         functions.add(FunctionScore.of(fs -> fs.gauss(g -> g
                 .field("createdAt")
                 .placement(DecayPlacement.of(dp -> dp
                         .origin(JsonData.of("now"))   // 문자열은 JsonData로
-                        .scale(JsonData.of(FRESH_SCALE)) // 예: "7d"
+                        .scale(JsonData.of(scale)) // 예: "7d"
                         .decay(0.5)
                 ))
         )));
