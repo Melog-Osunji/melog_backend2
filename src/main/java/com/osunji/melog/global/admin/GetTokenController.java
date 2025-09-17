@@ -24,7 +24,7 @@ public class GetTokenController {
     private final RefreshTokenRepository refreshRepo;
     private final AuthService authService;
 
-    @Value("${dev.token.access-ttl-ms:900000}")     // 15분
+    @Value("${dev.token.access-ttl-ms:3600000}")     // 15분
     private long accessTtlMs;
 
     @Value("${dev.token.refresh-ttl-ms:86400000}")  // 1일 (dev)

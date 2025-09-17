@@ -1,5 +1,7 @@
 package com.osunji.melog.user.domain;
 
+import java.util.UUID;
+
 import com.osunji.melog.user.domain.enums.Platform;
 import jakarta.persistence.*;
 
@@ -23,9 +25,9 @@ public class User {
      * 사용자 ID (고유 UUID)
      */
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column
-    private String id;
+    @GeneratedValue(strategy = GenerationType.UUID)  // UUID 자동 생성
+    @Column(columnDefinition = "uuid")
+    private UUID id;
     /*
      * 가입 이메일
      */
@@ -52,7 +54,6 @@ public class User {
     /**
      * 한 줄 소개
      */
-    @Lob
     private String intro;
 
     @Column

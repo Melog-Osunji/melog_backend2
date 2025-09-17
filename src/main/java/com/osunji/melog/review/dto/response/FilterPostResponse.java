@@ -11,7 +11,7 @@ public class FilterPostResponse {
 	@Getter
 	@Setter
 	@Builder
-	//---------------추천/팔로우/인기 피드 (GET /api/posts/recommends, /populars, /follows)-----------------//
+	//---------------추천/팔로우/인기 피드 (API 18,19,20번)-----------------//
 	public static class FeedList {
 		private List<FeedPostData> results;
 	}
@@ -19,20 +19,10 @@ public class FilterPostResponse {
 	@Getter
 	@Setter
 	@Builder
-	//---------------특정 유저의 모든 게시글 (GET /api/user/{userID}/posts)-----------------//
+	//---------------특정 유저의 모든 게시글 (API 22번)-----------------//
 	public static class UserPostList {
 		private List<UserPostData> results;
 	}
-
-	@Getter
-	@Setter
-	@Builder
-	//---------------특정 유저의 북마크 게시글 (GET /api/posts/{userID}/bookmarks)-----------------//
-	public static class BookmarkList {
-		private List<BookmarkData> results;
-	}
-
-
 
 	@Getter
 	@Setter
@@ -52,10 +42,10 @@ public class FilterPostResponse {
 		private String mediaType;               // 미디어타입
 		private String mediaUrl;                // 미디어url
 		private List<String> tags;              // ["베토벤", "감상", "피아노"]
-		private int createdAgo;                 // 몇시간전작성인지 Integer
-		private int likeCount;                  // 좋아요개수
-		private List<String> hiddenUser;        // ["숨김처리","유저","목록"]
-		private int commentCount;               // 댓글개수
+		private Integer createdAgo;             // ✅ Integer 타입으로 통일
+		private Integer likeCount;              // ✅ Integer 타입으로 통일
+		private List<String> hiddenUser;       // ["숨김처리","유저","목록"]
+		private Integer commentCount;           // ✅ Integer 타입으로 통일
 		private BestCommentData bestComment;    // 베댓정보
 	}
 
@@ -72,10 +62,9 @@ public class FilterPostResponse {
 	@Setter
 	@Builder
 	public static class BestCommentData {
-		private String nickName;                  // 베댓작성자닉네임
+		private String userId;                  // ✅ 베댓작성자아이디
 		private String content;                 // 베댓내용
 		private String profileImg;              // 프로필사진url
-
 	}
 
 	@Getter
@@ -85,7 +74,7 @@ public class FilterPostResponse {
 		private String id;                      // 게시글고유아이디
 		private String title;                   // 제목
 		private String content;                 // 내용
-		private String mediaType;               // 미디어타입 (audio 등)
+		private String mediaType;               // 미디어타입
 		private String mediaUrl;                // 미디어url
 		private List<String> tags;              // ["베토벤", "감상", "피아노"]
 	}

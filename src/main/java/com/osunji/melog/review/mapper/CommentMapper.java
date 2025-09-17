@@ -1,11 +1,7 @@
 package com.osunji.melog.review.mapper;
 
-import com.osunji.melog.review.dto.request.CommentRequest;
 import com.osunji.melog.review.dto.response.CommentResponse;
-import com.osunji.melog.review.entity.Post;
 import com.osunji.melog.review.entity.PostComment;
-import com.osunji.melog.user.domain.User;
-
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -14,49 +10,30 @@ import java.util.stream.Collectors;
 @Component
 public class CommentMapper {
 
-	/**
-	 * create DTO + User + Post + (부모 댓글) → PostComment entity
-	 */
-	public PostComment toEntity(CommentRequest.Create req, User user, Post post, PostComment parentComment) {
-		if (parentComment == null) {
-			return PostComment.createComment(user, post, req.getContent());
-		} else {
-			return PostComment.createReply(user, post, req.getContent(), parentComment);
-		}
-	}
-
-	/**
-	 * bestComment entity → Best DTO
-	 */
+	/** 베스트 댓글 변환 (API 17번) */
 	public CommentResponse.Best toBestComment(PostComment bestComment) {
-		if (bestComment == null) {
-			return null;
-		}
+		if (bestComment == null) return null;
 
 		return CommentResponse.Best.builder()
-			.nickname(bestComment.getUser().getNickname())
-			.profileUrl(bestComment.getUser().getProfileImageUrl())
+			.userID(bestComment.getUser().getId().toString())     // ✅ API 명세: "userID"
+			.profileUrl(bestComment.getUser().getProfileImageUrl()) // ✅ API 명세: "profileUrl"
 			.content(bestComment.getContent())
-			.likes(bestComment.getLikedUsers().size())
+			.likes(bestComment.getLikeCount())                    // ✅ Entity 메서드 사용
 			.build();
 	}
 
-	/**
-	 * CommentData entity → CommentData DTO 변환
-	 */
+	/** 댓글 데이터 변환 (API 16번) */
 	public CommentResponse.CommentData toCommentData(PostComment comment) {
 		return CommentResponse.CommentData.builder()
-			.nickname(comment.getUser().getNickname())
-			.profileUrl(comment.getUser().getProfileImageUrl())
+			.userID(comment.getUser().getId().toString())         // ✅ API 명세: "userID"
+			.profileUrl(comment.getUser().getProfileImageUrl())  // ✅ API 명세: "profileUrl"
 			.content(comment.getContent())
-			.likes(comment.getLikedUsers().size())
-			.recomments(toRecommentList(comment.getChildComments()))
+			.likes(comment.getLikeCount())                        // ✅ Entity 메서드 사용
+			.recomments(toRecommentList(comment.getChildComments())) // ✅ 대댓글 재귀 처리
 			.build();
 	}
 
-	/**
-	 * ReCommentData entity → RecommentData dto
-	 */
+	/** 대댓글 리스트 변환 */
 	private List<CommentResponse.RecommentData> toRecommentList(List<PostComment> childComments) {
 		if (childComments == null || childComments.isEmpty()) {
 			return List.of();
@@ -66,15 +43,13 @@ public class CommentMapper {
 			.collect(Collectors.toList());
 	}
 
-	/**
-	 * RecommentData entity → RecommentData DTO
-	 */
+	/** 대댓글 데이터 변환 (재귀 구조) */
 	private CommentResponse.RecommentData toRecommentData(PostComment comment) {
 		return CommentResponse.RecommentData.builder()
-			.nickname(comment.getUser().getNickname())
+			.userID(comment.getUser().getId().toString())         // ✅ API 명세: "userID"
 			.content(comment.getContent())
-			.likes(comment.getLikedUsers().size())
-			.recomments(toRecommentList(comment.getChildComments()))
+			.likes(comment.getLikeCount())                        // ✅ Entity 메서드 사용
+			.recomments(toRecommentList(comment.getChildComments())) // ✅ 재귀 처리
 			.build();
 	}
 }
