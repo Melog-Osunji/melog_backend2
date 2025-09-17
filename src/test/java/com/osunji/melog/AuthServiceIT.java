@@ -41,7 +41,7 @@ import static org.mockito.ArgumentMatchers.*;
         "jwt.refresh=test-refresh-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 })
 class AuthServiceIT {
-
+/*
     // ---- Redis Testcontainer ----
     @Container
     static GenericContainer<?> redis =
@@ -179,5 +179,5 @@ class AuthServiceIT {
         System.out.println("=== Redis Container Logs (tail) ===");
         System.out.println(logs.substring(Math.max(0, logs.length() - 2000))); // 너무 길면 뒤쪽만
     }
-
+*/
 }

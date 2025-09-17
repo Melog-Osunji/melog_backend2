@@ -79,8 +79,11 @@ class GetTokenControllerBlackBoxTest {
         assertThat(ap.get("iss")).isEqualTo("melog-api");
         // aud는 단일/배열일 수 있음 → 양쪽 다 허용
         Object aud = ap.get("aud");
-        if (aud instanceof List<?> list) assertThat(list).contains("melog-client");
-        else if (aud instanceof String s) assertThat(s).isEqualTo("melog-client");
+        if (aud instanceof java.util.List<?> list) {
+            assertThat(list).anySatisfy(e -> assertThat(String.valueOf(e)).isEqualTo("melog-client"));
+        } else {
+            assertThat(String.valueOf(aud)).isEqualTo("melog-client");
+        }
 
         assertThat(ap.get("userId")).isEqualTo("alice");
         assertThat(ap.get("jti")).isNotNull();

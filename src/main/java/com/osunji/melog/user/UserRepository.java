@@ -17,6 +17,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {  // UUID →
 
     Optional<User> findByEmail(String email);
     Optional<User> findByOidc(String oidc);
+
     // ✅ UUID 변환 문제 해결을 위한 명시적 쿼리
     @Query("SELECT u FROM User u WHERE u.id = :userId")
     Optional<User> findByUUID(@Param("userId") UUID userId);
@@ -30,4 +31,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {  // UUID →
     Optional<User> findByIdWithCast(@Param("userId") String userId);
     // ID 리스트로 여러 유저 조회 (검색 기능용)
     List<User> findAllByIdIn(List<UUID> ids);
+
+    Optional<User> findByOidcAndPlatform(String oidc, Platform platform);
+
 }
