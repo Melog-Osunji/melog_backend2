@@ -1,5 +1,5 @@
 package com.osunji.melog.elk.repository;
-
+import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.IndexRequest;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
@@ -12,8 +12,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Repository
@@ -46,12 +48,32 @@ public class ELKSearchRepository {
 			log.error("검색 로그 기록 실패: {}", e.getMessage());
 		}
 	}
+	/**
+	 * 인기 검색어 조회 (최근 7일, 최대 20개)
+	 */
+	public boolean testConnection() {
+		try {
+			System.out.println("🔍 ELK 연결 테스트 시작");
+
+			var response = elasticsearchClient.info();
+			System.out.println("✅ ELK 연결 성공: " + response.clusterName());
+			System.out.println("  - 클러스터: " + response.clusterName());
+			System.out.println("  - 버전: " + response.version().number());
+
+			return true;
+		} catch (Exception e) {
+			System.out.println("❌ ELK 연결 실패: " + e.getMessage());
+			e.printStackTrace();
+			return false;
+		}
+	}
 
 	/**
-	 * 인기 검색어 조회 (최근 3일)
+	 * 인기 검색어 조회 - 20개 빈도 내림차순
 	 */
 	public List<String> getPopularSearchTerms() {
 		try {
+			System.out.println("📊 ELK 인기 검색어 집계 시작 (20개 빈도순)");
 			ensureIndexExists("search_logs");
 
 			SearchRequest searchRequest = SearchRequest.of(s -> s
@@ -63,6 +85,7 @@ public class ELKSearchRepository {
 									.gte("now-3d")
 							)
 					))
+
 				.aggregations("popular_terms", a -> a
 					.terms(t -> t
 						.field("query")
@@ -79,18 +102,28 @@ public class ELKSearchRepository {
 				.buckets()
 				.array()
 				.stream()
-				.map(bucket -> bucket.key().stringValue())
-				.collect(Collectors.toList());
+				.map(bucket -> {
+					String term = bucket.key().stringValue();
+					long count = bucket.docCount();
+					System.out.println("    🔥 " + count + "회: '" + term + "'");
+					return term;
+				})
+				.collect(Collectors.toList());  // ✅ 필터링 제거, 모든 검색어 포함
 
-			log.info("인기 검색어 {}개 조회 완료", results.size());
+			System.out.println("✅ ELK 인기 검색어 " + results.size() + "개 (빈도순)");
+
+			// ✅ 20개 미만이면 그냥 반환, 20개 이상이면 20개만
 			return results;
 
 		} catch (Exception e) {
-			log.error("인기 검색어 조회 실패: {}", e.getMessage());
-			// 실패 시 기본값 반환
+			log.error("인기 검색어 조회 실패: {}", e.getMessage(), e);
+
+			// ✅ 실패 시에도 20개 기본값
 			return Arrays.asList(
 				"피아노", "교향곡", "협주곡", "소나타", "바이올린",
-				"첼로", "오페라", "클래식", "바로크", "낭만주의"
+				"첼로", "오페라", "클래식", "바로크", "낭만주의",
+				"베토벤", "모차르트", "쇼팽", "바흐", "브람스",
+				"리스트", "드뷔시", "라벨", "바그너", "브루크너"
 			);
 		}
 	}
@@ -215,35 +248,56 @@ public class ELKSearchRepository {
 	/**
 	 * 게시글 검색 (제목, 내용, 태그)
 	 */
-	public List<String> searchPosts(String query) {
-		try {
-			ensureIndexExists("posts");
+	public List<String> searchPosts(String q) {
+		if (q == null || q.isBlank()) return List.of();
 
-			SearchRequest searchRequest = SearchRequest.of(s -> s
+		List<String> out = new ArrayList<>();
+		try {
+			var shoulds = new ArrayList<Query>();
+
+			// 기본 multi_match
+			shoulds.add(Query.of(qb -> qb
+				.multiMatch(m -> m
+					.query(q)
+					.fields("title^3", "content", "tags")
+				)
+			));
+
+			// 짧은 쿼리일수록 wildcard 보강
+			if (q.length() <= 2) {
+				shoulds.add(Query.of(qb -> qb.wildcard(w -> w.field("title").value("*" + q + "*"))));
+				shoulds.add(Query.of(qb -> qb.wildcard(w -> w.field("content").value("*" + q + "*"))));
+				shoulds.add(Query.of(qb -> qb.wildcard(w -> w.field("tags").value("*" + q + "*"))));
+			} else {
+				shoulds.add(Query.of(qb -> qb.wildcard(w -> w.field("title").value("*" + q + "*"))));
+			}
+
+			var req = SearchRequest.of(s -> s
 				.index("posts")
-				.query(q -> q
-					.multiMatch(m -> m
-						.query(query)
-						.fields("title^2", "content", "tags^1.5")
-					)
-				)
-				.sort(sort -> sort
-					.field(f -> f.field("likeCount").order(co.elastic.clients.elasticsearch._types.SortOrder.Desc))
-				)
-				.size(20)
+				.size(200)
+				.query(qb -> qb.bool(b -> b
+					.should(shoulds)
+					.minimumShouldMatch("1")
+				))
+				.source(src -> src.filter(f -> f.includes("id")))
 			);
 
-			SearchResponse<Void> response = elasticsearchClient.search(searchRequest, Void.class);
+			var resp = elasticsearchClient.search(req, Map.class);
 
-			return response.hits().hits().stream()
-				.map(hit -> hit.id())
-				.collect(Collectors.toList());
+			resp.hits().hits().forEach(h -> {
+				Map<String, Object> src = h.source();
+				if (src != null && src.get("id") != null) {
+					out.add(String.valueOf(src.get("id")));
+				}
+			});
 
+			return out;
 		} catch (Exception e) {
-			log.error("게시글 검색 실패: {}", e.getMessage());
-			return Arrays.asList();
+			return List.of();
 		}
 	}
+
+
 
 	/**
 	 * 사용자 검색 (닉네임, 자기소개)

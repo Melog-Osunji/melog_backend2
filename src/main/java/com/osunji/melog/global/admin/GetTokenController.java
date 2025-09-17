@@ -28,6 +28,7 @@ public class GetTokenController {
     private final RefreshTokenRepository refreshRepo;
     private final AuthService authService;
 
+
     private final long accessTtlMs;
     private final long refreshTtlMs;
     private final long refreshRoateBelow;
@@ -43,6 +44,7 @@ public class GetTokenController {
         this.accessTtlMs = accessTtlMs;
         this.refreshTtlMs = refreshTtlMs;
         this.refreshRoateBelow = refreshRoateBelow;
+
         this.jwtUtil = jwtUtil;
         this.refreshRepo = refreshRepo;
         this.authService = authService;

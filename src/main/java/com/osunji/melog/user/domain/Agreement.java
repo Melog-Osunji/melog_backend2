@@ -52,7 +52,7 @@ public class Agreement {
      */
     public Agreement(User user, Boolean marketing, LocalDate createdAt) {
         this.user = user;
-        this.userId = user.getId();
+        this.userId = String.valueOf(user.getId());
         this.marketing = marketing;
         this.createdAt = createdAt;
     }

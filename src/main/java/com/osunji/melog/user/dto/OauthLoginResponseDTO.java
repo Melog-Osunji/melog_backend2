@@ -8,12 +8,12 @@ public record OauthLoginResponseDTO(
         UserInfo user
 ) {
     public record UserInfo(
-            String id,
-            String email,
-            com.osunji.melog.user.domain.enums.Platform platform,
-            String nickName,
-            String profileImg,
-            String intro
+        java.util.UUID id,
+        String email,
+        com.osunji.melog.user.domain.enums.Platform platform,
+        String nickName,
+        String profileImg,
+        String intro
     ) {}
 
     public static OauthLoginResponseDTO of(String accessToken, boolean isNewUser, User entity) {

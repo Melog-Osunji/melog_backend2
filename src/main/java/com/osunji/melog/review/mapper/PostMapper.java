@@ -1,6 +1,5 @@
 package com.osunji.melog.review.mapper;
 
-import com.osunji.melog.review.dto.request.PostRequest;
 import com.osunji.melog.review.dto.response.PostResponse;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
 import com.osunji.melog.review.entity.Post;
@@ -8,158 +7,182 @@ import com.osunji.melog.review.entity.PostComment;
 import com.osunji.melog.user.domain.User;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;  // ✅ LocalDate → LocalDateTime
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
 public class PostMapper {
 
-
-	/** ==========PostRequet의 내용========== */
-	/** Create                  DTO > Entity */
-	public Post toEntity(PostRequest.Create req, User user) {
-		return new Post(
-				user,
-			req.getTitle(),
-			req.getContent(),
-			req.getMediaType(),
-			req.getMediaUrl(),
-			req.getTags()
-		);
-	}
-
-	/** Update                DTO > entitu 부분 값만 */
-	public void applyUpdate(Post post, PostRequest.Update req) {
-		if(req.getTitle()     != null) post.setTitle(req.getTitle());
-		if(req.getContent()   != null) post.setContent(req.getContent());
-		if(req.getMediaType() != null) post.setMediaType(req.getMediaType());
-		if(req.getMediaUrl()  != null) post.setMediaLink(req.getMediaUrl());
-		if(req.getTags()      != null) post.setTagList(req.getTags());
-	}
-
-
-	/** ==========PostResponse의 내용========== */
-	private PostResponse.Single convertToSingleResponse(Post post, PostComment bestComment, int commentCount) {
-		PostResponse.BestCommentData bestCommentData = null;
-		if (bestComment != null) {
-			bestCommentData = PostResponse.BestCommentData.builder()
-				.nickName(bestComment.getUser().getNickname())
-				.content(bestComment.getContent())
-				.profileImg(bestComment.getUser().getProfileImageUrl())
-				.build();
-		}
-
-		PostResponse.PostData postData = PostResponse.PostData.builder()
-			.id(post.getId())
-			.title(post.getTitle())
-			.content(post.getContent())
-			.mediaType(post.getMediaType())
-			.mediaUrl(post.getMediaLink())
-			.tags(post.getTagList())
-			.createdAgo(calcHoursAgo(post.getCreatedAt()))
-			.likeCount(post.getLikes().size())
-			.hiddenUser(post.getHiddenUser().stream().map(User::getId).collect(Collectors.toList()))
-			.commentCount(commentCount)
-			.bestComment(bestCommentData)
-			.build();
-
-		PostResponse.UserData userData = PostResponse.UserData.builder()
-			.id(post.getUser().getId())
-			.nickName(post.getUser().getNickname())
-			.profileImg(post.getUser().getProfileImageUrl())
-			.build();
-
-		return PostResponse.Single.builder()
-			.post(postData)
-			.user(userData)
-			.build();
-	}
-
-
-	// 공통 PostData 변환 (Post, BestComment, commentCount → PostData)
-	private PostResponse.PostData toPostData(Post post, PostComment best, int commentCount) {
-		return PostResponse.PostData.builder()
-			.id(post.getId())
-			.title(post.getTitle())
-			.content(post.getContent())
-			.mediaType(post.getMediaType())
-			.mediaUrl(post.getMediaLink())
-			.tags(post.getTagList())
-			.createdAgo(calcHoursAgo(post.getCreatedAt()))
-			.likeCount(post.getLikes().size())
-			.hiddenUser(post.getHiddenUser().stream().map(User::getId).collect(Collectors.toList()))
-			.commentCount(commentCount)
-			.bestComment(best != null ? PostResponse.BestCommentData.builder()
-				.nickName(best.getUser().getNickname())
-				.content(best.getContent())
-				.profileImg(best.getUser().getProfileImageUrl())
-				.build() : null)
-			.build();
-	}
-
-	// 공통 UserData 변환 (User → UserData)
-	private PostResponse.UserData toUserData(User user) {
-		return PostResponse.UserData.builder()
-			.id(user.getId())
-			.nickName(user.getNickname())
-			.profileImg(user.getProfileImageUrl())
-			.build();
-	}
+	/** 단일 게시글 조회 응답 변환 (API 15번) */
 	public PostResponse.Single toSingle(Post post, PostComment bestComment, int commentCount) {
 		return PostResponse.Single.builder()
 			.post(toPostData(post, bestComment, commentCount))
 			.user(toUserData(post.getUser()))
 			.build();
 	}
+
+	/** 피드용 게시글 데이터 변환 (API 18,19,20번) */
 	public FilterPostResponse.FeedPostData toFeedPostData(Post post, PostComment bestComment, int commentCount) {
-		FilterPostResponse.PostData postData = FilterPostResponse.PostData.builder()
-			.id(post.getId())
-			.title(post.getTitle())
-			.content(post.getContent())
-			.mediaType(post.getMediaType())
-			.mediaUrl(post.getMediaLink())
-			.tags(post.getTagList())
-			.createdAgo(calcHoursAgo(post.getCreatedAt()))
-			.likeCount(post.getLikes().size())
-			.hiddenUser(post.getHiddenUser().stream().map(User::getId).collect(Collectors.toList()))
-			.commentCount(commentCount)
-			.bestComment(bestComment == null ? null : FilterPostResponse.BestCommentData.builder()
-				.nickName(bestComment.getUser().getNickname())
-				.content(bestComment.getContent())
-				.profileImg(bestComment.getUser().getProfileImageUrl())
-				.build())
-			.build();
+		try {
+			System.out.println("🔍 PostMapper.toFeedPostData 시작");
+			System.out.println("  - Post ID: " + post.getId());
+			System.out.println("  - Post 제목: " + post.getTitle());
+			System.out.println("  - Post 내용: '" + post.getContent() + "'");
 
-		FilterPostResponse.UserData userData = FilterPostResponse.UserData.builder()
-			.id(post.getUser().getId())
-			.nickName(post.getUser().getNickname())
-			.profileImg(post.getUser().getProfileImageUrl())
-			.build();
+			if (bestComment != null) {
+				System.out.println("  - BestComment 내용: '" + bestComment.getContent() + "'");
+				System.out.println("  - BestComment 사용자 ID: " + bestComment.getUser().getId());
+			}
 
-		return FilterPostResponse.FeedPostData.builder()
-			.post(postData)
-			.user(userData)
-			.build();
+			FilterPostResponse.PostData postData = FilterPostResponse.PostData.builder()
+				.id(post.getId().toString())
+				.title(post.getTitle())
+				.content(post.getContent())
+				.mediaType(post.getMediaType())
+				.mediaUrl(post.getMediaUrl())
+				.tags(post.getTags())
+				.createdAgo(calcHoursAgo(post.getCreatedAt())) // ✅ calcDaysAgo → calcHoursAgo
+				.likeCount(post.getLikeCount())
+				.hiddenUser(getHiddenUserNicknames(post))
+				.commentCount(commentCount)
+				.bestComment(toBestCommentForFeed(bestComment))
+				.build();
+
+			System.out.println("✅ PostData 생성 완료");
+
+			FilterPostResponse.UserData userData = FilterPostResponse.UserData.builder()
+				.id(post.getUser().getId().toString())
+				.nickName(post.getUser().getNickname())
+				.profileImg(post.getUser().getProfileImageUrl())
+				.build();
+
+			System.out.println("✅ UserData 생성 완료");
+
+			return FilterPostResponse.FeedPostData.builder()
+				.post(postData)
+				.user(userData)
+				.build();
+
+		} catch (Exception e) {
+			System.out.println("❌ PostMapper.toFeedPostData 오류: " + e.getMessage());
+			e.printStackTrace();
+			throw e;
+		}
 	}
 
-	/**
-	 * entity → UserPostData (특정 유저의 모든 게시글)
-	 */
+	/** 사용자 게시글 목록용 변환 (API 22번) */
 	public FilterPostResponse.UserPostData toUserPostData(Post post) {
 		return FilterPostResponse.UserPostData.builder()
-			.id(post.getId())
+			.id(post.getId().toString())
 			.title(post.getTitle())
 			.content(post.getContent())
 			.mediaType(post.getMediaType())
-			.mediaUrl(post.getMediaLink())
-			.tags(post.getTagList())
+			.mediaUrl(post.getMediaUrl())
+			.tags(post.getTags())
 			.build();
 	}
 
-	/* createdAt 기준 현재까지 경과 시간 (시간 단위 int) */
-	private int calcHoursAgo(LocalDate createdAt) {
-		return (int) ChronoUnit.HOURS.between(createdAt.atStartOfDay(), LocalDate.now().atStartOfDay());
+	// ========== 공통 변환 메서드 ==========
+
+	/** PostResponse용 PostData 변환 */
+	private PostResponse.PostData toPostData(Post post, PostComment bestComment, int commentCount) {
+		return PostResponse.PostData.builder()
+			.id(post.getId().toString())
+			.title(post.getTitle())
+			.content(post.getContent())
+			.mediaType(post.getMediaType())
+			.mediaUrl(post.getMediaUrl())
+			.tags(post.getTags())
+			.createdAgo(calcHoursAgo(post.getCreatedAt())) // ✅ 수정
+			.likeCount(post.getLikeCount())
+			.hiddenUser(getHiddenUserNicknames(post))
+			.commentCount(commentCount)
+			.bestComment(toBestCommentForPost(bestComment))
+			.build();
 	}
 
+	/** UserData 변환 */
+	private PostResponse.UserData toUserData(User user) {
+		return PostResponse.UserData.builder()
+			.id(user.getId().toString())
+			.nickName(user.getNickname())
+			.profileImg(user.getProfileImageUrl())
+			.build();
+	}
+
+	/** PostResponse용 BestComment 변환 */
+	private PostResponse.BestCommentData toBestCommentForPost(PostComment bestComment) {
+		if (bestComment == null) return null;
+
+		return PostResponse.BestCommentData.builder()
+			.nickName(bestComment.getUser().getNickname())
+			.content(bestComment.getContent())
+			.profileImg(bestComment.getUser().getProfileImageUrl())
+			.build();
+	}
+
+	/** FilterPostResponse용 BestComment 변환 - 안전한 버전 */
+	private FilterPostResponse.BestCommentData toBestCommentForFeed(PostComment bestComment) {
+		if (bestComment == null) {
+			System.out.println("✅ bestComment is null - 빈 객체 반환");
+			return null;
+		}
+
+		try {
+			System.out.println("🔍 toBestCommentForFeed 시작");
+			System.out.println("  - 댓글 내용: '" + bestComment.getContent() + "'");
+			System.out.println("  - 사용자 ID: " + bestComment.getUser().getId());
+			System.out.println("  - 사용자 닉네임: " + bestComment.getUser().getNickname());
+
+			String userId = bestComment.getUser().getId().toString();
+			String content = bestComment.getContent();
+			String profileImg = bestComment.getUser().getProfileImageUrl();
+
+			System.out.println("✅ 변환할 데이터 준비 완료");
+			System.out.println("  - userId: " + userId);
+			System.out.println("  - content: '" + content + "'");
+			System.out.println("  - profileImg: " + profileImg);
+
+			FilterPostResponse.BestCommentData result = FilterPostResponse.BestCommentData.builder()
+				.userId(userId)
+				.content(content)
+				.profileImg(profileImg)
+				.build();
+
+			System.out.println("✅ BestCommentData 생성 완료");
+			return result;
+
+		} catch (Exception e) {
+			System.out.println("❌ toBestCommentForFeed 오류: " + e.getMessage());
+			e.printStackTrace();
+			throw e;
+		}
+	}
+
+	/** 숨김 처리한 사용자들의 닉네임 리스트 반환 */
+	private List<String> getHiddenUserNicknames(Post post) {
+		try {
+			return post.getHiddenUsers().stream()
+				.map(User::getNickname)
+				.filter(nickname -> nickname != null)
+				.collect(Collectors.toList());
+		} catch (Exception e) {
+			System.out.println("❌ getHiddenUserNicknames 오류: " + e.getMessage());
+			return List.of();
+		}
+	}
+
+	/** LocalDateTime 기준 몇 시간 전인지 계산 ✅ */
+	private Integer calcHoursAgo(LocalDateTime createdAt) {
+		if (createdAt == null) return 0;
+		return (int) ChronoUnit.HOURS.between(createdAt, LocalDateTime.now());
+	}
+
+	/** LocalDateTime 기준 며칠 전인지 계산 (선택적 사용) ✅ */
+	private Integer calcDaysAgo(LocalDateTime createdAt) {
+		if (createdAt == null) return 0;
+		return (int) ChronoUnit.DAYS.between(createdAt.toLocalDate(), LocalDateTime.now().toLocalDate());
+	}
 }
