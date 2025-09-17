@@ -231,7 +231,7 @@ public class HarmonyService {
 			.recommendedRooms(recommendedRooms)
 			.build();
 	}
-
+//ddtest
 	/**
 	 * 5. 하모니룸 게시글 조회
 	 */
