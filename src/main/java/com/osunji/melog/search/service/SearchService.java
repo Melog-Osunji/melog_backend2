@@ -23,8 +23,12 @@ public class SearchService {
 	/**
 	 * api(32번) 인기 작곡가 조회 (검색량 상위 + 태그량 상위)
 	 */
-	public List<SearchResponse.Composer> getPopularComposers() {
-		return searchRepository.getPopularComposers();
+	public SearchResponse.Composer getPopularComposers() {  // ✅ List 제거
+		List<SearchResponse.Composer> composers = searchRepository.getPopularComposers();
+		// 첫 번째 요소만 반환하거나, 합쳐서 반환
+		return composers.isEmpty() ?
+			SearchResponse.Composer.builder().name(List.of()).imgLink(List.of()).build() :
+			composers.get(0);
 	}
 
 	/**

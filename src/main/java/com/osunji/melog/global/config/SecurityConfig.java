@@ -44,12 +44,29 @@ public class SecurityConfig {
             "/auth/oidc/callback",
             "/auth/refresh",
             "/auth/logout",
+            "/api/auth/oidc/start",        // /auth → /api/auth 수정
+            "/api/auth/oidc/callback",     // /auth → /api/auth 수정
+            "/api/auth/refresh",           // /auth → /api/auth 수정
+            "/api/auth/logout",
             "/health",
             "/api/dev/**",      // 개발용 (있다면)
+            "/api/*",
             "/docs/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
-            "/swagger-ui.html"
+            "/swagger-ui.html",
+            "/api/posts/**",
+            "/api/posts",
+            "/api/users/*/posts",
+            "/api/posts/*/bookmarks",
+            "/api/posts/*/comments/*",
+            "/api/youtube/*",
+            "/api/search/**",
+            "/api/search",
+            "/api/harmony/**",
+            "/api/harmony"
+
+
     };
 
     @Bean

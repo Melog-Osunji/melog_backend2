@@ -1,149 +1,218 @@
 package com.osunji.melog.review.entity;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
+import com.osunji.melog.review.dto.request.PostRequest;
 import com.osunji.melog.user.domain.User;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.Lob;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 @Entity
-@Table(name = "post")
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@Table(name = "posts")
 @Getter
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Post {
 
     /**
-     * 게시물 고유 ID
+     * 게시물 고유 ID (UUID 자동 생성)
      */
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String id;
+    @Column(columnDefinition = "uuid")
+    private UUID id;
 
     /**
-     * 게시물 작성자
+     * 작성자 (User UUID와 연결)
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(nullable = false)
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     /**
      * 게시물 제목
      */
-    @Lob
+    @Column(nullable = false, length = 255)
     private String title;
 
     /**
      * 게시물 내용
      */
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String content;
 
     /**
-     * 미디어 타입
+     * 미디어 타입 (IMAGE, VIDEO, TEXT, etc.)
      */
     private String mediaType;
 
     /**
-     * 미디어 링크
+     * 미디어 URL
      */
-    private String mediaLink;
+    private String mediaUrl;
 
     /**
-     * 게시물 태그 목록
+     * 태그 리스트
      */
-    @Column(columnDefinition = "TEXT")
-    private String tags;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "tags", columnDefinition = "json")
+    private List<String> tags = new ArrayList<>();
 
     /**
-     * 게시물 생성 일시
+     * 생성 날짜
      */
     @Column(nullable = false)
-    private LocalDate createdAt;
+    private LocalDateTime createdAt;
 
     /**
-     * 좋아요를 누른 사용자 목록
+     * 좋아요를 누른 사용자들 (User.id = UUID)
      */
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-        name = "likes",
-        joinColumns = @JoinColumn(name = "postId"),
-        inverseJoinColumns = @JoinColumn(name = "userId")
+        name = "post_likes",
+        joinColumns = @JoinColumn(name = "post_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
     )
     private List<User> likes = new ArrayList<>();
-    /*** 이 게시물을 숨김 처리한 사용자 목록
+
+    /**
+     * 이 글을 숨김 처리한 사용자들 (User.id = UUID)
      */
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-        name = "hiddenUser",
-        joinColumns = @JoinColumn(name = "postId"),
-        inverseJoinColumns = @JoinColumn(name = "userId")
+        name = "post_hidden_users",
+        joinColumns = @JoinColumn(name = "post_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
     )
-    private List<User> hiddenUser = new ArrayList<>();
+    private List<User> hiddenUsers = new ArrayList<>();
+
+    // ========== 생성 메서드 ==========
+
     /**
-     * 게시물 생성자
+     * Post 생성 (기본)
      */
-    public Post(User user, String title, String content, String mediaType, String mediaLink, List<String> tagList) {
-        this.user = user;
-        this.title = title;
-        this.content = content;
-        this.mediaType = mediaType;
-        this.mediaLink = mediaLink;
-        this.tags = tagList != null && !tagList.isEmpty() ? String.join(",", tagList) : ""; // ✅ List를 문자열로 변환
-        this.createdAt = LocalDate.now();
-        this.likes = new ArrayList<>();
-        this.hiddenUser = new ArrayList<>();
+    public static Post create(User user, String title, String content,
+        String mediaType, String mediaUrl, List<String> tags) {
+        Post post = new Post();
+        post.user = user;
+        post.title = title;
+        post.content = content;
+        post.mediaType = mediaType;
+        post.mediaUrl = mediaUrl;
+        post.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
+        post.createdAt = LocalDateTime.now();
+        post.likes = new ArrayList<>();
+        post.hiddenUsers = new ArrayList<>();
+        return post;
     }
 
     /**
-     * 기본 게시물 생성 팩토리 메서드
+     * PostRequest.Create로부터 생성
      */
-    public static Post createPost(User user, String title, String content) {
-        return new Post(user, title, content, null, null, new ArrayList<>());
+    public static Post create(User user, PostRequest.Create request) {
+        return create(
+            user,
+            request.getTitle(),
+            request.getContent(),
+            request.getMediaType(),
+            request.getMediaUrl(),
+            request.getTags()
+        );
     }
+
+    // ========== 비즈니스 메서드 ==========
+
     /**
-     * 태그 문자열을 List<String>으로 변환해서 반환
+     * 게시물 수정
      */
-    public List<String> getTagList() {
-        if (tags == null || tags.trim().isEmpty()) {
-            return new ArrayList<>();
+    public void update(PostRequest.Update request) {
+        if (request.getTitle() != null) this.title = request.getTitle();
+        if (request.getContent() != null) this.content = request.getContent();
+        if (request.getMediaType() != null) this.mediaType = request.getMediaType();
+        if (request.getMediaUrl() != null) this.mediaUrl = request.getMediaUrl();
+        if (request.getTags() != null) this.tags = new ArrayList<>(request.getTags());
+    }
+
+    /**
+     * 좋아요 추가
+     */
+    public void addLike(User user) {
+        if (!this.likes.contains(user)) {
+            this.likes.add(user);
         }
-        return Arrays.asList(tags.split(","));
     }
 
     /**
-     * List<String>을 받아서 쉼표로 구분된 문자열로 저장
+     * 좋아요 제거
      */
-    public void setTagList(List<String> tagList) {
-        this.tags = tagList != null && !tagList.isEmpty() ? String.join(",", tagList) : "";
-    }
-    public void updatePost(String title, String content, String mediaType, String mediaLink, List<String> tagList) {
-        if (title != null) this.title = title;
-        if (content != null) this.content = content;
-        if (mediaType != null) this.mediaType = mediaType;
-        if (mediaLink != null) this.mediaLink = mediaLink;
-        if (tagList != null) this.setTagList(tagList);
+    public void removeLike(User user) {
+        this.likes.remove(user);
     }
 
+    /**
+     * 좋아요 개수
+     */
+    public int getLikeCount() {
+        return this.likes.size();
+    }
+
+    /**
+     * 사용자가 좋아요를 눌렀는지 확인
+     */
+    public boolean isLikedBy(User user) {
+        return this.likes.contains(user);
+    }
+
+    /**
+     * 숨김 처리 추가
+     */
+    public void addHiddenUser(User user) {
+        if (!this.hiddenUsers.contains(user)) {
+            this.hiddenUsers.add(user);
+        }
+    }
+
+    /**
+     * 숨김 처리 제거
+     */
+    public void removeHiddenUser(User user) {
+        this.hiddenUsers.remove(user);
+    }
+
+    /**
+     * 사용자가 숨김 처리했는지 확인
+     */
+    public boolean isHiddenBy(User user) {
+        return this.hiddenUsers.contains(user);
+    }
+
+    /**
+     * 좋아요한 사용자들의 닉네임 리스트 (Response용)
+     */
+    public List<String> getLikedUserNicknames() {
+        return this.likes.stream()
+            .map(User::getNickname)
+            .filter(nickname -> nickname != null)
+            .toList();
+    }
+
+    /**
+     * 숨김 처리한 사용자들의 닉네임 리스트 (Response용)
+     */
+    public List<String> getHiddenUserNicknames() {
+        return this.hiddenUsers.stream()
+            .map(User::getNickname)
+            .filter(nickname -> nickname != null)
+            .toList();
+    }
 }
