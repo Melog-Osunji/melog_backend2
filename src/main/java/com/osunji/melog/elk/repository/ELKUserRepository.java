@@ -75,8 +75,10 @@ public class ELKUserRepository {
                     .index(INDEX_USER_LOGS)
                     .size(0)
                     .query(q -> q.range(r -> r
-                            .field(F_EVENT_TIME)
-                            .gte(JsonData.of("now-" + days + "d"))
+                            .date(d -> d
+                                    .field(F_EVENT_TIME)
+                                    .gte("now-" + days + "d")       // Date math 문자열 그대로
+                            )
                     ))
                     .aggregations("daily", a -> a
                             .dateHistogram(dh -> dh
@@ -145,7 +147,12 @@ public class ELKUserRepository {
                     .sort(sort -> sort.field(f -> f.field(F_EVENT_TIME).order(SortOrder.Desc)))
                     .query(q -> q.bool(b -> b
                             .must(m -> m.term(t -> t.field(F_EVENT_TYPE).value("SIGNUP")))
-                            .must(m -> m.range(r -> r.field(F_EVENT_TIME).gte(JsonData.of("now-" + days + "d"))))
+                            .must(m -> m.range(r -> r
+                                    .date(d -> d
+                                            .field(F_EVENT_TIME)
+                                            .gte("now-" + days + "d")
+                                    )
+                            ))
                     ))
                     .source(src -> src.filter(f -> f.includes(List.of(F_USER_ID))))
             );
@@ -183,7 +190,12 @@ public class ELKUserRepository {
                     .sort(sort -> sort.field(f -> f.field(F_EVENT_TIME).order(SortOrder.Desc)))
                     .query(q -> q.bool(b -> b
                             .must(m -> m.term(t -> t.field(F_USER_ID).value(userId)))
-                            .must(m -> m.range(r -> r.field(F_EVENT_TIME).gte(JsonData.of("now-" + days + "d"))))
+                            .must(m -> m.range(r -> r
+                                    .date(d -> d
+                                            .field(F_EVENT_TIME)        // ← time(...)이 아니라 date(...).field(...)
+                                            .gte("now-" + days + "d")
+                                    )
+                            ))
                     ))
                     .source(src -> src.filter(f -> f.includes(List.of(F_EVENT_TYPE))))
             );

@@ -6,6 +6,7 @@ import co.elastic.clients.transport.rest_client.RestClientTransport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -22,16 +23,13 @@ import javax.net.ssl.SSLContext;
 @Configuration
 public class ElasticConfig {
 
-	@Value("${elasticsearch.host:localhost}")
-	private String host;
+	@Value("${spring.elasticsearch.uris}")
+	private String uris;
 
-	@Value("${elasticsearch.port:9200}")
-	private int port;
-
-	@Value("${elasticsearch.username:melog_elk}")
+	@Value("${spring.elasticsearch.username}")
 	private String username;
 
-	@Value("${elasticsearch.password:melog2598pw}")
+	@Value("${spring.elasticsearch.password}")
 	private String password;
 
 	@Bean
@@ -49,7 +47,7 @@ public class ElasticConfig {
 			);
 
 			return RestClient.builder(
-					new HttpHost(host, port, "https")
+					new HttpHost("localhost", 9200,"https")
 				)
 				.setHttpClientConfigCallback(httpClientBuilder ->
 					httpClientBuilder

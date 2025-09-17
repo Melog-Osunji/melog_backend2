@@ -22,11 +22,9 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final JWTUtil jwtUtil;
     private final JwtAuthFilter jwtAuthFilter;
 
     public SecurityConfig(JWTUtil jwtUtil, JwtAuthFilter jwtAuthFilter) {
-        this.jwtUtil = jwtUtil;
         this.jwtAuthFilter = jwtAuthFilter;
     }
 

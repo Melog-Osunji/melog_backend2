@@ -1,35 +1,22 @@
 package com.osunji.melog.feed;
 
-
-
-import co.elastic.clients.elasticsearch._types.FieldValue;
+import co.elastic.clients.elasticsearch._types.Time;
 import co.elastic.clients.elasticsearch._types.query_dsl.*;
-import co.elastic.clients.json.JsonData;
-import org.springframework.beans.factory.annotation.Value;     // ✅ 스프링 @Value 로 교체
-
+import com.osunji.melog.elk.entity.PostIndex;
 import lombok.AllArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.stereotype.Service;
-import org.springframework.data.elasticsearch.client.elc.NativeQuery;
-import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 
-import com.osunji.melog.elk.entity.PostIndex;
+import java.util.*;
+import java.util.stream.Collectors;
 
-
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-
-import co.elastic.clients.elasticsearch._types.query_dsl.FunctionScore;
-import co.elastic.clients.elasticsearch._types.query_dsl.FunctionScoreQuery;
-import co.elastic.clients.elasticsearch._types.query_dsl.MatchAllQuery;
-import co.elastic.clients.elasticsearch._types.query_dsl.MultiMatchQuery;
-import co.elastic.clients.elasticsearch._types.query_dsl.Query;
-import co.elastic.clients.elasticsearch._types.query_dsl.TermsQuery;
-import co.elastic.clients.elasticsearch._types.query_dsl.FieldValueFactorModifier;
-import org.springframework.data.elasticsearch.core.SearchHit;
+// ==== Elasticsearch Java API v8 (co.elastic.clients) – 쿼리/빌더는 전부 이 패키지로! ====
+import co.elastic.clients.elasticsearch._types.FieldValue;
 
 @Service
 public class FeedService {
@@ -37,17 +24,18 @@ public class FeedService {
 
     private final ElasticsearchOperations esOps;
     private final UserSignalService signalService;
-    private final Double tag;
-    private final Double followee;
-    private final Double scale;
+
+    // 가중치/스케일 설정
+    private final Double tag;         // function weight
+    private final Double followee;    // function weight
+    private final String scale;       // ← 데케이 스케일은 "7d" 같은 문자열!
+
     public FeedService(
             ElasticsearchOperations esOps,
             UserSignalService signalService,
             @Value("${recommend.boost.tag}") Double tag,
-            @Value("${recommend.boost.tag}") Double followee,
-            @Value("${recommend.fresh.scale}") Double scale
-
-
+            @Value("${recommend.boost.followee}") Double followee,  // ← 키 수정!
+            @Value("${recommend.fresh.scale}") String scale         // ← 타입: String ("7d" 등)
     ) {
         this.esOps = esOps;
         this.signalService = signalService;
@@ -55,49 +43,71 @@ public class FeedService {
         this.followee = followee;
         this.scale = scale;
     }
+
     public List<FeedItem> recommend(String userId, int size, List<String> seenIds) {
         var sig       = signalService.build(userId);
         var tags      = sig.getTopTags();
         var followees = sig.getFolloweeIds();
 
         // 1) 베이스 쿼리
-        Query baseQuery = (tags != null && !tags.isEmpty())
-                ? MultiMatchQuery.of(m -> m.query(String.join(" ", tags))
-                .fields("title^3", "content"))._toQuery()
-                : MatchAllQuery.of(m -> m)._toQuery();
+        Query baseQuery =
+                (tags != null && !tags.isEmpty())
+                        ? MultiMatchQuery.of(m -> m
+                        .query(String.join(" ", tags))
+                        .fields("title^3", "content")
+                )._toQuery()
+                        : MatchAllQuery.of(m -> m)._toQuery();
 
         // 2) function_score functions
         var functions = new ArrayList<FunctionScore>();
 
+        // 태그 부스팅
         if (tags != null && !tags.isEmpty()) {
-            Query tagsFilter = TermsQuery.of(t -> t.field("tags")
+            Query tagsFilter = TermsQuery.of(t -> t
+                    .field("tags")
                     .terms(v -> v.value(tags.stream().map(FieldValue::of).toList()))
             )._toQuery();
-            functions.add(FunctionScore.of(fs -> fs.filter(tagsFilter).weight(tag)));
+
+            functions.add(FunctionScore.of(fs -> fs
+                    .filter(tagsFilter)
+                    .weight(tag)
+            ));
         }
 
+        // 팔로잉 부스팅
         if (followees != null && !followees.isEmpty()) {
-            Query followeesFilter = TermsQuery.of(t -> t.field("userId")
+            Query followeesFilter = TermsQuery.of(t -> t
+                    .field("userId")
                     .terms(v -> v.value(followees.stream().map(FieldValue::of).toList()))
             )._toQuery();
-            functions.add(FunctionScore.of(fs -> fs.filter(followeesFilter).weight(followee)));
+
+            functions.add(FunctionScore.of(fs -> fs
+                    .filter(followeesFilter)
+                    .weight(followee)
+            ));
         }
 
+// 신선도(작성시각) 가우시안 데케이
         functions.add(FunctionScore.of(fs -> fs.gauss(g -> g
-                .field("createdAt")
-                .placement(DecayPlacement.of(dp -> dp
-                        .origin(JsonData.of("now"))   // 문자열은 JsonData로
-                        .scale(JsonData.of(scale)) // 예: "7d"
-                        .decay(0.5)
-                ))
+                .date(d -> d                               // ← DecayFunction.Builder → date(...)
+                        .field("createdAt")                    // ← DateDecayFunction.Builder.field(...)
+                        .placement(p -> p                      // ← DateDecayFunction.Builder.placement(...)
+                                .origin("now")                     // origin: String
+                                .scale(Time.of(t -> t.time(scale)))// scale: Time (예: scale="7d")
+                                // .offset(Time.of(t -> t.time("0d")))
+                                .decay(0.5)
+                        )
+                )
         )));
 
-        // 인기 가산 (likeCount)
+        // 인기(좋아요 수) 가산
         functions.add(FunctionScore.of(fs -> fs
-                .fieldValueFactor(fvf -> fvf.field("likeCount")
+                .fieldValueFactor(fvf -> fvf
+                        .field("likeCount")
                         .modifier(FieldValueFactorModifier.Log1p)
                         .factor(1.2)
-                        .missing(0.0))
+                        .missing(0.0)
+                )
         ));
 
         // 3) function_score 조립
@@ -117,22 +127,23 @@ public class FeedService {
         var hits = esOps.search(nq, PostIndex.class, IndexCoordinates.of(POSTS_INDEX))
                 .getSearchHits();
 
-        // 5) 서버단 정제: seenIds 제거 + 다양화(동일 작성자/대표태그 과다 억제)
+        // 5) 서버단 정제: seenIds 제거 + 다양화
         var dedup = new HashMap<String, Pair>();
         for (SearchHit<PostIndex> h : hits) {
             var p = h.getContent();
+            if (p == null) continue;
             if (seenIds != null && seenIds.contains(p.getId())) continue;
             dedup.putIfAbsent(p.getId(), new Pair(p, h.getScore()));
         }
 
         var ranked = dedup.values().stream()
                 .sorted(Comparator.comparingDouble((Pair p) -> p.score).reversed())
-                .limit(size * 3L)
+                .limit((long) size * 3)
                 .toList();
 
         var diversified = diversify(ranked, size,
-                pair -> pair.post.getUserId(),                           // 동일 작성자 제한
-                pair -> firstOrNull(pair.post.getTags())                 // 대표 태그 제한
+                pair -> pair.post.getUserId(),            // 동일 작성자 제한
+                pair -> firstOrNull(pair.post.getTags())  // 대표 태그 제한
         );
 
         return diversified.stream().map(p -> FeedItem.builder()
@@ -144,7 +155,8 @@ public class FeedService {
                 .likeCount(p.post.getLikeCount())
                 .createdAt(p.post.getCreatedAt())
                 .score(p.score)
-                .build()).toList();
+                .build()
+        ).collect(Collectors.toList());
     }
 
     // ===== helpers =====

@@ -7,6 +7,7 @@ import com.osunji.melog.user.domain.enums.Platform;
 import com.osunji.melog.user.dto.RefreshResult;
 import com.osunji.melog.user.repository.RefreshTokenRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -23,19 +24,25 @@ public class AuthService {
     private final RefreshTokenRepository refreshRepo;
     private final UserRepository userRepository;
 
-    // 나중에 properties로 옮길 예정
-    private static final long ACCESS_TTL_MS  = 1000L * 60 * 15;           // 15분
-    private static final long REFRESH_TTL_MS = 1000L * 60 * 60 * 24 * 14; // 14일
+    private final long accessTtlMs;
+    private final long refreshTtlMs;
+    private final long refreshRoateBelow;
 
-    // 남은 TTL이 이 값 이하일 때만 refresh 교체 3일
-    private static final long REFRESH_ROTATE_BELOW_SEC = 60L * 60 * 24 * 3;
-
-    public AuthService(OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo, UserRepository userRepository) {
+    public AuthService(
+            @Value("${jwt.access-expiration}") long accessTtlMs, //15분
+            @Value("${jwt.refresh-expiration}") long refreshTtlMs, //14일
+            @Value("${jwt.refresh-below}") long refreshRoateBelow,
+            OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo, UserRepository userRepository
+    ) {
+        this.accessTtlMs = accessTtlMs;
+        this.refreshTtlMs = refreshTtlMs;
+        this.refreshRoateBelow = refreshRoateBelow;
         this.oidcService = oidcService;
         this.jwtUtil = jwtUtil;
         this.refreshRepo = refreshRepo;
         this.userRepository = userRepository;
     }
+
 
     /** 컨트롤러 시그니처: provider, code, state, code_verifier */
     public RefreshResult handleOidcCallback(String provider, String code, String state, String codeVerifier) {
@@ -62,8 +69,8 @@ public class AuthService {
 
         // 토큰 생성
         String userId = user.getId();
-        String access  = jwtUtil.createAccessToken(userId, ACCESS_TTL_MS);
-        String refresh = jwtUtil.createRefreshToken(userId, REFRESH_TTL_MS);
+        String access  = jwtUtil.createAccessToken(userId, accessTtlMs);
+        String refresh = jwtUtil.createRefreshToken(userId, refreshTtlMs);
 
         String jti = jwtUtil.getJtiFromRefresh(refresh);
         long ttlSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(refresh));
@@ -102,15 +109,15 @@ public class AuthService {
             long remainingSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(refreshCookie));
 
             // 4) 액세스만 재발급 (리프레시 충분히 남음)
-            if (remainingSec > REFRESH_ROTATE_BELOW_SEC) {
-                String newAccess = jwtUtil.createAccessToken(userId, ACCESS_TTL_MS);
+            if (remainingSec > refreshRoateBelow) {
+                String newAccess = jwtUtil.createAccessToken(userId, accessTtlMs);
                 // 저장소 변경 없음, 기존 refresh 그대로 사용
                 return new RefreshResult(newAccess, refreshCookie, remainingSec);
             }
 
             // 5) 리프레시 교체 (만료 임박)
-            String newAccess  = jwtUtil.createAccessToken(userId, ACCESS_TTL_MS);
-            String newRefresh = jwtUtil.createRefreshToken(userId, REFRESH_TTL_MS);
+            String newAccess  = jwtUtil.createAccessToken(userId, accessTtlMs);
+            String newRefresh = jwtUtil.createRefreshToken(userId, refreshTtlMs);
 
             String newJti = jwtUtil.getJtiFromRefresh(newRefresh);
             long newTtlSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(newRefresh));

@@ -37,8 +37,10 @@ public class SearchLogReader {
     private Map<String, Long> termsAgg(String userId, int days, String field, int size, String aggName) {
         // 1) 기간/사용자 필터
         Query time = RangeQuery.of(r -> r
-                .field("searchTime")
-                .gte(JsonData.of("now-" + days + "d"))   // 날짜형이면 ES가 파싱
+                .date(d -> d
+                        .field("searchTime")
+                        .gte("now-" + days + "d")   // ← 문자열로
+                )
         )._toQuery();
 
         Query uid = TermQuery.of(t -> t.field("userId").value(userId))._toQuery();

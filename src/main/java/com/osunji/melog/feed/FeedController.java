@@ -2,6 +2,11 @@ package com.osunji.melog.feed;
 
 
 import java.util.*;
+
+import com.osunji.melog.global.common.AuthHelper;
+import com.osunji.melog.global.security.JwtAuthFilter;
+import com.osunji.melog.global.util.JWTUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,10 +21,11 @@ public class FeedController {
 
     @GetMapping("/recommend")
     public ResponseEntity<Map<String,Object>> recommend(
-            @RequestHeader("X-User-Id") String userId,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) List<String> seen // 클라이언트가 이미 본 글
+            @RequestParam(required = false) List<String> seen,
+            HttpServletRequest request
     ) {
+        String userId = (String) request.getAttribute(JwtAuthFilter.USER_ID_ATTR);
         var items = feedService.recommend(userId, size, seen==null?List.of():seen);
         var meta = Map.of(
                 "alg", "es-hybrid-v1",
