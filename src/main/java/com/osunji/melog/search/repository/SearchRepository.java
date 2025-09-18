@@ -517,45 +517,52 @@ public class SearchRepository {
 		return searchCounts;
 	}
 
-	/**
-	 * 특정 키워드의 검색 빈도 조회 - 한글/영어 통합
-	 */
 	private Long getSearchCountForKeyword(String keyword) {
 		try {
-			// ✅ 한글-영어 매핑
+			// ✅ 등가 키워드 매핑 유지
 			List<String> searchKeywords = getEquivalentKeywords(keyword);
 			System.out.println("    검색 키워드들: " + searchKeywords);
 
 			long totalCount = 0L;
 
-			// ✅ 모든 등가 키워드로 검색
+			// ✅ 각 등가 키워드별로 검색
 			for (String searchKeyword : searchKeywords) {
-				var searchRequest = co.elastic.clients.elasticsearch.core.SearchRequest.of(s -> s
-					.index("search_logs")
-					.size(0)
-					.query(q -> q
-						.bool(b -> b
-							.must(m -> m.term(t -> t.field("query").value(searchKeyword)))
-							.must(m -> m.range(r -> r
-								.field("searchTime")
-								.gte(JsonData.of(LocalDateTime.now().minusDays(30)))
-							))
+				try {
+					var searchRequest = co.elastic.clients.elasticsearch.core.SearchRequest.of(s -> s
+						.index("search_logs")
+						.size(0)
+						.query(q -> q
+							.bool(b -> b
+									.must(m -> m
+										.match(ma -> ma
+											.field("query")
+											.query(searchKeyword)
+										)
+									)
+								// 시간 필터는 일단 제거 (field 오류 때문에)
+							)
 						)
-					)
-				);
+					);
 
-				var response = elasticsearchClient.search(searchRequest, Void.class);
-				long count = response.hits().total().value();
-				if (count > 0) {
-					System.out.println("      '" + searchKeyword + "': " + count + "회");
-					totalCount += count;
+					var response = elasticsearchClient.search(searchRequest, Void.class);
+
+					if (response != null && response.hits() != null && response.hits().total() != null) {
+						long count = response.hits().total().value();
+						if (count > 0) {
+							System.out.println("      '" + searchKeyword + "': " + count + "회");
+							totalCount += count;
+						}
+					}
+
+				} catch (Exception e) {
+					System.out.println("      '" + searchKeyword + "' 검색 실패: " + e.getMessage());
 				}
 			}
 
 			return totalCount;
 
 		} catch (Exception e) {
-			System.out.println("        키워드 '" + keyword + "' 검색 실패: " + e.getMessage());
+			System.out.println("        키워드 '" + keyword + "' 전체 검색 실패: " + e.getMessage());
 			return 0L;
 		}
 	}

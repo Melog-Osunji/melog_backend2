@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +22,7 @@ public class UserSignalService {
     public UserSignals build(String userId) {
         // 1) 온보딩 → 태그 후보
         var obTags = new ArrayList<String>();
-        onboardingRepository.findByUser_Id(userId).ifPresent(ob -> {
+        onboardingRepository.findByUser_Id(UUID.fromString(userId)).ifPresent(ob -> {
             if (ob.getComposers()   != null) obTags.addAll(ob.getComposers());
             if (ob.getPeriods()     != null) obTags.addAll(ob.getPeriods());
             if (ob.getInstruments() != null) obTags.addAll(ob.getInstruments());
