@@ -488,7 +488,7 @@ public class SearchRepository {
 	}
 
 	/**
-	 * 악기별 검색 빈도 조회
+	 * 악기별 검색 빈도 조회 wpqkf
 	 */
 	private Map<String, Long> getInstrumentSearchCounts(List<String> instruments) {
 		Map<String, Long> searchCounts = new HashMap<>();
