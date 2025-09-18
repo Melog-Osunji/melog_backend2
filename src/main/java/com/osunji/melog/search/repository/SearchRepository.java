@@ -531,17 +531,19 @@ public class SearchRepository {
 			// ✅ 모든 등가 키워드로 검색
 			for (String searchKeyword : searchKeywords) {
 				var searchRequest = co.elastic.clients.elasticsearch.core.SearchRequest.of(s -> s
-					.index("search_logs")
-					.size(0)
-					.query(q -> q
-						.bool(b -> b
-							.must(m -> m.term(t -> t.field("query").value(searchKeyword)))
-							.must(m -> m.range(r -> r
-								.field("searchTime")
-								.gte(JsonData.of(LocalDateTime.now().minusDays(30)))
-							))
+						.index("search_logs")
+						.size(0)
+						.query(q -> q
+								.bool(b -> b
+												.must(m -> m
+														.match(ma -> ma
+																.field("query")
+																.query(searchKeyword)
+														)
+												)
+										// 시간 필터는 일단 제거 (field 오류 때문에)
+								)
 						)
-					)
 				);
 
 				var response = elasticsearchClient.search(searchRequest, Void.class);

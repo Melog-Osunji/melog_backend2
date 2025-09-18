@@ -1,5 +1,7 @@
-package com.osunji.melog.feed;
+package com.osunji.melog.feed.controller;
 
+import com.osunji.melog.feed.service.ElkIndexService;
+import com.osunji.melog.feed.service.ElkSeedService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

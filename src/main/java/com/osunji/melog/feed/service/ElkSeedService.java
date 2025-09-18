@@ -1,4 +1,4 @@
-package com.osunji.melog.feed;
+package com.osunji.melog.feed.service;
 
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
