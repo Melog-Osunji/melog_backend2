@@ -1,11 +1,10 @@
-package com.osunji.melog.feed;
+package com.osunji.melog.feed.controller;
 
 
 import java.util.*;
 
-import com.osunji.melog.global.common.AuthHelper;
+import com.osunji.melog.feed.service.FeedService;
 import com.osunji.melog.global.security.JwtAuthFilter;
-import com.osunji.melog.global.util.JWTUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

@@ -68,7 +68,7 @@ public class AuthService {
                 });
 
         // 토큰 생성
-        String userId = user.getId();
+        String userId = user.getId().toString();
         String access  = jwtUtil.createAccessToken(userId, accessTtlMs);
         String refresh = jwtUtil.createRefreshToken(userId, refreshTtlMs);
 

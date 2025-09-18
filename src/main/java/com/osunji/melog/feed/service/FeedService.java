@@ -1,8 +1,9 @@
-package com.osunji.melog.feed;
+package com.osunji.melog.feed.service;
 
 import co.elastic.clients.elasticsearch._types.Time;
 import co.elastic.clients.elasticsearch._types.query_dsl.*;
 import com.osunji.melog.elk.entity.PostIndex;
+import com.osunji.melog.feed.FeedItem;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;

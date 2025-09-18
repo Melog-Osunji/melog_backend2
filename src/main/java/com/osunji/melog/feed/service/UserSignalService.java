@@ -1,5 +1,7 @@
-package com.osunji.melog.feed;
+package com.osunji.melog.feed.service;
 
+import com.osunji.melog.feed.SearchLogReader;
+import com.osunji.melog.feed.UserSignals;
 import com.osunji.melog.user.repository.FollowRepository;
 import com.osunji.melog.user.repository.OnboardingRepository;
 import lombok.RequiredArgsConstructor;
