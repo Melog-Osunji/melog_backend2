@@ -22,11 +22,9 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final JWTUtil jwtUtil;
     private final JwtAuthFilter jwtAuthFilter;
 
     public SecurityConfig(JWTUtil jwtUtil, JwtAuthFilter jwtAuthFilter) {
-        this.jwtUtil = jwtUtil;
         this.jwtAuthFilter = jwtAuthFilter;
     }
 
@@ -49,8 +47,10 @@ public class SecurityConfig {
             "/api/auth/refresh",           // /auth → /api/auth 수정
             "/api/auth/logout",
             "/health",
+
             "/api/dev/**",      // 개발용 (있다면)
             "/api/*",
+
             "/docs/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",

@@ -3,6 +3,8 @@ package com.osunji.melog.global.util;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Value;
 
@@ -17,16 +19,19 @@ public class JWTUtil {
     private final SecretKey secretKey;
     private final SecretKey refreshSecretKey;
 
-    public JWTUtil(@Value("${jwt.secret}") String secret,
-        @Value("${jwt.refresh}") String refresh) {
-        this.secretKey = new SecretKeySpec(
-            secret.getBytes(StandardCharsets.UTF_8),
-            Jwts.SIG.HS256.key().build().getAlgorithm());
-        this.refreshSecretKey = new SecretKeySpec(
-            refresh.getBytes(StandardCharsets.UTF_8),
-            Jwts.SIG.HS256.key().build().getAlgorithm());
-    }
 
+    public JWTUtil(@org.springframework.beans.factory.annotation.Value("${jwt.secret}") String secretB64Url,
+                   @org.springframework.beans.factory.annotation.Value("${jwt.refresh}") String refreshB64Url) {
+        // Base64URL로 고정 사용
+        byte[] accessBytes  = Decoders.BASE64URL.decode(secretB64Url.trim());
+        byte[] refreshBytes = Decoders.BASE64URL.decode(refreshB64Url.trim());
+        if (accessBytes.length < 32 || refreshBytes.length < 32) {
+            throw new IllegalArgumentException("HS256 secret must be ≥ 32 bytes.");
+        }
+        this.secretKey = Keys.hmacShaKeyFor(accessBytes);
+        this.refreshSecretKey = Keys.hmacShaKeyFor(refreshBytes);
+
+    }
     /* ===================== Access Token ===================== */
 
     public String createAccessToken(String userId, long ttlMillis) {
@@ -65,14 +70,16 @@ public class JWTUtil {
 
     public String createRefreshToken(String userId, String jti, long ttlMillis) {
         return Jwts.builder()
-            .claim("userId", userId)
-            .issuer("melog-api")
-            .audience().add("melog-client").and()
-            .id(jti) // ★ Redis key로 사용
-            .issuedAt(new Date())
-            .expiration(new Date(System.currentTimeMillis() + ttlMillis))
-            .signWith(refreshSecretKey)
-            .compact();
+
+                .claim("userId", userId)
+                .issuer("melog-api")
+                .audience().add("melog-client").and()
+                .id(jti)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + ttlMillis))
+                .signWith(refreshSecretKey)
+                .compact();
+
     }
 
     public void validateRefresh(String token) {

@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.HexFormat;
+import java.util.Optional;
 
 @Repository
 public class RefreshTokenRepository {
@@ -49,4 +50,10 @@ public class RefreshTokenRepository {
             throw new IllegalStateException("SHA-256 unsupported", e);
         }
     }
+
+    public Optional<String> findLatestByUserId(String userId) {
+        String v = redis.opsForValue().get(userId);
+        return Optional.ofNullable(v).filter(s -> !s.isBlank());
+    }
+
 }

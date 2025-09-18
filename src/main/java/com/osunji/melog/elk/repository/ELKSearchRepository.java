@@ -6,7 +6,6 @@ import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
 import co.elastic.clients.elasticsearch.indices.GetIndexRequest;
-import co.elastic.clients.json.JsonData;
 import com.osunji.melog.elk.entity.SearchLog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -78,14 +77,15 @@ public class ELKSearchRepository {
 			ensureIndexExists("search_logs");
 
 			SearchRequest searchRequest = SearchRequest.of(s -> s
-				.index("search_logs")
-				.size(0)
-				.query(q -> q
-					.range(r -> r
-						.field("searchTime")
-						.gte(JsonData.of(LocalDateTime.now().minusDays(7)))  // 최근 7일
-					)
-				)
+					.index("search_logs")
+					.size(0)
+					.query(q -> q.range(r -> r
+							.date(d -> d
+									.field("searchTime")
+									.gte("now-3d")
+							)
+					))
+
 				.aggregations("popular_terms", a -> a
 					.terms(t -> t
 						.field("query")
@@ -142,8 +142,9 @@ public class ELKSearchRepository {
 					.bool(b -> b
 						.must(m -> m.term(t -> t.field("category").value(category)))
 						.must(m -> m.range(r -> r
-							.field("searchTime")
-							.gte(JsonData.of(LocalDateTime.now().minusDays(days)))
+								.date(d->d
+										.field("searchTime")
+										.gte("now-3d"))
 						))
 					)
 				)
