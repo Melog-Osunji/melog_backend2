@@ -1,4 +1,8 @@
 package com.osunji.melog.feed.view;
 
-public class CommentCountView {
+import java.util.UUID;
+
+public interface CommentCountView {
+    UUID getPostId();
+    long getCnt();
 }

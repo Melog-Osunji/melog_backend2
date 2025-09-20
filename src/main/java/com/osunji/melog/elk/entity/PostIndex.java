@@ -1,7 +1,9 @@
 package com.osunji.melog.elk.entity;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
@@ -10,17 +12,19 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Document(indexName = "posts")
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Document(indexName = "posts")
 public class PostIndex {
 	@Id
 	private String id;
 
-	@Field(type = FieldType.Text, analyzer = "standard")
+	@Field(type = FieldType.Text, analyzer = "nori", searchAnalyzer = "nori")
 	private String title;
 
-	@Field(type = FieldType.Text, analyzer = "standard")
+	@Field(type = FieldType.Text, analyzer = "nori", searchAnalyzer = "nori")
 	private String content;
 
 	@Field(type = FieldType.Keyword)

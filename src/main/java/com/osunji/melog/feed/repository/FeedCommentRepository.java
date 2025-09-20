@@ -9,13 +9,19 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.UUID;
 
-public interface CommentRepository extends JpaRepository<PostComment, UUID> {
+
+public interface FeedCommentRepository extends JpaRepository<PostComment, UUID> {
+
+    interface CountView {
+        UUID getPostId();
+        long getCnt();
+    }
 
     @Query("""
-           select c.post.id as postId, count(c) as cnt
-           from Comment c
-           where c.post.id in :postIds
-           group by c.post.id
+           select pc.post.id as postId, count(pc) as cnt
+           from PostComment pc
+           where pc.post.id in :postIds
+           group by pc.post.id
            """)
-    List<CommentCountView> countByPostIds(@Param("postIds") List<UUID> postIds);
+    List<CountView> countByPostIds(@Param("postIds") List<UUID> postIds);
 }

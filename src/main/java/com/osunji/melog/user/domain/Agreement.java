@@ -1,6 +1,7 @@
 package com.osunji.melog.user.domain;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -25,7 +26,7 @@ public class Agreement {
      * 사용자 ID (uuid fk)
      */
     @Id
-    private String userId;
+    private UUID userId;
 
     /**
      * User와 연결
@@ -52,7 +53,7 @@ public class Agreement {
      */
     public Agreement(User user, Boolean marketing, LocalDate createdAt) {
         this.user = user;
-        this.userId = String.valueOf(user.getId());
+        this.userId = user.getId();
         this.marketing = marketing;
         this.createdAt = createdAt;
     }

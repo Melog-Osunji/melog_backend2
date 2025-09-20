@@ -1,10 +1,8 @@
-package com.osunji.melog.feed;
+package com.osunji.melog.feed.view;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@ConfigurationProperties(prefix = "application.yml")
 public class RecommendProperties {
     private Boost boost = new Boost();
     private String freshScale;

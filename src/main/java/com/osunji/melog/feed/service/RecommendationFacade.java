@@ -1,15 +1,14 @@
-package com.osunji.melog.feed;
+package com.osunji.melog.feed.service;
 
 import com.osunji.melog.feed.dto.FeedResponse;
 import com.osunji.melog.feed.repository.CommentReader;
 import com.osunji.melog.feed.repository.PostReader;
 import com.osunji.melog.feed.repository.UserReader;
-import com.osunji.melog.feed.service.FeedService;
+import com.osunji.melog.feed.view.FeedItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,14 +26,14 @@ public class RecommendationFacade {
 
         // 2) 배치 키 수집 (String -> UUID 안전 변환)
         List<UUID> postIds = items.stream()
-                .map(com.osunji.melog.feed.FeedItem::getId) // String (postId)
+                .map(FeedItem::getId) // String (postId)
                 .map(RecommendationFacade::tryParseUuid)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
 
         List<UUID> authorIds = items.stream()
-                .map(com.osunji.melog.feed.FeedItem::getAuthorId) // String (userId)
+                .map(FeedItem::getAuthorId) // String (userId)
                 .filter(Objects::nonNull)
                 .map(RecommendationFacade::tryParseUuid)
                 .filter(Objects::nonNull)

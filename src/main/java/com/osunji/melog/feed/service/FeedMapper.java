@@ -1,10 +1,11 @@
-package com.osunji.melog.feed;
+package com.osunji.melog.feed.service;
 
 import com.osunji.melog.feed.dto.FeedResponse;
 
 import com.osunji.melog.feed.repository.CommentReader;
 import com.osunji.melog.feed.repository.PostReader;
 import com.osunji.melog.feed.repository.UserReader;
+import com.osunji.melog.feed.view.FeedItem;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -15,7 +16,7 @@ import java.util.Optional;
 public class FeedMapper {
 
     public FeedResponse.FeedItem toFeedItemDto(
-            com.osunji.melog.feed.FeedItem base,         // ES 추천 후보 (id, title, excerpt …)
+            FeedItem base,         // ES 추천 후보 (id, title, excerpt …)
             PostReader.PostDetail post,                 // 도메인 게시글 상세
             UserReader.UserProfile author,              // 작성자 프로필
             CommentReader.BestComment bestComment       // 베댓

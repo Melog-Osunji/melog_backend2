@@ -1,7 +1,6 @@
 package com.osunji.melog.feed.reader;
 
 import com.osunji.melog.feed.repository.PostCommentRepository;
-import com.osunji.melog.feed.repository.PostReader;
 import com.osunji.melog.review.entity.Post;
 import com.osunji.melog.review.repository.PostRepository;
 
@@ -14,14 +13,14 @@ import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
-public class PostReaderJPA implements PostReader {
+public class PostReader implements com.osunji.melog.feed.repository.PostReader {
 
     private final PostRepository postRepository;
     private final PostCommentRepository postCommentRepository;
 
     @Transactional(readOnly = true)
     @Override
-    public Map<UUID, PostReader.PostDetail> batchFindDetails(List<UUID> postIds) {
+    public Map<UUID, com.osunji.melog.feed.repository.PostReader.PostDetail> batchFindDetails(List<UUID> postIds) {
         if (postIds == null || postIds.isEmpty()) return Collections.emptyMap();
 
         // 1) 게시글 배치 조회
@@ -37,7 +36,7 @@ public class PostReaderJPA implements PostReader {
         // 3) 매핑: 좋아요 수는 컬렉션 size, 태그는 JSON 컬럼 그대로
         return posts.stream().collect(Collectors.toMap(
                 Post::getId,
-                p -> new PostReader.PostDetail(
+                p -> new com.osunji.melog.feed.repository.PostReader.PostDetail(
                         p.getId(),
                         p.getMediaType(),                      // String
                         p.getMediaUrl(),
