@@ -3,7 +3,7 @@ package com.osunji.melog.feed.service;
 import co.elastic.clients.elasticsearch._types.Time;
 import co.elastic.clients.elasticsearch._types.query_dsl.*;
 import com.osunji.melog.elk.entity.PostIndex;
-import com.osunji.melog.feed.FeedItem;
+import com.osunji.melog.feed.view.FeedItem;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
@@ -45,7 +45,7 @@ public class FeedService {
         this.scale = scale;
     }
 
-    public List<FeedItem> recommend(String userId, int size, List<String> seenIds) {
+    public List<FeedItem> recommend(UUID userId, int size, List<String> seenIds) {
         var sig       = signalService.build(userId);
         var tags      = sig.getTopTags();
         var followees = sig.getFolloweeIds();
