@@ -2,44 +2,37 @@ package com.osunji.melog.review.entity;
 
 import java.io.Serializable;
 import java.time.LocalDate;
+import java.util.UUID;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.Id;
-import jakarta.persistence.IdClass;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import com.osunji.melog.user.domain.User;
+import jakarta.persistence.*;
 
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import com.osunji.melog.user.User;
-
 @Entity
-@Table(name = "postBookmark")
+@Table(name = "post_bookmarks")  // 테이블명 일관성 개선
 @IdClass(PostBookmark.PostBookmarkId.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PostBookmark {
 
     /**
-     * 북마크한 사용자
+     * 북마크한 사용자 (UUID)
      */
     @Id
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn
+    @JoinColumn(name = "user_id")
     private User user;
 
     /**
-     * 북마크된 게시물
+     * 북마크된 게시물 (UUID)
      */
     @Id
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn
+    @JoinColumn(name = "post_id")
     private Post post;
 
     /**
@@ -57,19 +50,23 @@ public class PostBookmark {
         this.createdAt = LocalDate.now();
     }
 
+    /**
+     * 북마크 생성 팩토리 메서드
+     */
     public static PostBookmark createBookmark(User user, Post post) {
         return new PostBookmark(user, post);
     }
+
     /**
-     * 복합키 클래스
+     * 복합키 클래스 (UUID 기반으로 수정)
      */
     @NoArgsConstructor
     @EqualsAndHashCode
     public static class PostBookmarkId implements Serializable {
-        private String user; // User의 userId 타입과 일치
-        private String post; // Post의 id 타입과 일치
+        private UUID user; // ✅ User.id가 UUID이므로 UUID로 변경
+        private UUID post; // ✅ Post.id가 UUID이므로 UUID로 변경
 
-        public PostBookmarkId(String user, String post) {
+        public PostBookmarkId(UUID user, UUID post) {
             this.user = user;
             this.post = post;
         }

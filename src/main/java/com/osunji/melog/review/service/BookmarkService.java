@@ -1,6 +1,8 @@
 package com.osunji.melog.review.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import com.osunji.melog.global.common.AuthHelper;
 import com.osunji.melog.global.dto.ApiMessage;
@@ -9,7 +11,7 @@ import com.osunji.melog.review.entity.Post;
 import com.osunji.melog.review.entity.PostBookmark;
 import com.osunji.melog.review.repository.BookmarkRepository;
 import com.osunji.melog.review.repository.PostRepository;
-import com.osunji.melog.user.User;
+import com.osunji.melog.user.domain.User;
 import com.osunji.melog.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,83 +27,93 @@ public class BookmarkService {
 	private final UserRepository userRepository;
 	private final AuthHelper authHelper;
 
-	//---------------북마크 CRUD-----------------//
-
-	/**      게시글북마크 create (API 27번)   path(postID)header(token)       */
-	public ApiMessage<Void> addBookmark(String postId, String authHeader) {
-		// 1. 토큰으로 유저 id 겟
-		String userId = null;
+	/** 게시글 북마크 생성 (API 27번) */
+	public ApiMessage addBookmark(String postIdStr, String authHeader) {
 		try {
-			userId = authHelper.authHelper(authHeader);
-		} catch (Exception e) {
+			// 1. 토큰에서 userId 추출
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+
+			// 2. 사용자 및 게시글 조회
+			User user = userRepository.findById(userId)
+				.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+			UUID postId = UUID.fromString(postIdStr);
+			Post post = postRepository.findById(postId)
+				.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
+
+			// 3. 중복 북마크 체크
+			if (bookmarkRepository.existsByUserIdAndPostId(userId, postId)) {
+				return ApiMessage.fail(409, "이미 북마크한 게시글입니다.");
+			}
+
+			// 4. 북마크 생성 및 저장
+			PostBookmark bookmark = PostBookmark.createBookmark(user, post);
+			bookmarkRepository.save(bookmark);
+
+			return ApiMessage.success(201, "북마크가 성공적으로 추가되었습니다.", null);
+
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (IllegalStateException e) {
 			return ApiMessage.fail(401, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "북마크 추가 실패: " + e.getMessage());
 		}
-		// 2. 유저 존재 확인
-		User user = userRepository.findById(userId)
-			.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-		// 3. 해당 게시글 존재 확인
-		Post post = postRepository.findById(postId)
-			.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
-
-		// 이미 북마크되어 있지 않은 경우만 생성
-		if (bookmarkRepository.existsByUserIdAndPostId(userId, postId)) {
-			return ApiMessage.fail(409, "이미 북마크한 게시글입니다.");
-		}
-		PostBookmark bookmark = new PostBookmark(user, post);
-
-		bookmarkRepository.save(bookmark);
-
-		return ApiMessage.success(200, "북마크가 성공적으로 추가되었습니다.", null);
 	}
 
-
-	/**      게시글북마크 delete (API 25번)   path(postID)header(token)       */
-	public ApiMessage<Void> removeBookmark(String postId, String authHeader) {
-		// 1. 토큰으로 유저 id 겟
-		String userId = null;
+	/** 게시글 북마크 삭제 (API 25번) */
+	public ApiMessage removeBookmark(String postIdStr, String authHeader) {
 		try {
-			userId = authHelper.authHelper(authHeader);
-		} catch (Exception e) {
+			// 1. 토큰에서 userId 추출
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+
+			// 2. UUID 변환
+			UUID postId = UUID.fromString(postIdStr);
+
+			// 3. 북마크 존재 여부 확인
+			if (!bookmarkRepository.existsByUserIdAndPostId(userId, postId)) {
+				return ApiMessage.fail(404, "북마크 정보가 존재하지 않습니다.");
+			}
+
+			// 4. 북마크 삭제
+			bookmarkRepository.deleteByUserIdAndPostId(userId, postId);
+
+			return ApiMessage.success(200, "북마크가 성공적으로 제거되었습니다.", null);
+
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (IllegalStateException e) {
 			return ApiMessage.fail(401, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "북마크 삭제 실패: " + e.getMessage());
 		}
-		// 2. 유저 존재 확인
-		User user = userRepository.findById(userId)
-			.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-		// 3. 해당 게시글 존재 확인
-		Post post = postRepository.findById(postId)
-			.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
-
-
-		// 존재해야만 삭제
-		if (!bookmarkRepository.existsByUserIdAndPostId(userId, postId)) {
-			return ApiMessage.fail(404, "북마크 정보가 존재하지 않습니다.");
-		}
-		bookmarkRepository.deleteByUserIdAndPostId(userId, postId);
-
-		return ApiMessage.success(200, "북마크가 성공적으로 제거되었습니다.", null);
 	}
 
+	/** 사용자 북마크 목록 조회 (API 23번) */
+	@Transactional(readOnly = true)
+	public ApiMessage<BookmarkResponse.ListAll> getBookmarksByUser(String userIdStr) {
+		try {
+			UUID userId = UUID.fromString(userIdStr);
+			List<PostBookmark> bookmarks = bookmarkRepository.findBookmarkAllByuserId(userId);
 
+			List<BookmarkResponse.BookmarkData> results = bookmarks.stream()
+				.map(pb -> BookmarkResponse.BookmarkData.builder()
+					.postId(pb.getPost().getId().toString())
+					.title(pb.getPost().getTitle())
+					.createdAt(pb.getCreatedAt().atStartOfDay()) // LocalDate → LocalDateTime
+					.build())
+				.toList();
 
-	/**      게시글북마크 get (API 23번)   path(userId)       */
-	public ApiMessage<BookmarkResponse.ListAll> getBookmarksByUser(String userId) {
-		List<PostBookmark> bookmarks = bookmarkRepository.findBookmarkAllByuserId(userId);
+			BookmarkResponse.ListAll response = BookmarkResponse.ListAll.builder()
+				.results(results)
+				.build();
 
-		List<BookmarkResponse.BookmarkData> results = bookmarks.stream()
-			.map(pb -> BookmarkResponse.BookmarkData.builder()
-				.postId(pb.getPost().getId())
-				.title(pb.getPost().getTitle())
-				.createdAt(pb.getCreatedAt().atStartOfDay())
-				.build())
-			.toList();
+			return ApiMessage.success(200, "북마크 목록 조회 성공", response);
 
-		BookmarkResponse.ListAll response = BookmarkResponse.ListAll.builder()
-			.results(results)
-			.build();
-
-		return ApiMessage.success(200, "북마크 목록 조회 성공", response);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다.");
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "북마크 목록 조회 실패: " + e.getMessage());
+		}
 	}
-
-
-
 }
