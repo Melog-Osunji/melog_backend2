@@ -728,7 +728,7 @@ public class HarmonyService {
 
 
 	/**
-	 * 댓글 수 조회 - CommentRepository 활용 ✅
+	 * 댓글 수 조회 - FeedCommentRepository 활용 ✅
 	 */
 	private Integer getCommentCount(Post post) {
 		try {
@@ -740,7 +740,7 @@ public class HarmonyService {
 	}
 
 	/**
-	 * 베스트 댓글 조회 - CommentRepository 활용 ✅
+	 * 베스트 댓글 조회 - FeedCommentRepository 활용 ✅
 	 */
 	private HarmonyRoomResponse.HarmonyRoomPosts.PostResult.PostDetail.BestComment getBestComment(Post post) {
 		try {

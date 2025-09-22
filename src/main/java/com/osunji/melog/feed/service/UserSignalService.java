@@ -1,7 +1,7 @@
 package com.osunji.melog.feed.service;
 
-import com.osunji.melog.feed.SearchLogReader;
-import com.osunji.melog.feed.UserSignals;
+import com.osunji.melog.feed.reader.SearchLogReader;
+import com.osunji.melog.feed.view.UserSignals;
 import com.osunji.melog.user.repository.FollowRepository;
 import com.osunji.melog.user.repository.OnboardingRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.UUID;
 
 
 @Service
@@ -21,7 +22,7 @@ public class UserSignalService {
     private final FollowRepository followRepository;
     private final SearchLogReader searchLogReader;
 
-    public UserSignals build(String userId) {
+    public UserSignals build(UUID userId) {
         // 1) 온보딩 → 태그 후보
         var obTags = new ArrayList<String>();
         onboardingRepository.findByUser_Id(userId).ifPresent(ob -> {
@@ -31,8 +32,8 @@ public class UserSignalService {
         });
 
         // 2) 검색 로그(최근 30일): query + category
-        var topQ = searchLogReader.topQueries(userId, 30, 30).keySet();     // ["베토벤 피아노", ...]
-        var topC = searchLogReader.topCategories(userId, 30, 30).keySet();  // ["낭만파","피아노",...]
+        var topQ = searchLogReader.topQueries(userId.toString(), 30, 30).keySet();     // ["베토벤 피아노", ...]
+        var topC = searchLogReader.topCategories(userId.toString(), 30, 30).keySet();  // ["낭만파","피아노",...]
 
         var qTokens = new ArrayList<String>();
         for (var q : topQ) {

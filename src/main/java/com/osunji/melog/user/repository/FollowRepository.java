@@ -1,11 +1,13 @@
 package com.osunji.melog.user.repository;
 
 import java.util.List;
+import java.util.UUID;
+
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import com.osunji.melog.user.domain.Follow;
 
-public interface FollowRepository extends JpaRepository<Follow, String> {
+public interface FollowRepository extends JpaRepository<Follow, UUID> {
 
     @Query("""
        select f.following.id
@@ -13,5 +15,5 @@ public interface FollowRepository extends JpaRepository<Follow, String> {
        where f.follower.id = :userId
          and f.status = true
     """)
-    List<String> findFolloweeIds(@Param("userId") String userId);
+    List<UUID> findFolloweeIds(@Param("userId") UUID userId);
 }

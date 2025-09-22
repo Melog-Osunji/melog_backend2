@@ -25,7 +25,6 @@ import java.util.stream.Collectors;
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    /** 컨트롤러/서비스에서 쉽게 꺼내 쓰도록 request attribute key 제공 */
     public static final String USER_ID_ATTR = "USER_ID";
 
     private final JWTUtil jwtUtil;
@@ -37,7 +36,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         final String uri = request.getRequestURI();
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true; // preflight
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true;
 
         AntPathMatcher m = new AntPathMatcher();
         String[] skip = {
@@ -68,9 +67,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             "/api/harmony"
 
         };
-        for (String p : skip) {
-            if (m.match(p, uri)) return true;
-        }
+        for (String p : skip) if (m.match(p, uri)) return true;
         return false;
     }
 
@@ -78,48 +75,45 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
             throws ServletException, IOException {
 
-        // 이미 인증되어 있으면 그대로 통과(기존 동작 유지)
+        // 이미 인증되어 있으면 통과하며, USER_ID_ATTR도 보정
         Authentication existing = SecurityContextHolder.getContext().getAuthentication();
         if (existing != null && existing.isAuthenticated() && !(existing instanceof AnonymousAuthenticationToken)) {
-            // 편의상 USER_ID_ATTR도 채워주기 (다른 필터가 먼저 인증했을 수도 있으니)
-            if (existing.getName() != null) {
-                req.setAttribute(USER_ID_ATTR, existing.getName());
+            if (existing.getPrincipal() instanceof UUID uuid) {
+                req.setAttribute(USER_ID_ATTR, uuid);
+            } else if (existing.getName() != null) {
+                // 이름(문자열)만 있는 경우 보정 시도
+                try { req.setAttribute(USER_ID_ATTR, UUID.fromString(existing.getName())); } catch (IllegalArgumentException ignored) {}
             }
             chain.doFilter(req, res);
             return;
         }
 
-        // 1) 토큰 추출 (헤더 → 쿠키 → (개발용) 쿼리파라미터)
+        // 토큰 추출(헤더 → 쿠키 → 쿼리파라미터[개발용])
         String token = extractAccessToken(req);
         if (token == null) {
-            // 토큰 없으면 익명으로 통과. 최종 접근 권한은 SecurityConfig에서 제어됨.
             chain.doFilter(req, res);
             return;
         }
 
         try {
-            // 2) 검증 + userId/roles 추출
-            jwtUtil.validateAccess(token);
-            String userId = jwtUtil.getUserIdFromAccess(token);
+            jwtUtil.validateAccess(token); // 만료/서명/iss/aud 등 검증
+            String userIdStr = jwtUtil.getUserIdFromAccess(token);
 
-            // roles(optional) → 권한 매핑
-//            Collection<SimpleGrantedAuthority> authorities = extractAuthorities(token);
+            // ★ UUID로 확정
+            UUID userId = UUID.fromString(userIdStr);
 
-            // 3) SecurityContext 세팅(기존 목적 유지)
             var authorities = Collections.<SimpleGrantedAuthority>emptyList();
-// 또는 Collections.emptyList() 도 가능 (권한 검사는 안 하니까)
-
             UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(userId, null,authorities);
+                    new UsernamePasswordAuthenticationToken(userId, null, authorities);
             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
             SecurityContextHolder.getContext().setAuthentication(auth);
-            // 4) 컨트롤러에서 헤더 없이도 userId를 사용할 수 있도록 attribute 세팅(요청 범위)
+
+            // 요청 스코프 attr도 UUID로
             req.setAttribute(USER_ID_ATTR, userId);
 
             chain.doFilter(req, res);
 
-        } catch (JwtException e) {
-            // 기존처럼 invalid_token 응답
+        } catch (JwtException | IllegalArgumentException e) { // 잘못된 토큰/UUID 포맷
             SecurityContextHolder.clearContext();
             res.setHeader("WWW-Authenticate", "Bearer error=\"invalid_token\"");
             res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -129,15 +123,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
     }
 
-    /** Authorization 헤더 → access 쿠키 → (개발용) accessToken 쿼리파라미터 순으로 토큰을 추출 */
     private String extractAccessToken(HttpServletRequest req) {
-        // 1) Authorization: Bearer ...
         String header = req.getHeader(HttpHeaders.AUTHORIZATION);
-        if (header != null && header.startsWith("Bearer ")) {
-            return header.substring(7);
-        }
+        if (header != null && header.startsWith("Bearer ")) return header.substring(7);
 
-        // 2) access 쿠키
         if (req.getCookies() != null) {
             for (Cookie c : req.getCookies()) {
                 if ("access".equals(c.getName()) && c.getValue() != null && !c.getValue().isBlank()) {
@@ -145,15 +134,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 }
             }
         }
-
-        // 3) (개발 편의) 쿼리 파라미터 ?accessToken=... — 운영에서는 꺼둘 것을 권장
-        String qp = req.getParameter("accessToken");
-        if (qp != null && !qp.isBlank()) {
-            return qp;
-        }
+        String qp = req.getParameter("accessToken"); // 개발 편의
+        if (qp != null && !qp.isBlank()) return qp;
 
         return null;
     }
+
+
 
 //    /** roles 클레임을 권한으로 매핑(없어도 무방) */
 //    @SuppressWarnings("unchecked")
