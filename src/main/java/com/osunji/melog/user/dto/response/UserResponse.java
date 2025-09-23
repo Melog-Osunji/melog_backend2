@@ -46,4 +46,19 @@ public class UserResponse {
         private boolean marketing;
         private String createdAt; // ISO-8601 문자열 (예: 2025-07-18T11:30:00)
     }
+
+    @Getter
+    @Builder
+    public static class followingResponse{
+        private String userId;
+        private String followingId;
+        private String msg;
+    }
+
+    @Getter
+    @Builder
+    public static class followingCheckResponse{
+        private boolean result;
+    }
+
 }

@@ -39,8 +39,15 @@ public class UserRequest {
     }
 
     @Getter
+    @Builder
     public static class profilePatch {
         @NotNull
         private Map<String, String> updates; // e.g. {"intro":"안녕하세요", "nickName":"모차르트러버"}
+    }
+
+    @Getter
+    @Builder
+    public static class following {
+        private String follower;
     }
 }

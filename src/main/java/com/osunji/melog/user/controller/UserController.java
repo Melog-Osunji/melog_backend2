@@ -89,6 +89,7 @@ public class UserController {
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
+    // 프로필 조회
     @GetMapping("/profile")
     public ResponseEntity<?> profile(
             @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
@@ -97,6 +98,30 @@ public class UserController {
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
+    // 팔로우/언팔로우
+    @PostMapping("/following")
+    public ResponseEntity<?> following(
+            @RequestBody UserRequest.following request,
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+    ) {
+        ApiMessage<UserResponse.followingResponse> response = userService.following(request, userId);
+        return ResponseEntity.status(response.getCode()).body(response);
+    }
+
+    // 팔로우 여부 조회
+    @GetMapping("/following/{nickname:[A-Za-z0-9가-힣._-]{2,20}}")
+    public ResponseEntity<?> getFollowing(
+            @PathVariable String nickname,
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+    ) {
+        // 언더스코어를 공백으로 복원
+        String realNickname = nickname.replace("_", " ");
+
+        ApiMessage<UserResponse.followingCheckResponse> response =
+                userService.followingListByNickname(userId, realNickname);
+
+        return ResponseEntity.status(response.getCode()).body(response);
+    }
 
 
 

@@ -2,11 +2,13 @@ package com.osunji.melog.user.service;
 
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.user.domain.Agreement;
+import com.osunji.melog.user.domain.Follow;
 import com.osunji.melog.user.domain.Onboarding;
 import com.osunji.melog.user.domain.User;
 import com.osunji.melog.user.dto.request.UserRequest;
 import com.osunji.melog.user.dto.response.UserResponse;
 import com.osunji.melog.user.repository.AgreementRepository;
+import com.osunji.melog.user.repository.FollowRepository;
 import com.osunji.melog.user.repository.OnboardingRepository;
 import com.osunji.melog.user.repository.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -14,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -24,11 +27,13 @@ public class UserService {
     private final UserRepository userRepository;
     private final AgreementRepository agreementRepository;
     private final OnboardingRepository onboardingRepository;
+    private final FollowRepository followRepository;
 
-    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository) {
+    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository) {
         this.userRepository = userRepository;
         this.agreementRepository = agreementRepository;
         this.onboardingRepository = onboardingRepository;
+        this.followRepository = followRepository;
     }
 
     private static final Set<String> PROFILE_UPDATABLE_FIELDS = Set.of(
@@ -107,7 +112,6 @@ public class UserService {
     }
 
 
-
     @Transactional
     public ApiMessage<UserResponse.OnboardingResponse> onboarding(UserRequest.onboarding request, UUID userId) {
 
@@ -121,8 +125,8 @@ public class UserService {
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
 
         // 3) 입력 정제 (중복/공백 제거)
-        List<String> composers   = sanitize(request.getComposer());   // Lombok @Getter 기준
-        List<String> periods     = sanitize(request.getPeriod());
+        List<String> composers = sanitize(request.getComposer());   // Lombok @Getter 기준
+        List<String> periods = sanitize(request.getPeriod());
         List<String> instruments = sanitize(request.getInstrument());
 
         // 4) 생성 저장 (unique 충돌은 DB에 맡기고 캐치)
@@ -310,4 +314,70 @@ public class UserService {
     }
 
 
+    @Transactional
+    public ApiMessage<UserResponse.followingResponse> following(UserRequest.following request, UUID userId) {
+
+        // 0) 파라미터 해석 및 기본 검증
+        if (request == null || request.getFollower() == null) {
+            return ApiMessage.fail(HttpStatus.BAD_REQUEST.value(), "대상 사용자 ID가 없습니다.");
+        }
+
+        UUID targetId;
+        try {
+            targetId = UUID.fromString(request.getFollower());
+        } catch (IllegalArgumentException e) {
+            return ApiMessage.fail(HttpStatus.BAD_REQUEST.value(), "잘못된 UUID 형식입니다: " + request.getFollower());
+        }
+
+        if (userId.equals(targetId)) {
+            return ApiMessage.fail(HttpStatus.BAD_REQUEST.value(), "자기 자신을 팔로우할 수 없습니다.");
+        }
+
+        // 1) 주체/대상 유저 로드
+        User me = userRepository.findById(userId)
+                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
+        User target = userRepository.findById(targetId)
+                .orElseThrow(() -> new NoSuchElementException("대상 사용자를 찾을 수 없습니다: " + targetId));
+
+        // 2) 기존 팔로우 관계 조회
+        Follow rel = followRepository.findByFollower_IdAndFollowing_Id(userId, targetId).orElse(null);
+
+        String msg;
+        if (rel == null) {
+            // 없으면 새로 팔로우
+            rel = Follow.createFollow(me, target);
+            followRepository.save(rel);
+            msg = "followed";
+        } else if (Boolean.TRUE.equals(rel.getStatus())) {
+            // 이미 팔로우 중이면 언팔로우
+            rel.deactivate();          // 아래 엔티티 메서드 참고
+            // JPA dirty checking으로 업데이트 반영
+            msg = "unfollowed";
+        } else {
+            // 기존 기록은 있는데 비활성 상태면 다시 팔로우
+            rel.activate(LocalDateTime.now());
+            msg = "followed";
+        }
+
+        UserResponse.followingResponse body = UserResponse.followingResponse.builder()
+                .userId(me.getId().toString())
+                .followingId(target.getId().toString())
+                .msg(msg)
+                .build();
+
+        return ApiMessage.success(HttpStatus.OK.value(), msg, body);
+    }
+
+    @Transactional
+    public ApiMessage<UserResponse.followingCheckResponse> followingListByNickname(UUID userId, String nickname) {
+        UUID targetId = userRepository.findIdByNickname(nickname)
+                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다.")).getId();
+
+        boolean iFollow   = followRepository.existsByFollower_IdAndFollowing_Id(userId, targetId);
+
+        UserResponse.followingCheckResponse body = UserResponse.followingCheckResponse.builder()
+                .result(iFollow)
+                .build();
+        return ApiMessage.success(HttpStatus.OK.value(), "팔로우 정보 조회 성공", body);
+    }
 }
