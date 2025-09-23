@@ -47,6 +47,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 	List<Post> findByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId,
 		@Param("currentUserId") UUID currentUserId);
 
+
 	//---------------미디어 관련-----------------//
 	/** 인기 미디어 조회 + hiddenUsers 제외 */
 	@Query("SELECT p FROM Post p JOIN FETCH p.user " +

@@ -70,4 +70,14 @@ public class HarmonyRoomRequest {
 	public static class ApproveOrDeny {
 		private String userID;              // 승인/거절할 사용자 ID
 	}
+
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
+	@Builder
+	public static class Report {
+		private String reason;          // 신고 사유 ("spam", "abuse", "inappropriate" 등)
+		private String category;        // 신고 카테고리
+		private String details;         // 상세 내용
+	}
 }

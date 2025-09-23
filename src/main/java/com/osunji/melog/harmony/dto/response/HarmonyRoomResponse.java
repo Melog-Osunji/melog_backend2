@@ -48,6 +48,7 @@ public class HarmonyRoomResponse {
 		@AllArgsConstructor
 		@Builder
 		public static class RecentMediaInfo {
+			private String harmonyRoomId;
 			private String userNickname;
 			private String userProfileImgLink;
 			private String harmonyRoomName;
@@ -91,6 +92,8 @@ public class HarmonyRoomResponse {
 	@AllArgsConstructor
 	@Builder
 	public static class HarmonyRoomPosts {
+		private String harmonyRoomId;           // ✅ 하모니룸 고유 ID 추가
+		private String harmonyRoomName;
 		private List<PostResult> recommend;     // 추천 게시글
 		private List<PostResult> popular;       // 인기 게시글
 
@@ -149,6 +152,7 @@ public class HarmonyRoomResponse {
 	@AllArgsConstructor
 	@Builder
 	public static class Information {
+		private String id;
 		private String profileImgLink;
 		private String name;
 		private List<String> category;
@@ -169,6 +173,7 @@ public class HarmonyRoomResponse {
 	@AllArgsConstructor
 	@Builder
 	public static class Detail {
+		private String id;
 		private String profileImgLink;
 		private String name;
 		private List<String> category;
@@ -188,9 +193,20 @@ public class HarmonyRoomResponse {
 	@AllArgsConstructor
 	@Builder
 	public static class IsMember {
+		private String harmonyRoomId;           // ✅ 하모니룸 고유 ID 추가
+		private String harmonyRoomName;
 		private Boolean isMember;
 	}
-
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
+	@Builder
+	public static class BookmarkResult {
+		private String harmonyRoomId;           // ✅ 하모니룸 고유 ID 추가
+		private String harmonyRoomName;
+		private Boolean bookmarked;     // true: 즐겨찾기 추가, false: 제거
+		private String message;         // "즐겨찾기에 추가되었습니다" / "즐겨찾기에서 제거되었습니다"
+	}
 	/**
 	 * 가입 승인 대기 유저 리스트 응답 DTO
 	 */
@@ -199,6 +215,8 @@ public class HarmonyRoomResponse {
 	@AllArgsConstructor
 	@Builder
 	public static class WaitingUsers {
+		private String harmonyRoomId;           // ✅ 하모니룸 고유 ID 추가
+		private String harmonyRoomName;
 		private List<WaitingUserInfo> waitingUsers;
 
 		@Data
@@ -229,9 +247,37 @@ public class HarmonyRoomResponse {
 	@AllArgsConstructor
 	@Builder
 	public static class Share {
+		private String harmonyRoomId;           // ✅ 하모니룸 고유 ID 추가
+		private String harmonyRoomName;
 		private String deepLink;            // 딥링크 URL
 		private String webLink;             // 웹 링크 (앱 없을 때)
 		private String storeLink;           // 앱스토어 링크
 		private String qrCode;              // QR 코드 URL (선택)
+	}
+
+	/**
+	 * 하모니룸 이름 검색 결과 DTO
+	 */
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
+	@Builder
+	public static class SearchByName {
+		private List<HarmonyRoomSearchResult> harmonyRooms;
+
+		@Data
+		@NoArgsConstructor
+		@AllArgsConstructor
+		@Builder
+		public static class HarmonyRoomSearchResult {
+			private String id;                      // ✅ 하모니룸 고유 ID (이미 있음)
+			private String name;                    // 하모니룸 이름
+			private List<String> category;          // 카테고리
+			private String profileImgLink;          // 프로필 이미지
+			private String intro;                   // 소개글
+			private Integer memberNum;              // 멤버 수
+			private Boolean isPrivate;              // 비공개 여부
+			private Boolean isDirectAssign;         // 바로 가입 여부
+		}
 	}
 }

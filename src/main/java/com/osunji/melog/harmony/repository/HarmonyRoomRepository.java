@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.awt.print.Pageable;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,7 +32,32 @@ public interface HarmonyRoomRepository extends JpaRepository<HarmonyRoom, UUID> 
 	 */
 	@Query("SELECT h FROM HarmonyRoom h WHERE h.isPrivate = false ORDER BY h.bookMarkNum DESC, h.createdAt DESC")
 	List<HarmonyRoom> findPublicHarmonyRoomsForRecommend();
+	/**
+	 * ✅ 실제 북마크 수 기준 랭킹 조회 (기존 메서드 대체)
+	 */
+	@Query("SELECT COUNT(hr) + 1 FROM HarmonyRoom hr " +
+		"WHERE (SELECT COUNT(hrb) FROM HarmonyRoomBookmark hrb WHERE hrb.harmonyRoom = hr) > :bookmarkCount")
+	Long findRankingByActualBookMarkCount(@Param("bookmarkCount") Long bookmarkCount);
 
+	/**
+	 * ✅ 하모니룸별 실제 북마크 수와 함께 조회 (성능 최적화용)
+	 */
+	@Query("SELECT hr.id, hr.name, COUNT(hrb) as bookmarkCount " +
+		"FROM HarmonyRoom hr " +
+		"LEFT JOIN HarmonyRoomBookmark hrb ON hrb.harmonyRoom = hr " +
+		"GROUP BY hr.id, hr.name " +
+		"ORDER BY COUNT(hrb) DESC")
+	List<Object[]> findHarmonyRoomsWithBookmarkCount();
+
+	/**
+	 * ✅ 북마크 수 상위 하모니룸 조회 (인기순)
+	 */
+	@Query("SELECT hr FROM HarmonyRoom hr " +
+		"LEFT JOIN HarmonyRoomBookmark hrb ON hrb.harmonyRoom = hr " +
+		"WHERE hr.isPrivate = false " +
+		"GROUP BY hr " +
+		"ORDER BY COUNT(hrb) DESC")
+	List<HarmonyRoom> findTopHarmonyRoomsByBookmarkCount(Pageable pageable);
 	/**
 	 * 북마크 순 랭킹 조회
 	 */

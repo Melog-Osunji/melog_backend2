@@ -13,6 +13,8 @@ import com.osunji.melog.review.repository.PostRepository;
 import com.osunji.melog.user.domain.User;
 import com.osunji.melog.user.repository.UserRepository;
 import com.osunji.melog.review.repository.CommentRepository;
+import com.osunji.melog.elk.service.HarmonyReportLogService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -36,6 +38,9 @@ public class HarmonyService {
 	private final HarmonyRoomMembersRepository harmonyRoomMembersRepository;
 	private final UserRepository userRepository;
 	private final PostRepository postRepository;
+	private final HarmonyReportLogService harmonyReportLogService;
+	private final HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository;
+	private final HarmonyRoomReportRepository harmonyRoomReportRepository;
 	private final AuthHelper authHelper;
 	private final PostService postService;
 	/**
@@ -72,9 +77,8 @@ public class HarmonyService {
 	}
 
 	/**
-	 * 2. 나의 하모니룸 조회
+	 * 2. 나의 하모니룸 조회 (즐겨찾기 기능 완성)
 	 */
-	//todo : 추후 즐겨찾기 한 하모니룸 추가
 	@Transactional(readOnly = true)
 	public HarmonyRoomResponse.MyHarmony getMyHarmony(String authHeader) {
 		// 0 = 토큰으로 유저 인식 및 유저 체크
@@ -105,12 +109,26 @@ public class HarmonyService {
 				.build())
 			.collect(Collectors.toList());
 
-		log.info("📋SERVICE LINE 75 : 나의 하모니룸 조회 완료: 생성 하모니룸  {}개, 멤버인 하모니룸  {}개", myHarmony.size(), harmony.size());
+		// ✅ 3 = 내가 즐겨찾기한 하모니룸 (실제 구현)
+		List<HarmonyRoomBookmark> bookmarkList = harmonyRoomBookmarkRepository.findByUserId(userId);
+		List<HarmonyRoomResponse.MyHarmony.HarmonyRoomInfo> bookmarkHarmony = bookmarkList.stream()
+			.map(bookmark -> bookmark.getHarmonyRoom())
+			.filter(Objects::nonNull) // null 체크
+			.sorted(Comparator.comparing(HarmonyRoom::getName))
+			.map(room -> HarmonyRoomResponse.MyHarmony.HarmonyRoomInfo.builder()
+				.id(room.getId().toString())
+				.profileImg(room.getProfileImageUrl())
+				.name(room.getName())
+				.build())
+			.collect(Collectors.toList());
+
+		log.info("📋 나의 하모니룸 조회 완료: 생성 {}개, 멤버 {}개, 즐겨찾기 {}개",
+			myHarmony.size(), harmony.size(), bookmarkHarmony.size());
 
 		return HarmonyRoomResponse.MyHarmony.builder()
 			.myHarmony(myHarmony)
 			.harmony(harmony)
-			.bookmarkHarmony(List.of()) // 북마크 기능 빈리스트로 리턴
+			.bookmarkHarmony(bookmarkHarmony) // ✅ 실제 즐겨찾기 데이터 반환
 			.build();
 	}
 
@@ -142,23 +160,23 @@ public class HarmonyService {
 
 		List<HarmonyRoomResponse.RecentMedia.RecentMediaInfo> recentMediaList = new ArrayList<>();
 
+
 		for (HarmonyRoomPosts harmonyRoomPosts : harmonyRoomPostsList) {
 			List<String> postIds = harmonyRoomPosts.getPostIds();
 			if (postIds.isEmpty()) continue;
 
-			// 3 =  게시글 ID들을 UUID로 변환
 			List<UUID> postUuids = postIds.stream()
 				.map(UUID::fromString)
 				.collect(Collectors.toList());
 
-			// 4 = 게시글들 조회하고 YouTube 미디어만 필터링
 			List<Post> posts = postRepository.findAllById(postUuids);
 			posts.stream()
 				.filter(post -> "youtube".equals(post.getMediaType()) && post.getMediaUrl() != null)
-				.sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt())) // ✅ 시간까지 정확한 정렬
+				.sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
 				.forEach(post -> {
 					String createdAgo = calculateCreatedAgo(post.getCreatedAt());
 					recentMediaList.add(HarmonyRoomResponse.RecentMedia.RecentMediaInfo.builder()
+						.harmonyRoomId(harmonyRoomPosts.getHarmonyRoom().getId().toString()) // ✅ 하모니룸 ID 추가
 						.userNickname(post.getUser().getNickname())
 						.userProfileImgLink(post.getUser().getProfileImageUrl())
 						.harmonyRoomName(harmonyRoomPosts.getHarmonyRoom().getName())
@@ -230,7 +248,7 @@ public class HarmonyService {
 			.recommendedRooms(recommendedRooms)
 			.build();
 	}
-//ddtest
+
 	/**
 	 * 5. 하모니룸 게시글 조회
 	 */
@@ -277,6 +295,8 @@ public class HarmonyService {
 		log.info("📝 하모니룸 게시글 조회 완료: {}개", posts.size());
 
 		return HarmonyRoomResponse.HarmonyRoomPosts.builder()
+			.harmonyRoomId(harmonyRoom.getId().toString())  // ✅ 하모니룸 ID 추가
+			.harmonyRoomName(harmonyRoom.getName())
 			.recommend(recommend)
 			.popular(popular)
 			.build();
@@ -308,6 +328,8 @@ public class HarmonyService {
 		log.info("ℹ️ 하모니룸 정보 조회 완료: {} (멤버 {}명)", harmonyRoom.getName(), members.size());
 
 		return HarmonyRoomResponse.Information.builder()
+			.id(harmonyRoom.getId().toString())         // ✅ 하모니룸 ID 추가
+
 			.profileImgLink(harmonyRoom.getProfileImageUrl())
 			.name(harmonyRoom.getName())
 			.category(harmonyRoom.getCategory())
@@ -322,16 +344,16 @@ public class HarmonyService {
 	}
 
 	/**
-	 * 7. 하모니룸 상세 정보 조회
+	 * 7. 하모니룸 상세 정보 조회 (북마크 기능 완성)
 	 */
-	// todo : 즐겨찾기(북마크) 기능 추가
 	@Transactional(readOnly = true)
 	public HarmonyRoomResponse.Detail getHarmonyRoomDetail(String harmonyId, String authHeader) {
-		// 0 = ㅇㅇ유저그거
+		// 0 = 사용자 인증 및 조회
 		UUID userId = authHelper.authHelperAsUUID(authHeader);
 		User user = userRepository.findById(userId)
 			.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
-		// 1 = 하모니룸 체크
+
+		// 1 = 하모니룸 조회
 		UUID harmonyRoomId = UUID.fromString(harmonyId);
 		HarmonyRoom harmonyRoom = harmonyRoomRepository.findById(harmonyRoomId)
 			.orElseThrow(() -> new IllegalArgumentException("하모니룸을 찾을 수 없습니다"));
@@ -339,8 +361,9 @@ public class HarmonyService {
 		// 2 = 멤버 수 조회
 		Long memberCount = harmonyRoomMembersRepository.countByHarmonyRoom(harmonyRoom);
 
-		// 3 = 랭킹 조회 (북마크 수 기준)
-		Long ranking = harmonyRoomRepository.findRankingByBookMarkNum(harmonyRoom.getBookMarkNum());
+		// ✅ 3 = 실제 북마크 수 기준 랭킹 조회
+		Long actualBookmarkCount = harmonyRoomBookmarkRepository.countByHarmonyRoomId(harmonyRoomId);
+		Long ranking = harmonyRoomRepository.findRankingByActualBookMarkCount(actualBookmarkCount);
 
 		// 4 = 게시글 수 조회
 		Optional<HarmonyRoomPosts> harmonyRoomPostsOpt = harmonyRoomPostsRepository.findByHarmonyRoom(harmonyRoom);
@@ -349,10 +372,16 @@ public class HarmonyService {
 		// 5 = 내가 멤버인지 확인
 		boolean isAssign = harmonyRoomMembersRepository.existsByHarmonyRoomAndUser(harmonyRoom, user);
 
-		log.info("📋 하모니룸 상세정보 조회 완료: {} (멤버 {}명, 랭킹 {}위)",
-			harmonyRoom.getName(), memberCount, ranking);
+		// ✅ 6 = 내가 북마크했는지 확인 (실제 구현)
+		boolean isBookmark = harmonyRoomBookmarkRepository
+			.findByUserIdAndHarmonyRoomId(userId, harmonyRoomId)
+			.isPresent();
+
+		log.info("📋 하모니룸 상세정보 조회 완료: {} (멤버 {}명, 북마크 {}개, 랭킹 {}위, 내 북마크: {})",
+			harmonyRoom.getName(), memberCount, actualBookmarkCount, ranking, isBookmark);
 
 		return HarmonyRoomResponse.Detail.builder()
+			.id(harmonyRoom.getId().toString())
 			.profileImgLink(harmonyRoom.getProfileImageUrl())
 			.name(harmonyRoom.getName())
 			.category(harmonyRoom.getCategory())
@@ -360,7 +389,7 @@ public class HarmonyService {
 			.memberNum(memberCount.intValue())
 			.ranking(ranking.intValue())
 			.countPosts(postCount)
-			.isBookmark(false) // 북마크 기능 제거
+			.isBookmark(isBookmark)      // ✅ 실제 북마크 상태 반환
 			.isAssign(isAssign)
 			.build();
 	}
@@ -384,6 +413,8 @@ public class HarmonyService {
 		log.info("👥 멤버 여부 확인: {} - {}", harmonyRoom.getName(), isMember ? "멤버임" : "비멤버");
 		// 3 = 체크
 		return HarmonyRoomResponse.IsMember.builder()
+			.harmonyRoomId(harmonyRoom.getId().toString())  // ✅ 하모니룸 ID 추가
+			.harmonyRoomName(harmonyRoom.getName())
 			.isMember(isMember)
 			.build();
 	}
@@ -421,7 +452,7 @@ public class HarmonyService {
 	}
 
 	/**
-	 * 10. 하모니룸 삭제
+	 * 10. 하모니룸 삭제 (연관된 북마크와 신고까지 모두 삭제)
 	 */
 	public void deleteHarmonyRoom(String harmonyId, HarmonyRoomRequest.Delete request, String authHeader) {
 		UUID userId = authHelper.authHelperAsUUID(authHeader);
@@ -438,19 +469,60 @@ public class HarmonyService {
 		}
 
 		String roomName = harmonyRoom.getName();
+		log.info("🗑️ 하모니룸 삭제 시작: {} (소유자: {})", roomName, user.getNickname());
 
-		// 연관 데이터 삭제
-		harmonyRoomPostsRepository.findByHarmonyRoom(harmonyRoom).ifPresent(harmonyRoomPostsRepository::delete);
-		harmonyRoomAssignWaitRepository.findByHarmonyRoom(harmonyRoom).ifPresent(harmonyRoomAssignWaitRepository::delete);
+		try {
+			// ✅ 1. 북마크 먼저 삭제 (Foreign Key 제약 해결)
+			List<HarmonyRoomBookmark> bookmarks = harmonyRoomBookmarkRepository.findByHarmonyRoomId(harmonyRoomId);
+			if (!bookmarks.isEmpty()) {
+				harmonyRoomBookmarkRepository.deleteAll(bookmarks);
+				log.info("  📌 북마크 {}개 삭제 완료", bookmarks.size());
+			}
 
-		List<HarmonyRoomMembers> members = harmonyRoomMembersRepository.findByHarmonyRoom(harmonyRoom);
-		harmonyRoomMembersRepository.deleteAll(members);
+			// ✅ 2. 신고 기록 삭제
+			List<HarmonyRoomReport> reports = harmonyRoomReportRepository.findByHarmonyRoomIdOrderByReportedAtDesc(harmonyRoomId);
+			if (!reports.isEmpty()) {
+				harmonyRoomReportRepository.deleteAll(reports);
+				log.info("  🚨 신고 기록 {}개 삭제 완료", reports.size());
+			}
 
-		// 하모니룸 삭제
-		harmonyRoomRepository.delete(harmonyRoom);
+			// ✅ 3. 기존 연관 데이터 삭제
+			harmonyRoomPostsRepository.findByHarmonyRoom(harmonyRoom).ifPresent(harmonyRoomPostsRepository::delete);
+			log.info("  📝 게시글 목록 삭제 완료");
 
-		// TODO: ElasticSearch에 폐쇄 사유 로그 저장
-		log.info("🗑️ 하모니룸 삭제 완료: {} (사유: {})", roomName, request.getReason());
+			harmonyRoomAssignWaitRepository.findByHarmonyRoom(harmonyRoom).ifPresent(harmonyRoomAssignWaitRepository::delete);
+			log.info("  ⏳ 가입 대기 목록 삭제 완료");
+
+			List<HarmonyRoomMembers> members = harmonyRoomMembersRepository.findByHarmonyRoom(harmonyRoom);
+			if (!members.isEmpty()) {
+				harmonyRoomMembersRepository.deleteAll(members);
+				log.info("  👥 멤버 {}명 삭제 완료", members.size());
+			}
+
+			// ✅ 4. 마지막에 하모니룸 삭제
+			harmonyRoomRepository.delete(harmonyRoom);
+			log.info("  🏠 하모니룸 본체 삭제 완료");
+
+			// ✅ 5. ElasticSearch에 삭제 로그 (선택사항)
+			try {
+				harmonyReportLogService.logHarmonyReport(
+					"DELETE_" + System.currentTimeMillis(),
+					harmonyRoomId.toString(),
+					roomName + " (DELETED)",
+					userId.toString(),
+					"HARMONY_ROOM_DELETED",
+					"사유: " + (request.getReason() != null ? request.getReason() : "미제공")
+				);
+			} catch (Exception e) {
+				log.warn("⚠️ 삭제 로그 기록 실패: {}", e.getMessage());
+			}
+
+			log.info("✅ 하모니룸 완전 삭제 완료: {}", roomName);
+
+		} catch (Exception e) {
+			log.error("💥 하모니룸 삭제 중 오류 발생: {}", e.getMessage(), e);
+			throw new RuntimeException("하모니룸 삭제에 실패했습니다: " + e.getMessage());
+		}
 	}
 
 	/**
@@ -549,6 +621,64 @@ public class HarmonyService {
 		log.info("❌ 가입 거절 완료: {} → {}", targetUser.getNickname(), harmonyRoom.getName());
 	}
 
+
+	/**
+	 * 13. 하모니룸 즐겨찾기 추가/제거 (토글) - POST /api/harmony/{harmonyID}/bookmark
+	 */
+	@Transactional
+	public HarmonyRoomResponse.BookmarkResult toggleBookmark(String harmonyId, String authHeader) {
+		try {
+			log.info("🔖 하모니룸 즐겨찾기 토글 시작: {}", harmonyId);
+
+			// 1. 사용자 인증
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			User user = userRepository.findById(userId)
+				.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
+
+			// 2. 하모니룸 존재 확인 (HarmonyRoom 사용)
+			UUID harmonyRoomUuid = UUID.fromString(harmonyId);
+			HarmonyRoom harmonyRoom = harmonyRoomRepository.findById(harmonyRoomUuid)
+				.orElseThrow(() -> new IllegalArgumentException("하모니룸을 찾을 수 없습니다"));
+
+			// 3. 기존 즐겨찾기 확인
+			Optional<HarmonyRoomBookmark> existingBookmark =
+				harmonyRoomBookmarkRepository.findByUserIdAndHarmonyRoomId(userId, harmonyRoomUuid);
+
+			boolean bookmarked;
+			String message;
+
+			if (existingBookmark.isPresent()) {
+				// 즐겨찾기 제거
+				harmonyRoomBookmarkRepository.delete(existingBookmark.get());
+				bookmarked = false;
+				message = "즐겨찾기에서 제거되었습니다";
+				log.info("📌 즐겨찾기 제거됨 - 사용자: {}, 하모니룸: {}", user.getNickname(), harmonyRoom.getName());
+			} else {
+				// 즐겨찾기 추가
+				HarmonyRoomBookmark bookmark = HarmonyRoomBookmark.create(user, harmonyRoom);
+				harmonyRoomBookmarkRepository.save(bookmark);
+				bookmarked = true;
+				message = "즐겨찾기에 추가되었습니다";
+				log.info("⭐ 즐겨찾기 추가됨 - 사용자: {}, 하모니룸: {}", user.getNickname(), harmonyRoom.getName());
+			}
+
+			return HarmonyRoomResponse.BookmarkResult.builder()
+				.harmonyRoomId(harmonyRoom.getId().toString())  // ✅ 하모니룸 ID 추가
+				.harmonyRoomName(harmonyRoom.getName())
+				.bookmarked(bookmarked)
+				.message(message)
+				.build();
+
+		} catch (IllegalArgumentException e) {
+			log.error("❌ 즐겨찾기 토글 오류: {}", e.getMessage());
+			throw e;
+		} catch (Exception e) {
+			log.error("💥 즐겨찾기 토글 처리 실패: {}", e.getMessage(), e);
+			throw new RuntimeException("즐겨찾기 처리에 실패했습니다", e);
+		}
+	}
+
+
 	/**
 	 * 14. 하모니룸 공유
 	 */
@@ -572,6 +702,112 @@ public class HarmonyService {
 			.storeLink(storeLink)
 			.qrCode(qrCode)
 			.build();
+	}
+
+	/**
+	 * 15. 하모니룸 신고 (Field 오류 해결 버전)
+	 */
+	@Transactional
+	public void reportHarmony(String harmonyId, HarmonyRoomRequest.Report reportRequest, String authHeader) {
+		try {
+			log.info("🚨 하모니룸 신고 시작: {} - 사유: {}", harmonyId, reportRequest.getReason());
+
+			// 1. 사용자 인증
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			User reporter = userRepository.findById(userId)
+				.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
+
+			// 2. 하모니룸 존재 확인
+			UUID harmonyRoomUuid = UUID.fromString(harmonyId);
+			HarmonyRoom harmonyRoom = harmonyRoomRepository.findById(harmonyRoomUuid)
+				.orElseThrow(() -> new IllegalArgumentException("하모니룸을 찾을 수 없습니다"));
+
+			// 3. 중복 신고 방지 (DB 기반)
+			boolean alreadyReported = harmonyRoomReportRepository
+				.existsByReporterIdAndHarmonyRoomId(userId, harmonyRoomUuid);
+
+			if (alreadyReported) {
+				log.warn("⚠️ 이미 신고한 하모니룸: 사용자={}, 하모니룸={}",
+					reporter.getNickname(), harmonyRoom.getName());
+				throw new IllegalArgumentException("이미 신고한 하모니룸입니다");
+			}
+
+			// 4. 신고 기록 저장 (DB)
+			HarmonyRoomReport report = HarmonyRoomReport.create(
+				reporter,
+				harmonyRoom,
+				reportRequest.getReason(),
+				reportRequest.getCategory(),
+				reportRequest.getDetails()
+			);
+
+			harmonyRoomReportRepository.save(report);
+			log.info("📝 신고 기록 DB 저장 완료: {} - 신고자: {}", report.getId(), reporter.getNickname());
+
+			// 5. ✅ ElasticSearch에 안전한 로그 기록 (Field 오류 해결)
+			try {
+				harmonyReportLogService.logHarmonyReportByCategory(
+					report.getId().toString(),      // reportId
+					harmonyRoom.getId().toString(), // harmonyId
+					harmonyRoom.getName(),          // harmonyName (한글 지원)
+					reporter.getId().toString(),    // reporterId
+					reportRequest.getReason(),      // reason (한글 지원)
+					reportRequest.getCategory(),    // category
+					reportRequest.getDetails()      // details (한글 지원, null 허용)
+				);
+				log.info("📊 ElasticSearch 신고 로그 기록 완료");
+			} catch (Exception e) {
+				log.warn("⚠️ ElasticSearch 로그 기록 실패: {}", e.getMessage());
+				// ElasticSearch 실패해도 신고는 정상 처리
+			}
+
+			// 6. 통계 업데이트
+			try {
+				harmonyReportLogService.logReportStatistics(harmonyId);
+			} catch (Exception e) {
+				log.warn("신고 통계 업데이트 실패: {}", e.getMessage());
+			}
+
+		} catch (IllegalArgumentException e) {
+			log.error("❌ 신고 처리 오류: {}", e.getMessage());
+			throw e;
+		} catch (Exception e) {
+			log.error("💥 신고 처리 실패: {}", e.getMessage(), e);
+			throw new RuntimeException("신고 처리에 실패했습니다", e);
+		}
+	}
+
+
+	/**
+	 * ElasticSearch에 신고 로그 기록
+	 */
+	private void logReportToElasticsearch(HarmonyRoomReport report) {
+		try {
+			Map<String, Object> logData = Map.of(
+				"type", "harmony_report",
+				"harmonyId", report.getHarmonyRoom().getId().toString(),
+				"harmonyName", report.getHarmonyRoom().getName(),
+				"reporterId", report.getReporter().getId().toString(),
+				"reporterNickname", report.getReporter().getNickname(),
+				"reason", report.getReason(),
+				"category", report.getCategory(),
+				"details", report.getDetails() != null ? report.getDetails() : "",
+				"timestamp", report.getReportedAt().toString(),
+				"serverTime", LocalDateTime.now().toString()
+			);
+
+			// TODO: 실제 ElasticSearch 클라이언트 구현
+			// elasticsearchOperations.index(IndexRequest.of(i -> i
+			//     .index("harmony-reports")
+			//     .document(logData)
+			// ));
+
+			log.info("📊 ElasticSearch 신고 로그 데이터: {}", logData);
+
+		} catch (Exception e) {
+			log.error("⚠️ ElasticSearch 로깅 실패: {}", e.getMessage());
+			throw e;
+		}
 	}
 
 	/**
@@ -650,12 +886,6 @@ public class HarmonyService {
 		// getHarmonyRoomPosts와 동일한 로직
 		return getHarmonyRoomPosts(harmonyId);
 	}
-
-
-
-
-
-
 
 
 
