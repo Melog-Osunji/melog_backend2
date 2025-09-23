@@ -111,7 +111,7 @@ public class JWTUtil {
             .getExpiration();
         return exp.getTime();
     }
-
+    //ho
     /* ===================== 호환용 (기존 메서드) ===================== */
     public String createJWT(String userId, Long expiredMillis) {
         return createAccessToken(userId, expiredMillis);
