@@ -1,4 +1,4 @@
-package com.osunji.melog.user.dto;
+package com.osunji.melog.user.dto.response;
 
 import com.osunji.melog.user.domain.User;
 
