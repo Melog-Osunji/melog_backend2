@@ -15,6 +15,7 @@ public class CommentMapper {
 		if (bestComment == null) return null;
 
 		return CommentResponse.Best.builder()
+			.id(bestComment.getId().toString())
 			.userID(bestComment.getUser().getId().toString())     // ✅ API 명세: "userID"
 			.profileUrl(bestComment.getUser().getProfileImageUrl()) // ✅ API 명세: "profileUrl"
 			.content(bestComment.getContent())
@@ -25,6 +26,7 @@ public class CommentMapper {
 	/** 댓글 데이터 변환 (API 16번) */
 	public CommentResponse.CommentData toCommentData(PostComment comment) {
 		return CommentResponse.CommentData.builder()
+			.id(comment.getId().toString())
 			.userID(comment.getUser().getId().toString())         // ✅ API 명세: "userID"
 			.profileUrl(comment.getUser().getProfileImageUrl())  // ✅ API 명세: "profileUrl"
 			.content(comment.getContent())
@@ -46,6 +48,7 @@ public class CommentMapper {
 	/** 대댓글 데이터 변환 (재귀 구조) */
 	private CommentResponse.RecommentData toRecommentData(PostComment comment) {
 		return CommentResponse.RecommentData.builder()
+			.id(comment.getId().toString())
 			.userID(comment.getUser().getId().toString())         // ✅ API 명세: "userID"
 			.content(comment.getContent())
 			.likes(comment.getLikeCount())                        // ✅ Entity 메서드 사용

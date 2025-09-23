@@ -13,21 +13,26 @@ import com.osunji.melog.review.dto.request.PostRequest;
 import com.osunji.melog.review.dto.response.PostResponse;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
 import com.osunji.melog.user.UserRepository;
+import com.osunji.melog.user.repository.FollowRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class PostService {
-
+	private final FollowRepository followRepository;
 	private final PostRepository postRepository;
 	private final CommentRepository commentRepository;
 	private final UserRepository userRepository;
@@ -281,93 +286,196 @@ public class PostService {
 	//---------------피드 조회-----------------//
 
 	/** 인기 피드 GET (API 19번) */
+
+	/** 인기 피드 GET (API 19번) - 좋아요 순 */
 	@Transactional(readOnly = true)
 	public ApiMessage<FilterPostResponse.FeedList> getPopularPosts(String authHeader) {
 		try {
+			System.out.println("🔥 ===== 인기 피드 조회 시작 (좋아요 순) =====");
+
 			// 1. 토큰에서 userId 추출 (선택적)
 			UUID userId = null;
 			try {
 				userId = authHelper.authHelperAsUUID(authHeader);
+				System.out.println("✅ 로그인 사용자: " + userId);
 			} catch (Exception e) {
-				// 비로그인 사용자도 조회 가능
+				System.out.println("ℹ️ 비로그인 사용자로 처리");
 			}
 
-			// 2. 인기 게시글 50개 조회
-			List<Post> posts = postRepository.findPopularPosts(userId)
-				.stream().limit(50).toList();
+			// 2. ✅ 전체 게시글 조회 후 좋아요 순 정렬
+			System.out.println("📋 인기 게시글 조회 시작...");
+
+			List<Post> allPosts = postRepository.findAll();
+			System.out.println("  - 전체 게시글 수: " + allPosts.size());
+
+			// 좋아요 수 기준으로 정렬
+			List<Post> popularPosts = allPosts.stream()
+				.filter(post -> post.getUser() != null) // user가 null인 게시글 제외
+				.sorted((p1, p2) -> {
+					int likes1 = (p1.getLikes() != null) ? p1.getLikes().size() : 0;
+					int likes2 = (p2.getLikes() != null) ? p2.getLikes().size() : 0;
+
+					System.out.println("    게시글 " + p1.getId() + ": " + likes1 + "개 좋아요");
+					System.out.println("    게시글 " + p2.getId() + ": " + likes2 + "개 좋아요");
+
+					return Integer.compare(likes2, likes1); // 좋아요 많은 순 (내림차순)
+				})
+				.limit(50)
+				.collect(Collectors.toList());
+
+			System.out.println("  - 인기 게시글 (좋아요 순) " + popularPosts.size() + "개 선별 완료");
 
 			// 3. DTO 변환
-			List<FilterPostResponse.FeedPostData> feedPostList = posts.stream()
-				.map(post -> {
-					Optional<PostComment> bestCommentOpt = commentRepository.findBestComment(post.getId());
+			System.out.println("📋 DTO 변환 시작...");
+			List<FilterPostResponse.FeedPostData> feedPostList = new ArrayList<>();
+
+			for (Post post : popularPosts) {
+				try {
+					int likeCount = (post.getLikes() != null) ? post.getLikes().size() : 0;
+					System.out.println("  변환 중: " + post.getId() + " - " + post.getTitle() + " (좋아요 " + likeCount + "개)");
+
+					// ✅ 안전한 댓글 조회
+					Optional<PostComment> bestCommentOpt = Optional.empty();
+					int commentCount = 0;
+
+					try {
+						bestCommentOpt = commentRepository.findBestComment(post.getId());
+						commentCount = commentRepository.countCommentByPostId(post.getId());
+					} catch (Exception e) {
+						System.out.println("    ⚠️ 댓글 조회 실패: " + e.getMessage());
+					}
+
 					PostComment bestComment = bestCommentOpt.orElse(null);
-					int commentCount = commentRepository.countCommentByPostId(post.getId());
-					return postMapper.toFeedPostData(post, bestComment, commentCount);
-				})
-				.toList();
+					FilterPostResponse.FeedPostData feedData = postMapper.toFeedPostData(post, bestComment, commentCount);
+					feedPostList.add(feedData);
+
+					System.out.println("    ✅ 변환 완료");
+
+				} catch (Exception e) {
+					System.out.println("    ❌ DTO 변환 오류: " + e.getMessage());
+					e.printStackTrace();
+					// 실패한 게시글은 스킵하고 계속 진행
+				}
+			}
+
+			System.out.println("✅ DTO 변환 완료: " + feedPostList.size() + "개");
 
 			FilterPostResponse.FeedList feedList = FilterPostResponse.FeedList.builder()
 				.results(feedPostList)
 				.build();
 
+			System.out.println("🎉 ===== 인기 피드 조회 성공 (좋아요 순) =====");
 			return ApiMessage.success(200, "인기 피드 조회 성공", feedList);
 
 		} catch (Exception e) {
+			System.out.println("💥 인기 피드 조회 오류: " + e.getMessage());
+			e.printStackTrace();
 			return ApiMessage.fail(500, "인기 피드 조회 실패: " + e.getMessage());
 		}
 	}
 
-	/** 팔로우 피드 GET (API 20번) - 디버깅 버전 */
+
+
+
+	/** 팔로우 피드 GET (API 20번)  */
 	@Transactional(readOnly = true)
 	public ApiMessage<FilterPostResponse.FeedList> getFollowPosts(String authHeader) {
 		try {
 			System.out.println("🔥 ===== 팔로우 피드 조회 시작 =====");
-			System.out.println("authHeader: " + (authHeader != null ? authHeader.substring(0, Math.min(30, authHeader.length())) + "..." : "null"));
 
-			// 1. 토큰에서 userId 추출 (필수)
+			// 1. 토큰에서 userId 추출
 			UUID userId = authHelper.authHelperAsUUID(authHeader);
 			System.out.println("✅ 사용자 ID 추출: " + userId);
 
 			// 2. 팔로잉 유저 ID 리스트 조회
-			List<UUID> followingUserIds = getFollowingUserIds(userId);
+			List<UUID> followingUserIds = followRepository.findFolloweeIds(userId);
 			System.out.println("📋 팔로잉 사용자 수: " + followingUserIds.size());
 			System.out.println("  - 팔로잉 ID 목록: " + followingUserIds);
 
-			// ✅ 임시로 현재 사용자 자신의 게시글도 포함 (테스트용)
 			if (followingUserIds.isEmpty()) {
-				System.out.println("⚠️ 팔로잉 사용자가 없음 - 임시로 본인 포함");
-				followingUserIds = List.of(userId);  // 본인 게시글이라도 표시
+				System.out.println("⚠️ 팔로잉 사용자가 없음 - 빈 결과 반환");
+				return ApiMessage.success(200, "팔로우하는 사용자가 없습니다",
+					FilterPostResponse.FeedList.builder()
+						.results(Collections.emptyList())
+						.build());
 			}
 
-			// 3. 팔로우 피드 조회
-			System.out.println("📋 게시글 조회 시작...");
-			List<Post> posts = postRepository.findFollowPosts(followingUserIds, userId)
-				.stream().limit(50).toList();
-			System.out.println("  - 조회된 게시글 수: " + posts.size());
+			// 3. ✅ 완전히 안전한 방법: findAll()로 전체 조회 후 필터링
+			System.out.println("📋 게시글 조회 시작 (전체 조회 후 필터링 방법)...");
 
-			if (posts.isEmpty()) {
-				System.out.println("⚠️ 조회된 게시글이 없음");
-				// 전체 게시글 수 확인
-				List<Post> allPosts = postRepository.findAll();
-				System.out.println("  - DB 전체 게시글 수: " + allPosts.size());
+			List<Post> allPosts = postRepository.findAll();
+			System.out.println("  - 전체 게시글 수: " + allPosts.size());
+
+			// 각 게시글 정보 출력 (디버깅)
+			for (Post post : allPosts) {
+				if (post.getUser() != null) {
+					System.out.println("    게시글: " + post.getId() + " - 작성자: " + post.getUser().getId() + " - 제목: " + post.getTitle());
+				} else {
+					System.out.println("    게시글: " + post.getId() + " - 작성자: null - 제목: " + post.getTitle());
+				}
+			}
+
+			// 팔로잉하는 사용자의 게시글만 필터링
+			List<Post> followingPosts = allPosts.stream()
+				.filter(post -> {
+					if (post.getUser() == null) {
+						System.out.println("    ⚠️ 게시글 " + post.getId() + "의 user가 null");
+						return false;
+					}
+					boolean isFollowing = followingUserIds.contains(post.getUser().getId());
+					System.out.println("    게시글 " + post.getId() + " 작성자 " + post.getUser().getId() + " 팔로잉 여부: " + isFollowing);
+					return isFollowing;
+				})
+				.sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt())) // 최신순
+				.limit(50)
+				.collect(Collectors.toList());
+
+			System.out.println("  - 팔로잉 사용자 게시글 수: " + followingPosts.size());
+
+			// 각 팔로잉 사용자별 게시글 수 출력
+			for (UUID followingId : followingUserIds) {
+				long count = followingPosts.stream()
+					.filter(p -> p.getUser() != null && p.getUser().getId().equals(followingId))
+					.count();
+				System.out.println("    - 사용자 " + followingId + ": " + count + "개 게시글");
+
+				// 해당 사용자의 게시글 제목들 출력
+				followingPosts.stream()
+					.filter(p -> p.getUser() != null && p.getUser().getId().equals(followingId))
+					.forEach(p -> System.out.println("      * " + p.getTitle()));
 			}
 
 			// 4. DTO 변환
 			System.out.println("📋 DTO 변환 시작...");
-			List<FilterPostResponse.FeedPostData> feedPostList = posts.stream()
-				.map(post -> {
+			List<FilterPostResponse.FeedPostData> feedPostList = new ArrayList<>();
+
+			for (Post post : followingPosts) {
+				try {
+					System.out.println("  변환 중: " + post.getId() + " - " + post.getTitle());
+
+					// ✅ 안전한 댓글 조회
+					Optional<PostComment> bestCommentOpt = Optional.empty();
+					int commentCount = 0;
+
 					try {
-						System.out.println("  변환 중: " + post.getId() + " - " + post.getTitle());
-						Optional<PostComment> bestCommentOpt = commentRepository.findBestComment(post.getId());
-						PostComment bestComment = bestCommentOpt.orElse(null);
-						int commentCount = commentRepository.countCommentByPostId(post.getId());
-						return postMapper.toFeedPostData(post, bestComment, commentCount);
+						bestCommentOpt = commentRepository.findBestComment(post.getId());
+						commentCount = commentRepository.countCommentByPostId(post.getId());
 					} catch (Exception e) {
-						System.out.println("❌ DTO 변환 오류: " + e.getMessage());
-						throw e;
+						System.out.println("    ⚠️ 댓글 조회 실패: " + e.getMessage());
 					}
-				})
-				.toList();
+
+					PostComment bestComment = bestCommentOpt.orElse(null);
+					FilterPostResponse.FeedPostData feedData = postMapper.toFeedPostData(post, bestComment, commentCount);
+					feedPostList.add(feedData);
+
+					System.out.println("    ✅ 변환 완료");
+
+				} catch (Exception e) {
+					System.out.println("    ❌ DTO 변환 오류: " + e.getMessage());
+					e.printStackTrace();
+					// 실패한 게시글은 스킵하고 계속 진행
+				}
+			}
 
 			System.out.println("✅ DTO 변환 완료: " + feedPostList.size() + "개");
 
@@ -378,15 +486,14 @@ public class PostService {
 			System.out.println("🎉 ===== 팔로우 피드 조회 성공 =====");
 			return ApiMessage.success(200, "팔로우 피드 조회 성공", feedList);
 
-		} catch (IllegalStateException e) {
-			System.out.println("❌ 인증 오류: " + e.getMessage());
-			return ApiMessage.fail(401, e.getMessage());
 		} catch (Exception e) {
 			System.out.println("💥 팔로우 피드 조회 오류: " + e.getMessage());
 			e.printStackTrace();
 			return ApiMessage.fail(500, "팔로우 피드 조회 실패: " + e.getMessage());
 		}
 	}
+
+
 
 	/** 추천 피드 GET (API 18번) - TODO 구현 */
 	@Transactional(readOnly = true)
