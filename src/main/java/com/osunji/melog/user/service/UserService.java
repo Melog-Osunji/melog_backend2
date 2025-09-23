@@ -36,38 +36,77 @@ public class UserService {
     );
 
     @Transactional
-    public ApiMessage<UserResponse.AgreementResponse> agreement(UserRequest.agreement request, UUID userId) {
-        // 1) 유저 조회
+    public ApiMessage<UserResponse.AgreementResponse> createAgreement(UserRequest.agreement request, UUID userId) {
+        // 1) 유저 존재 확인
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
-        // 2) 약관 레코드 upsert
-        Agreement agreement = agreementRepository.findById(userId)
-                .map(a -> {                      // 기존 있으면 marketing만 갱신
-                    a.updateMarketing(request.isMarketing());
-                    return a;
-                })
-                .orElseGet(() ->
-                        Agreement.createAgreement(user, request.isMarketing())
-                );
+        // 2) 이미 동의가 있으면 409
+        if (agreementRepository.existsById(userId)) {
+            return ApiMessage.fail(HttpStatus.CONFLICT.value(), "이미 약관 동의가 존재합니다.");
+        }
 
+        // 3) 생성
+        Agreement agreement = Agreement.createAgreement(user, request.isMarketing());
         agreementRepository.save(agreement);
 
-        // 3) createdAt을 ISO-8601 문자열로 변환
-        // 현재 엔티티가 LocalDate이므로 00:00:00으로 맞춰 ISO-8601 출력
+        // 4) 응답
+        return ApiMessage.success(
+                HttpStatus.CREATED.value(),
+                "created",
+                toAgreementResponse(agreement)
+        );
+    }
+
+    @Transactional
+    public ApiMessage<UserResponse.AgreementResponse> updateMarketing(UserRequest.agreement request, UUID userId) {
+        // 1) 기존 동의 없으면 404
+        Agreement agreement = agreementRepository.findById(userId)
+                .orElseThrow(() -> new NoSuchElementException("약관 동의가 존재하지 않습니다."));
+
+        // 2) 마케팅 동의만 갱신
+        agreement.updateMarketing(request.isMarketing());
+        // JPA dirty checking으로 flush
+
+        // 3) 응답
+        return ApiMessage.success(
+                HttpStatus.OK.value(),
+                "updated",
+                toAgreementResponse(agreement)
+        );
+    }
+
+    private UserResponse.AgreementResponse toAgreementResponse(Agreement agreement) {
         String createdAtIso = agreement.getCreatedAt()
                 .atStartOfDay()
                 .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 
-        // 4) 응답 DTO 구성
+        return UserResponse.AgreementResponse.builder()
+                .id(agreement.getUserId().toString())
+                .marketing(agreement.getMarketing())
+                .createdAt(createdAtIso)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ApiMessage<UserResponse.AgreementResponse> getMarketing(UUID userId) {
+        Agreement agreement = agreementRepository.findById(userId)
+                .orElseThrow(() -> new NoSuchElementException("약관 동의가 존재하지 않습니다."));
+
+        String createdAtIso = agreement.getCreatedAt()
+                .atStartOfDay()
+                .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+
         UserResponse.AgreementResponse body = UserResponse.AgreementResponse.builder()
                 .id(agreement.getUserId().toString())
                 .marketing(agreement.getMarketing())
                 .createdAt(createdAtIso)
                 .build();
 
-        return ApiMessage.success(200, "success", body);
+        return ApiMessage.success(HttpStatus.OK.value(), "success", body);
     }
+
+
 
     @Transactional
     public ApiMessage<UserResponse.OnboardingResponse> onboarding(UserRequest.onboarding request, UUID userId) {
@@ -108,6 +147,28 @@ public class UserService {
 
 
         return ApiMessage.success(HttpStatus.CREATED.value(), "온보딩 생성 완료", body);
+    }
+
+    public ApiMessage<UserResponse.OnboardingResponse> getOnboarding(UUID userId) {
+
+        // 1) 온보딩 정보 조회
+        Onboarding ob = onboardingRepository.findByUser_Id(userId)
+                .orElseThrow(() -> new NoSuchElementException("온보딩 정보를 찾을 수 없습니다."));
+
+        // 2) User도 필요하다면 fetch
+        User user = ob.getUser();
+
+        // 3) 응답 DTO 매핑
+        UserResponse.OnboardingResponse body = UserResponse.OnboardingResponse.builder()
+                .id(ob.getOnboardingId().toString())
+                .userId(user.getId().toString())
+                .composer(ob.getComposers())
+                .period(ob.getPeriods())
+                .instrument(ob.getInstruments())
+                .build();
+
+        // 4) ApiMessage success 래핑
+        return ApiMessage.success(HttpStatus.OK.value(), "온보딩 조회 성공", body);
     }
 
     // ----- helpers -----
@@ -227,8 +288,26 @@ public class UserService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public ApiMessage<UserResponse.ProfileResponse> getProfile(UUID userId) {
+        // 1) 유저 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NoSuchElementException("존재하지 않는 사용자입니다."));
+
+        // 2) 응답 바디 생성
+        UserResponse.ProfileResponse body = UserResponse.ProfileResponse.builder()
+                .id(user.getId().toString())
+                .email(user.getEmail())
+                .nickName(user.getNickname())
+                .platform(user.getPlatform().name())
+                .build();
+
+        return ApiMessage.success(HttpStatus.OK.value(), "프로필 조회 성공", body);
+    }
+
     private String sanitize(String s) {
         return s == null ? null : s.trim();
     }
+
 
 }

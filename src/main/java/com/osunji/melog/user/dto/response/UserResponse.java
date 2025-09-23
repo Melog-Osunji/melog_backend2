@@ -38,4 +38,12 @@ public class UserResponse {
         private String profileImg; // GET_FROM_KAKAO or updated
         private String intro;      // updated
     }
+
+    @Getter
+    @Builder
+    public static class MarketingResponse{
+        private String userId;
+        private boolean marketing;
+        private String createdAt; // ISO-8601 문자열 (예: 2025-07-18T11:30:00)
+    }
 }

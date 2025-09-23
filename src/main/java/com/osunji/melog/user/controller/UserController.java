@@ -21,33 +21,61 @@ public class UserController {
     }
 
 
-    // 약관 동의 저장
+    // 약관 동의 -> 마케팅 여부 저장
     @PostMapping("/agreement")
     public ResponseEntity<?> agreement(
             @RequestBody UserRequest.agreement request,
             @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
     ) {
-        ApiMessage response = userService.agreement(request, userId);
+        ApiMessage<UserResponse.AgreementResponse> response = userService.createAgreement(request, userId);
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
-    // 온보딩
+    @PatchMapping("/marketing")
+    public ResponseEntity<?> marketing(
+            @RequestBody UserRequest.agreement request,
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+    ) {
+        ApiMessage<UserResponse.AgreementResponse> response = userService.updateMarketing(request, userId);
+        return ResponseEntity.status(response.getCode()).body(response);
+    }
+
+
+    @GetMapping("/marketing")
+    public ResponseEntity<?> getMarketing(
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+    ) {
+        ApiMessage<UserResponse.AgreementResponse> response = userService.getMarketing(userId);
+        return ResponseEntity.status(response.getCode()).body(response);
+    }
+
+
+    // 온보딩 생성
     @PostMapping("/onboarding")
     public ResponseEntity<?> onboarding(
             @RequestBody UserRequest.onboarding request,
             @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
     ) {
-        ApiMessage response = userService.onboarding(request, userId);
+        ApiMessage<UserResponse.OnboardingResponse> response = userService.onboarding(request, userId);
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
-    // 온보딩
+    // 온보딩 업데이트
     @PatchMapping("/onboarding")
     public ResponseEntity<?> patchOnboarding(
             @RequestBody UserRequest.onboardingPatch request,
             @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
     ) {
         ApiMessage<?> response = userService.patchOnboarding(request, userId);
+        return ResponseEntity.status(response.getCode()).body(response);
+    }
+
+    // 온보딩
+    @GetMapping("/onboarding")
+    public ResponseEntity<?> getOnboarding(
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+    ) {
+        ApiMessage<?> response = userService.getOnboarding(userId);
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
@@ -60,5 +88,17 @@ public class UserController {
         ApiMessage<UserResponse.ProfileResponse> response = userService.profile(request, userId);
         return ResponseEntity.status(response.getCode()).body(response);
     }
+
+    @GetMapping("/profile")
+    public ResponseEntity<?> profile(
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+    ) {
+        ApiMessage<UserResponse.ProfileResponse> response = userService.getProfile(userId);
+        return ResponseEntity.status(response.getCode()).body(response);
+    }
+
+
+
+
 
 }
