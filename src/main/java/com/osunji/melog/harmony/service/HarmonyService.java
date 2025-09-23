@@ -11,7 +11,7 @@ import com.osunji.melog.review.entity.Post;
 import com.osunji.melog.review.entity.PostComment;
 import com.osunji.melog.review.repository.PostRepository;
 import com.osunji.melog.user.domain.User;
-import com.osunji.melog.user.UserRepository;
+import com.osunji.melog.user.repository.UserRepository;
 import com.osunji.melog.review.repository.CommentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;

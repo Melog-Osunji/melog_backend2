@@ -1,4 +1,4 @@
-package com.osunji.melog.user;
+package com.osunji.melog.user.repository;
 
 import com.osunji.melog.user.domain.User;
 import com.osunji.melog.user.domain.enums.Platform;
@@ -17,6 +17,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {  // UUID →
 
     Optional<User> findByEmail(String email);
     Optional<User> findByOidc(String oidc);
+    Optional<User> findById(UUID id);
 
     // ✅ UUID 변환 문제 해결을 위한 명시적 쿼리
     @Query("SELECT u FROM User u WHERE u.id = :userId")
