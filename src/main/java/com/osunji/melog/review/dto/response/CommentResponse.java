@@ -20,6 +20,7 @@ public class CommentResponse {
 	@Builder
 	//---------------베스트 댓글 조회 (API 17번)-----------------//
 	public static class Best {
+		private String id;
 		private String userID;                  // ✅ API 명세: "userID"
 		private String profileUrl;              // ✅ API 명세: "profileUrl"
 		private String content;                 // 댓글내용
@@ -30,6 +31,7 @@ public class CommentResponse {
 	@Setter
 	@Builder
 	public static class CommentData {
+		private String id;
 		private String userID;                  // ✅ API 명세: "userID" (작성자아이디)
 		private String profileUrl;              // ✅ API 명세: "profileUrl"
 		private String content;                 // 댓글내용
@@ -41,6 +43,7 @@ public class CommentResponse {
 	@Setter
 	@Builder
 	public static class RecommentData {
+		private String id;
 		private String userID;                  // ✅ API 명세: "userID" (작성자아이디)
 		private String content;                 // 댓글내용
 		private Integer likes;                  // ✅ Integer 타입으로 통일
