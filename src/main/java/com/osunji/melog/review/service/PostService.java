@@ -528,11 +528,7 @@ public class PostService {
 		}
 	}
 
-	// 임시 메서드 - 추후 UserService에서 구현
-	private List<UUID> getFollowingUserIds(UUID userId) {
-		// TODO: UserService에서 팔로우 리스트 조회 로직 구현
-		return List.of(); // 임시로 빈 리스트
-	}
+
 
 
 }

@@ -289,6 +289,32 @@ public class HarmonyController {
 	}
 
 
+
+	/**
+	 * 13. 하모니룸 즐겨찾기 추가/제거 (토글) - POST /api/harmony/{harmonyID}/bookmark
+	 */
+	@PostMapping("/harmony/{harmonyId}/bookmark")
+	public ResponseEntity<ApiMessage<HarmonyRoomResponse.BookmarkResult>> toggleBookmark(
+		@PathVariable String harmonyId,
+		@RequestHeader("Authorization") String authHeader) {
+
+		log.info("🔖 하모니룸 즐겨찾기 토글 요청: {}", harmonyId);
+
+		try {
+			HarmonyRoomResponse.BookmarkResult result = harmonyService.toggleBookmark(harmonyId, authHeader);
+			return ResponseEntity.ok(ApiMessage.success(200, result.getMessage(), result));
+		} catch (IllegalArgumentException e) {
+			log.error("즐겨찾기 토글 실패 - 잘못된 요청: {}", e.getMessage());
+			return ResponseEntity.badRequest().body(ApiMessage.fail(400, e.getMessage()));
+		} catch (IllegalStateException e) {
+			log.error("즐겨찾기 토글 실패 - 인증 오류: {}", e.getMessage());
+			return ResponseEntity.status(401).body(ApiMessage.fail(401, "인증이 필요합니다"));
+		} catch (Exception e) {
+			log.error("하모니룸 즐겨찾기 토글 실패: {}", e.getMessage(), e);
+			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "즐겨찾기 처리에 실패했습니다"));
+		}
+	}
+
 	/**
 	 * 14. 하모니룸 공유 - POST /api/harmony/{harmonyID}/share
 	 */
@@ -311,6 +337,34 @@ public class HarmonyController {
 	}
 
 	/**
+	 * 15. 하모니룸 신고 - POST /api/harmony/{harmonyID}/report
+	 */
+	@PostMapping("/harmony/{harmonyId}/report")
+	public ResponseEntity<ApiMessage<Void>> reportHarmony(
+		@PathVariable String harmonyId,
+		@RequestBody HarmonyRoomRequest.Report reportRequest,
+		@RequestHeader("Authorization") String authHeader) {
+
+		log.info("🚨 하모니룸 신고 요청: {} - 사유: {}, 카테고리: {}",
+			harmonyId, reportRequest.getReason(), reportRequest.getCategory());
+
+		try {
+			harmonyService.reportHarmony(harmonyId, reportRequest, authHeader);
+			return ResponseEntity.ok(ApiMessage.success(200, "신고가 접수되었습니다", null));
+		} catch (IllegalArgumentException e) {
+			log.error("하모니룸 신고 실패 - 잘못된 요청: {}", e.getMessage());
+			return ResponseEntity.badRequest().body(ApiMessage.fail(400, e.getMessage()));
+		} catch (IllegalStateException e) {
+			log.error("하모니룸 신고 실패 - 인증 오류: {}", e.getMessage());
+			return ResponseEntity.status(401).body(ApiMessage.fail(401, "인증이 필요합니다"));
+		} catch (Exception e) {
+			log.error("하모니룸 신고 처리 실패: {}", e.getMessage(), e);
+			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "신고 처리에 실패했습니다"));
+		}
+	}
+
+
+	/**
 	 * 16. 하모니룸 가입 신청 - POST /api/harmony/{harmonyID}/join
 	 */
 	@PostMapping("/harmony/{harmonyId}/join")
@@ -330,6 +384,11 @@ public class HarmonyController {
 			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "가입 신청에 실패했습니다"));
 		}
 	}
+
+
+
+
+
 
 	/**
 	 * 17. 하모니룸 탈퇴 - DELETE /api/harmony/{harmonyID}/leave
