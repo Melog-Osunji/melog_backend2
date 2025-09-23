@@ -64,7 +64,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             "/api/search/**",
             "/api/search",
             "/api/harmony/**",
-            "/api/harmony"
+            "/api/harmony",
+            "/api/secretMelog/notices0128/**"
 
         };
         for (String p : skip) if (m.match(p, uri)) return true;

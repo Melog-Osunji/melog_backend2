@@ -64,7 +64,10 @@ public class SecurityConfig {
             "/api/search/**",
             "/api/search",
             "/api/harmony/**",
-            "/api/harmony"
+            "/api/harmony",
+        "/api/secretMelog/notices0128",
+        "/api/secretMelog/notices0128/**"
+
 
 
     };
