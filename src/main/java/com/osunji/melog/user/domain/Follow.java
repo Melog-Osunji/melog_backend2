@@ -1,6 +1,7 @@
 package com.osunji.melog.user.domain;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -27,7 +28,7 @@ public class Follow {
      */
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String id;
+    private UUID id;
     /**
      * 팔로우 하는 사람 == 나
      */
@@ -65,6 +66,17 @@ public class Follow {
 
     public static Follow createFollow(User follower, User following) {
         return new Follow(follower, following,true);
+    }
+
+    /** 팔로우 활성화(재팔로우) */
+    public void activate(LocalDateTime when) {
+        this.status = true;
+        this.followedAt = (when != null) ? when : LocalDateTime.now();
+    }
+
+    /** 팔로우 비활성화(언팔로우) */
+    public void deactivate() {
+        this.status = false;
     }
 
 }

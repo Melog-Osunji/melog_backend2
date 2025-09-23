@@ -63,5 +63,8 @@ public class Agreement {
         return new Agreement(user, marketing, LocalDate.now());
     }
 
+    public void updateMarketing(Boolean marketing) {
+        this.marketing = marketing;           // createdAt은 최초 동의 일시로 그대로 둠
+    }
 
 }

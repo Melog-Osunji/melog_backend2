@@ -1,4 +1,4 @@
-package com.osunji.melog.user.dto;
+package com.osunji.melog.user.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
