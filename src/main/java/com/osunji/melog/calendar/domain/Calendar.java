@@ -1,6 +1,7 @@
 package com.osunji.melog.calendar.domain;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 import jakarta.persistence.*;
 
@@ -23,7 +24,7 @@ public class Calendar {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", columnDefinition = "uuid")
-    private String id; // 가능하면 UUID 타입 권장: private UUID id;
+    private UUID id;
 
 
     @Column(name = "source", nullable = false, length = 40)

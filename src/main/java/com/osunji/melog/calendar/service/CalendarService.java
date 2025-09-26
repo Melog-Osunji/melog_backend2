@@ -1,20 +1,18 @@
 package com.osunji.melog.calendar.service;
 
-import com.osunji.melog.calendar.CultureCategory;
-import com.osunji.melog.calendar.EventScheduleRepository;
 import com.osunji.melog.calendar.domain.EventSchedule;
 import com.osunji.melog.calendar.dto.CalendarResponse;
+import com.osunji.melog.calendar.repository.EventScheduleRepository;
 import com.osunji.melog.global.dto.ApiMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
-import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -44,7 +42,7 @@ public class CalendarService {
 
         // 2) 내 일정 조회 (from/to와 겹치는 것만)
         List<EventSchedule> schedules =
-                eventScheduleRepository.findByUserAndOverlappingRange(userId, fromDate, toDate);
+                eventScheduleRepository.findByUser_IdAndEventDateBetween(userId, fromDate, toDate);
 
         // 3) items 매핑
         List<CalendarResponse.Item> items = schedules.stream()
