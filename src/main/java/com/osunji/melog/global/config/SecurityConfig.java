@@ -50,7 +50,7 @@ public class SecurityConfig {
 
             "/api/dev/**",      // 개발용 (있다면)
             "/api/*",
-
+            "/api/calendar/**",
             "/docs/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",

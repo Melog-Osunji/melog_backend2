@@ -10,7 +10,7 @@ import com.osunji.melog.review.mapper.CommentMapper;
 import com.osunji.melog.review.dto.request.CommentRequest;
 import com.osunji.melog.review.dto.response.CommentResponse;
 import com.osunji.melog.user.domain.User;
-import com.osunji.melog.user.UserRepository;
+import com.osunji.melog.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
