@@ -730,12 +730,12 @@ public class SearchRepository {
 			return getEmptySearchResultAll();
 		}
 	}
-
 	/** 38번 검색결과 - 프로필 */
-	public SearchResponse.SearchProfile searchProfile(String query) {
+	public SearchResponse.SearchProfile searchProfile(String query, String authHeader) {  // ✅ 토큰 매개변수 추가
 		System.out.println("👤 프로필 검색 실행: '" + query + "'");
 
-		UUID currentUserId = getCurrentUserId();
+		// ✅ 현재 사용자 ID 가져오기 (토큰에서 추출)
+		UUID currentUserId = authHelper.authHelperAsUUID(authHeader);
 		String userIdString = convertUserIdForLogging(currentUserId);
 
 		try {
@@ -757,6 +757,10 @@ public class SearchRepository {
 				// ✅ 2단계: DB에서 직접 사용자 검색 (닉네임, 자기소개 포함)
 				List<User> users = userRepository.findAll().stream()
 					.filter(user -> {
+						// 자기 자신 제외
+						if (user.getId().equals(currentUserId)) {
+							return false;
+						}
 						if (user.getNickname() != null &&
 							user.getNickname().toLowerCase().contains(query.toLowerCase())) {
 							return true;
@@ -777,7 +781,7 @@ public class SearchRepository {
 						.userNickname(user.getNickname())
 						.profileUrl(user.getProfileImageUrl())
 						.intro(user.getIntro())
-						.follow(checkFollowStatus(currentUserId, user.getId()))
+						.follow(checkFollowStatus(currentUserId, user.getId()))  // ✅ 팔로우 상태 확인
 						.build())
 					.collect(Collectors.toList());
 			} else {
@@ -785,6 +789,7 @@ public class SearchRepository {
 				List<UUID> userIds = userIdStrings.stream()
 					.limit(10)
 					.map(UUID::fromString)
+					.filter(userId -> !userId.equals(currentUserId))  // ✅ 자기 자신 제외
 					.collect(Collectors.toList());
 
 				profiles = userRepository.findAllByIdIn(userIds)
@@ -793,7 +798,7 @@ public class SearchRepository {
 						.userNickname(user.getNickname())
 						.profileUrl(user.getProfileImageUrl())
 						.intro(user.getIntro())
-						.follow(checkFollowStatus(currentUserId, user.getId()))
+						.follow(checkFollowStatus(currentUserId, user.getId()))  // ✅ 팔로우 상태 확인
 						.build())
 					.collect(Collectors.toList());
 			}
@@ -809,6 +814,34 @@ public class SearchRepository {
 			return SearchResponse.SearchProfile.builder().user(List.of()).build();
 		}
 	}
+
+	/**
+	 * ✅ 팔로우 상태 확인 메서드 추가
+	 */
+	private String checkFollowStatus(UUID currentUserId, UUID targetUserId) {
+		try {
+			// 현재 사용자가 대상 사용자를 팔로우하고 있는지 확인
+			boolean isFollowing = followRepository.existsByFollowerIdAndFollowingId(currentUserId, targetUserId);
+			return isFollowing ? "T" : "F";
+		} catch (Exception e) {
+			log.warn("팔로우 상태 확인 실패: {}", e.getMessage());
+			return "F";  // 오류 시 기본값
+		}
+	}
+
+	/**
+	 * ✅ 현재 사용자 ID 가져오기 (기존 메서드 활용 또는 수정)
+	 */
+	private UUID getCurrentUserId() {
+		// 이 메서드는 이미 있다면 제거하고, authHelper 사용
+		try {
+			return SecurityContextHolder.getContext().getAuthentication() != null ?
+				UUID.fromString(SecurityContextHolder.getContext().getAuthentication().getName()) : null;
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
 
 	/** 39번 검색결과 - 피드 */
 	public SearchResponse.SearchFeed searchFeed(String query) {
@@ -999,5 +1032,31 @@ public class SearchRepository {
 	}
 
 
+	/**
+	 * ✅ 팔로우 상태 확인 메서드 추가
+	 */
+	private String checkFollowStatus(UUID currentUserId, UUID targetUserId) {
+		try {
+			// 현재 사용자가 대상 사용자를 팔로우하고 있는지 확인
+			boolean isFollowing = followRepository.existsByFollowerIdAndFollowingId(currentUserId, targetUserId);
+			return isFollowing ? "T" : "F";
+		} catch (Exception e) {
+			log.warn("팔로우 상태 확인 실패: {}", e.getMessage());
+			return "F";  // 오류 시 기본값
+		}
+	}
+
+	/**
+	 * ✅ 현재 사용자 ID 가져오기 (기존 메서드 활용 또는 수정)
+	 */
+	private UUID getCurrentUserId() {
+		// 이 메서드는 이미 있다면 제거하고, authHelper 사용
+		try {
+			return SecurityContextHolder.getContext().getAuthentication() != null ?
+				UUID.fromString(SecurityContextHolder.getContext().getAuthentication().getName()) : null;
+		} catch (Exception e) {
+			return null;
+		}
+	}
 
 }

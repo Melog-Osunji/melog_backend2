@@ -111,14 +111,18 @@ public class SearchController {
 	 * [38번] 검색결과 - 프로필
 	 * GET /api/search/profile?q=검색어
 	 */
+
 	@GetMapping("/search/profile")
 	public ResponseEntity<ApiMessage<SearchResponse.SearchProfile>> searchProfile(
-		@RequestParam String q) {
+		@RequestParam String q,
+		@RequestHeader("Authorization") String authHeader) {
+
 		System.out.println("👤 프로필 검색 실행: '" + q + "'");
-		SearchResponse.SearchProfile response = searchService.searchProfile(q);
+		SearchResponse.SearchProfile response = searchService.searchProfile(q, authHeader);
 		ApiMessage<SearchResponse.SearchProfile> apiResponse = ApiMessage.success(200, "프로필 검색 완료", response);
 		return ResponseEntity.ok(apiResponse);
 	}
+
 
 	/**
 	 * [39번] 검색결과 - 피드

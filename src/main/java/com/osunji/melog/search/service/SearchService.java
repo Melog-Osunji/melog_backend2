@@ -69,9 +69,10 @@ public class SearchService {
 	/**
 	 * api(38번) 검색결과 - 프로필
 	 */
-	public SearchResponse.SearchProfile searchProfile(String query) {
-		return searchRepository.searchProfile(query);
+	public SearchResponse.SearchProfile searchProfile(String query, String authHeader) {
+		return searchRepository.searchProfile(query, authHeader);
 	}
+
 
 	/**
 	 * api(39번) 검색결과 - 피드 (최신순 + 인기순)
