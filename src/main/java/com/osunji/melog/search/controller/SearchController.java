@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.web.bind.annotation.RequestParam;
+
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -111,14 +113,18 @@ public class SearchController {
 	 * [38번] 검색결과 - 프로필
 	 * GET /api/search/profile?q=검색어
 	 */
+
 	@GetMapping("/search/profile")
 	public ResponseEntity<ApiMessage<SearchResponse.SearchProfile>> searchProfile(
-		@RequestParam String q) {
+		@RequestParam String q,
+		@RequestHeader("Authorization") String authHeader) {
+
 		System.out.println("👤 프로필 검색 실행: '" + q + "'");
-		SearchResponse.SearchProfile response = searchService.searchProfile(q);
+		SearchResponse.SearchProfile response = searchService.searchProfile(q, authHeader);
 		ApiMessage<SearchResponse.SearchProfile> apiResponse = ApiMessage.success(200, "프로필 검색 완료", response);
 		return ResponseEntity.ok(apiResponse);
 	}
+
 
 	/**
 	 * [39번] 검색결과 - 피드
@@ -131,5 +137,23 @@ public class SearchController {
 		SearchResponse.SearchFeed response = searchService.searchFeed(q);
 		ApiMessage<SearchResponse.SearchFeed> apiResponse = ApiMessage.success(200, "피드 검색 완료", response);
 		return ResponseEntity.ok(apiResponse);
+	}
+
+	/**
+	 * ✅ 40번 자동완성 검색어 API
+	 * GET /api/search/autocomplete?q=베토
+	 */
+	@GetMapping("/search/autocomplete")
+	public ResponseEntity<ApiMessage<SearchResponse.Autocomplete>> getAutocomplete(
+		@RequestParam String q) {
+
+		if (q == null || q.trim().length() < 1) {
+			return ResponseEntity.ok(ApiMessage.success(200, "자동완성 조회 완료",
+				SearchResponse.Autocomplete.builder().suggestions(List.of()).build()));
+		}
+
+		System.out.println("🔍 자동완성 검색: '" + q + "'");
+		SearchResponse.Autocomplete response = searchService.getAutocomplete(q);
+		return ResponseEntity.ok(ApiMessage.success(200, "자동완성 조회 완료", response));
 	}
 }

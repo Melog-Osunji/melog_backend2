@@ -1,5 +1,6 @@
 package com.osunji.melog.user.domain;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import com.osunji.melog.user.domain.enums.Platform;
@@ -88,5 +89,25 @@ public class User {
         String profileImageUrl, String intro) {
         return new User(email, platform, nickname, profileImageUrl, intro);
     }
+    // ✅ 프로필 이미지 업데이트 메서드 추가
+    public void updateProfileImage(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
+    }
 
+    // ✅ 프로필 전체 업데이트 메서드도 추가
+    public void updateProfile(String nickname, String intro, String profileImageUrl) {
+        if (nickname != null) this.nickname = nickname;
+        if (intro != null) this.intro = intro;
+        if (profileImageUrl != null) this.profileImageUrl = profileImageUrl;
+    }
+
+    // ✅ 닉네임만 업데이트
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    // ✅ 소개글만 업데이트
+    public void updateIntro(String intro) {
+        this.intro = intro;
+    }
 }

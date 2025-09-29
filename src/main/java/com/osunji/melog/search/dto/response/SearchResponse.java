@@ -5,6 +5,7 @@ import com.osunji.melog.user.domain.User;
 import lombok.Builder;
 import lombok.Data;
 import java.util.List;
+import java.util.List;
 
 public class SearchResponse {
 
@@ -99,4 +100,13 @@ public class SearchResponse {
 		private List<PostResult> resultPopular;
 
 	}
+
+
+
+	@Data
+	@Builder
+	public static class Autocomplete {
+		private List<String> suggestions;
+	}
+
 }
