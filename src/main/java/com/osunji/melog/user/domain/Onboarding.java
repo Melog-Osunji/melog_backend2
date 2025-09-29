@@ -1,6 +1,7 @@
 package com.osunji.melog.user.domain;
 
 import java.util.List;
+import java.util.UUID;
 
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.ElementCollection;
@@ -28,7 +29,7 @@ public class Onboarding {
      */
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String onboardingId;
+    private UUID onboardingId;
 
     /**
      * 연관된 사용자 (FK) / userId = 온보딩 테이블에서의 userID컬럼명

@@ -1,9 +1,6 @@
 package com.osunji.melog.notice;
 
 import com.osunji.melog.global.dto.ApiMessage;
-import com.osunji.melog.notice.NoticeRequest;
-import com.osunji.melog.notice.NoticeResponse;
-import com.osunji.melog.notice.NoticeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;

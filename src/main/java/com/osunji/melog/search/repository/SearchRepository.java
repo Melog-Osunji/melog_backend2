@@ -3,9 +3,8 @@ package com.osunji.melog.search.repository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.osunji.melog.review.entity.Post;
-import com.osunji.melog.review.entity.PostComment;
 import com.osunji.melog.user.domain.User;
-import com.osunji.melog.user.UserRepository;
+import com.osunji.melog.user.repository.UserRepository;
 import com.osunji.melog.review.repository.PostRepository;
 import com.osunji.melog.review.repository.CommentRepository;
 import com.osunji.melog.elk.repository.ELKSearchRepository;
@@ -14,11 +13,9 @@ import com.osunji.melog.search.preset.SearchPresetLoader;
 import com.osunji.melog.search.dto.response.SearchResponse;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import co.elastic.clients.json.JsonData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;

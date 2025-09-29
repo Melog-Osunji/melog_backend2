@@ -12,19 +12,16 @@ import com.osunji.melog.review.mapper.PostMapper;
 import com.osunji.melog.review.dto.request.PostRequest;
 import com.osunji.melog.review.dto.response.PostResponse;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
-import com.osunji.melog.user.UserRepository;
+import com.osunji.melog.user.repository.UserRepository;
 import com.osunji.melog.user.repository.FollowRepository;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;

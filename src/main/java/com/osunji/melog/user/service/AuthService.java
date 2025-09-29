@@ -1,7 +1,7 @@
 package com.osunji.melog.user.service;
 
 import com.osunji.melog.global.util.JWTUtil;
-import com.osunji.melog.user.UserRepository;
+import com.osunji.melog.user.repository.UserRepository;
 import com.osunji.melog.user.domain.User;
 import com.osunji.melog.user.domain.enums.Platform;
 import com.osunji.melog.user.dto.RefreshResult;
