@@ -5,7 +5,7 @@ import com.amazonaws.services.s3.model.*;
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.global.common.AuthHelper;
 import com.osunji.melog.user.domain.User;
-import com.osunji.melog.user.UserRepository;
+import com.osunji.melog.user.repository.UserRepository;
 import com.osunji.melog.harmony.entity.HarmonyRoom;
 import com.osunji.melog.harmony.repository.HarmonyRoomRepository;
 import lombok.RequiredArgsConstructor;

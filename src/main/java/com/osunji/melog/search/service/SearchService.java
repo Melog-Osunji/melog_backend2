@@ -80,4 +80,9 @@ public class SearchService {
 	public SearchResponse.SearchFeed searchFeed(String query) {
 		return searchRepository.searchFeed(query);
 	}
+
+	public SearchResponse.Autocomplete getAutocomplete(String query) {
+		return searchRepository.getAutocomplete(query);
+	}
+
 }

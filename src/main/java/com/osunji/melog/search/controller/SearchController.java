@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.web.bind.annotation.RequestParam;
+
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -135,5 +137,23 @@ public class SearchController {
 		SearchResponse.SearchFeed response = searchService.searchFeed(q);
 		ApiMessage<SearchResponse.SearchFeed> apiResponse = ApiMessage.success(200, "피드 검색 완료", response);
 		return ResponseEntity.ok(apiResponse);
+	}
+
+	/**
+	 * ✅ 40번 자동완성 검색어 API
+	 * GET /api/search/autocomplete?q=베토
+	 */
+	@GetMapping("/search/autocomplete")
+	public ResponseEntity<ApiMessage<SearchResponse.Autocomplete>> getAutocomplete(
+		@RequestParam String q) {
+
+		if (q == null || q.trim().length() < 1) {
+			return ResponseEntity.ok(ApiMessage.success(200, "자동완성 조회 완료",
+				SearchResponse.Autocomplete.builder().suggestions(List.of()).build()));
+		}
+
+		System.out.println("🔍 자동완성 검색: '" + q + "'");
+		SearchResponse.Autocomplete response = searchService.getAutocomplete(q);
+		return ResponseEntity.ok(ApiMessage.success(200, "자동완성 조회 완료", response));
 	}
 }
