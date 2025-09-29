@@ -2,8 +2,8 @@ package com.osunji.melog.inquirySettings.controller;
 
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.global.security.JwtAuthFilter;
-import com.osunji.melog.inquirySettings.dto.InquiryRequest;
-import com.osunji.melog.inquirySettings.dto.InquiryResponse;
+import com.osunji.melog.inquirySettings.dto.request.InquiryRequest;
+import com.osunji.melog.inquirySettings.dto.response.InquiryResponse;
 import com.osunji.melog.inquirySettings.service.InquiryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

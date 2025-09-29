@@ -1,4 +1,4 @@
-package com.osunji.melog.inquirySettings.dto;
+package com.osunji.melog.inquirySettings.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

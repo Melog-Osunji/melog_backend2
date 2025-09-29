@@ -3,16 +3,8 @@ package com.osunji.melog.user.domain;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import com.osunji.melog.user.domain.enums.FollowStatus;
+import jakarta.persistence.*;
 
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -51,13 +43,14 @@ public class Follow {
     /**
      * 팔로우 상태
      */
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Boolean status;
+    private FollowStatus status;
 
     /**
      * 팔로우 관계 생성자
      */
-    public Follow(User follower, User following, Boolean status) {
+    public Follow(User follower, User following, FollowStatus status) {
         this.follower = follower;
         this.following = following;
         this.status = status;
@@ -65,18 +58,18 @@ public class Follow {
     }
 
     public static Follow createFollow(User follower, User following) {
-        return new Follow(follower, following,true);
+        return new Follow(follower, following,FollowStatus.ACCEPTED);
     }
 
     /** 팔로우 활성화(재팔로우) */
     public void activate(LocalDateTime when) {
-        this.status = true;
+        this.status = FollowStatus.ACCEPTED;
         this.followedAt = (when != null) ? when : LocalDateTime.now();
     }
 
     /** 팔로우 비활성화(언팔로우) */
     public void deactivate() {
-        this.status = false;
+        this.status = FollowStatus.UNFOLLOW;
     }
 
 }
