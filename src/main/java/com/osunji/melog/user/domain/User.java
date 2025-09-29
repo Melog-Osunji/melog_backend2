@@ -61,6 +61,9 @@ public class User {
     @NotNull
     private String oidc;
 
+    @Column
+    private boolean active;
+
 
     //생성자 - 필수 정보로만 이루어짐
     public User(String email, Platform platform) {
