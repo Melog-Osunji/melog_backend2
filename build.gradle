@@ -39,7 +39,7 @@ dependencies {
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testImplementation "com.h2database:h2"
-	implementation 'com.nimbusds:nimbus-jose-jwt:9.37'
+	implementation 'com.nimbusds:nimbus-jose-jwt:10.0.2'
 	implementation "org.springframework.boot:spring-boot-starter-data-redis"
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 

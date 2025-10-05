@@ -1,4 +1,4 @@
-package com.osunji.melog.user.dto;
+package com.osunji.melog.global.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

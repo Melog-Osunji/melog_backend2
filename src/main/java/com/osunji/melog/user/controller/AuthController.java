@@ -1,14 +1,21 @@
 package com.osunji.melog.user.controller;
 
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.proc.BadJOSEException;
 import com.osunji.melog.elk.repository.ELKUserRepository;
 import com.osunji.melog.global.common.RefreshCookieHelper;
+import com.osunji.melog.user.dto.request.OauthLoginRequestDTO;
+import com.osunji.melog.user.dto.response.LoginResponseDTO;
 import com.osunji.melog.user.service.AuthService;
 import com.osunji.melog.user.dto.RefreshResult;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.text.ParseException;
 import java.util.Map;
 
 import static com.osunji.melog.global.common.RefreshCookieHelper.REFRESH_COOKIE_NAME;
@@ -19,38 +26,40 @@ public class AuthController {
 
     private final AuthService authService;
     private final RefreshCookieHelper cookieHelper;
-    private final ELKUserRepository elkUserRepository;
 
     public AuthController(AuthService authService, RefreshCookieHelper cookieHelper, ELKUserRepository elkUserRepository) {
         this.authService = authService;
         this.cookieHelper = cookieHelper;
-        this.elkUserRepository = elkUserRepository;
     }
-    @PostMapping("/oidc/callback")
-    public ResponseEntity<?> callback(@RequestBody Map<String, String> body,
-                                      HttpServletRequest req,
-                                      HttpServletResponse res) {
-        // 파라미터 수정 예정
-        String provider     = body.getOrDefault("provider", "kakao");
-        String code         = body.get("code");
-        String state        = body.get("state");
-        String codeVerifier = body.get("code_verifier");
 
-        // 1) OIDC 처리 (토큰 발급 등)
-        RefreshResult result = authService.handleOidcCallback(provider, code, state, codeVerifier);
+    @PostMapping("/login/kakao")
+    public ResponseEntity<?> callback(@RequestBody OauthLoginRequestDTO request)
+            throws BadJOSEException, ParseException, JOSEException {
 
-//
-////        String clientIp   = extractClientIp(req);
-//        String userAgent  = req.getHeader("User-Agent");
-//
-//        // (선택) 메타데이터로 남길 JSON 문자열
-//        String metaJson = String.format("{\"provider\":\"%s\"}", provider);
+        // 1) OIDC 처리
+        LoginResponseDTO loginResponse = authService.upsertUserFromKakaoIdToken(request);
 
+        // 2) JWT 발급
+        RefreshResult refreshResult = authService.issueJwtForUser(loginResponse.getUser().getId());
 
-        // 4) 쿠키/응답 처리
-        cookieHelper.setRefreshCookie(res, result.refreshToken(), result.refreshTtlSeconds());
-        return ResponseEntity.ok(Map.of("accessToken", result.accessToken()));
+        // 3) RefreshToken 쿠키 생성
+        ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", refreshResult.refreshToken())
+                .httpOnly(true)   // JS 접근 불가 (보안 필수)
+                .secure(true)     // HTTPS에서만 전송
+                .path("/")        // 모든 경로에서 유효
+                .maxAge(refreshResult.refreshTtlSeconds()) // TTL 설정
+                .sameSite("Strict") // CSRF 방지
+                .build();
+
+        // 4) 헤더 + 쿠키 설정 후 응답
+        return ResponseEntity.ok()
+                .header("Authorization", "Bearer " + refreshResult.accessToken())   // accessToken 헤더
+                .header("X-Refresh-Token", refreshResult.refreshToken())            // refreshToken 헤더
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())           // refreshToken 쿠키
+                .header("X-Refresh-TTL", String.valueOf(refreshResult.refreshTtlSeconds())) // 선택: TTL
+                .body(loginResponse);
     }
+
 
 //    /** 프록시/로드밸런서 환경 고려한 IP 추출 (추후 추가 예정) 지금은 아님
 //    private String extractClientIp(HttpServletRequest request) {
