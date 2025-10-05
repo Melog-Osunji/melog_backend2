@@ -1,4 +1,4 @@
-package com.osunji.melog.user.controller;
+package com.osunji.melog.global.admin;
 
 
 import org.springframework.http.ResponseEntity;

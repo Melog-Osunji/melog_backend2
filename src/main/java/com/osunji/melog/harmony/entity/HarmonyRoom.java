@@ -142,7 +142,30 @@ public class HarmonyRoom {
 			this.bookMarkNum--;
 		}
 	}
+	// ✅ 프로필 이미지 업데이트 메서드 추가
+	public void updateProfileImage(String profileImageUrl) {
+		this.profileImageUrl = profileImageUrl;
+	}
 
+	// ✅ 하모니룸 정보 업데이트 메서드
+	public void updateInfo(String name, String intro, List<String> category, Boolean isPrivate, Boolean isDirectAssign) {
+		if (name != null) this.name = name;
+		if (intro != null) this.intro = intro;
+		if (category != null) this.category = category;
+		if (isPrivate != null) this.isPrivate = isPrivate;
+		if (isDirectAssign != null) this.isDirectAssign = isDirectAssign;
+	}
+
+	// ✅ 북마크 수 증가/감소
+	public void incrementBookmark() {
+		this.bookMarkNum++;
+	}
+
+	public void decrementBookmark() {
+		if (this.bookMarkNum > 0) {
+			this.bookMarkNum--;
+		}
+	}
 	/**
 	 * 소유자 확인
 	 */
