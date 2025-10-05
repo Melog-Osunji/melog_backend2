@@ -1,6 +1,12 @@
 package com.osunji.melog.user.service;
 
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.proc.BadJOSEException;
+import com.nimbusds.jwt.JWTClaimsSet;
 import com.osunji.melog.global.util.JWTUtil;
+import com.osunji.melog.global.util.OidcUtil;
+import com.osunji.melog.user.dto.request.OauthLoginRequestDTO;
+import com.osunji.melog.user.dto.response.LoginResponseDTO;
 import com.osunji.melog.user.repository.UserRepository;
 import com.osunji.melog.user.domain.User;
 import com.osunji.melog.user.domain.enums.Platform;
@@ -12,8 +18,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.text.ParseException;
 import java.util.List;
-import java.util.Map;
 
 
 @Service
@@ -27,13 +33,14 @@ public class AuthService {
     private final long accessTtlMs;
     private final long refreshTtlMs;
     private final long refreshRoateBelow;
+    private final OidcUtil oidcUtil;
 
     public AuthService(
             @Value("${jwt.access-expiration}") long accessTtlMs, //15분
             @Value("${jwt.refresh-expiration}") long refreshTtlMs, //14일
             @Value("${jwt.refresh-below}") long refreshRoateBelow,
-            OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo, UserRepository userRepository
-    ) {
+            OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo, UserRepository userRepository,
+            OidcUtil oidcUtil) {
         this.accessTtlMs = accessTtlMs;
         this.refreshTtlMs = refreshTtlMs;
         this.refreshRoateBelow = refreshRoateBelow;
@@ -41,43 +48,84 @@ public class AuthService {
         this.jwtUtil = jwtUtil;
         this.refreshRepo = refreshRepo;
         this.userRepository = userRepository;
+        this.oidcUtil = oidcUtil;
     }
 
 
-    /** 컨트롤러 시그니처: provider, code, state, code_verifier */
-    public RefreshResult handleOidcCallback(String provider, String code, String state, String codeVerifier) {
-        if (provider == null || code == null || state == null || codeVerifier == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing_fields");
-        }
+    public LoginResponseDTO upsertUserFromKakaoIdToken(OauthLoginRequestDTO request)
+            throws BadJOSEException, ParseException, JOSEException {
 
-        Map<String, Object> claims = oidcService.exchangeAndVerify(provider, code, state, codeVerifier);
+        // ✅ 1. ID 토큰 검증
+        JWTClaimsSet claims = oidcUtil.verifyKakaoIdToken(request.getIdToken());
 
-        String sub = (String) claims.get("sub");
-        if (sub == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_sub");
-        String email = (String) claims.get("email");
-        String nickname = (String) claims.get("name");
-        String picture = (String) claims.get("picture");
+        // ✅ 2. 페이로드에서 값 추출
+        String sub = claims.getSubject();
+        if (sub == null)
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_sub");
 
-        // 1. DB 조회
-        User user = userRepository.findByOidcAndPlatform(sub, Platform.valueOf(provider.toUpperCase()))
+        String email = requireClaim(claims, "email");
+        String nickname = requireClaim(claims, "nickname");
+        String picture = requireClaim(claims, "picture");
+
+        Platform platform = request.getPlatform();
+
+        // ✅ 3. DB 조회 → 있으면 기존 유저, 없으면 새 유저 생성
+        return userRepository.findByOidcAndPlatform(sub, platform)
+                .map(user -> LoginResponseDTO.builder()
+                        .isNewUser(false)
+                        .user(convertToUserDTO(user))
+                        .build()
+                )
                 .orElseGet(() -> {
-                    // 2. 없으면 새 유저 생성
-                    User newUser = new User(email, Platform.valueOf(provider.toUpperCase()), nickname, picture, null);
+                    User newUser = new User(email, platform, nickname, picture, null);
                     newUser.setOidc(sub);
-                    return userRepository.save(newUser);
+                    User saved = userRepository.save(newUser);
+                    return LoginResponseDTO.builder()
+                            .isNewUser(true)
+                            .user(convertToUserDTO(saved))
+                            .build();
                 });
+    }
+//    public User upsertUserFromKakaoIdToken(OauthLoginRequestDTO request)
+//            throws BadJOSEException, ParseException, JOSEException {
+//
+//        // id token 검증
+//        JWTClaimsSet claims = oidcUtil.verifyKakaoIdToken(request.getIdToken());
+//
+//        // 페이로드에서 값 추출 (변수명 유지)
+//        String sub = claims.getSubject();
+//        if (sub == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_sub");
+//        String email = requireClaim(claims, "email");
+//        String nickname = requireClaim(claims, "nickname");
+//        String picture = requireClaim(claims, "picture");
+//
+//        // platform 꺼내기 (변수명 유지)
+//        Platform platform = request.getPlatform();
+//
+//        // 1. DB 조회, 없으면 생성 (변수명 유지: user)
+//
+//        return userRepository.findByOidcAndPlatform(sub, platform)
+//                .orElseGet(() -> {
+//                    User newUser = new User(email, platform, nickname, picture, null);
+//                    newUser.setOidc(sub);
+//                    return userRepository.save(newUser);
+//                });
+//    }
 
-        // 토큰 생성
-        String userId = user.getId().toString();
+    /** 2) 주어진 유저로 JWT 발급 + refresh 저장 (변수명 유지) */
+    public RefreshResult issueJwtForUser(String userId) {
+        // 토큰 생성 (변수명 유지)
         String access  = jwtUtil.createAccessToken(userId, accessTtlMs);
         String refresh = jwtUtil.createRefreshToken(userId, refreshTtlMs);
 
+        // refresh 저장 (변수명 유지)
         String jti = jwtUtil.getJtiFromRefresh(refresh);
         long ttlSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(refresh));
         refreshRepo.save(userId, jti, refresh, ttlSec);
 
         return new RefreshResult(access, refresh, ttlSec);
     }
+
 
     /** 컨트롤러 시그니처: rotateTokens(String refreshCookie, HttpServletRequest req) */
     public RefreshResult rotateTokens(String refreshCookie, HttpServletRequest req) {
@@ -161,5 +209,28 @@ public class AuthService {
                 "http://10.0.2.2:8080"
         ).contains(origin);
     }
+
+    private String requireClaim(JWTClaimsSet claims, String key) {
+        try {
+            String value = claims.getStringClaim(key);
+            if (value == null)
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "missing_" + key);
+            return value;
+        } catch (ParseException e) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid_" + key);
+        }
+    }
+
+    private LoginResponseDTO.UserDTO convertToUserDTO(User user) {
+        return LoginResponseDTO.UserDTO.builder()
+                .id(String.valueOf(user.getId()))
+                .email(user.getEmail())
+                .platform(user.getPlatform().name().toLowerCase())
+                .nickName(user.getNickname())
+                .profileImg(user.getProfileImageUrl())
+                .intro(user.getIntro())
+                .build();
+    }
+
 }
 
