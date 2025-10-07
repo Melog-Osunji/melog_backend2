@@ -47,9 +47,10 @@ public class SecurityConfig {
             "/api/auth/refresh",           // /auth → /api/auth 수정
             "/api/auth/logout",
             "/health",
-
+            "/api/auth/login/**",
             "/api/dev/**",      // 개발용 (있다면)
             "/api/*",
+            "/secure/ping",
             "/api/calendar/**",
             "/docs/**",
             "/v3/api-docs/**",
