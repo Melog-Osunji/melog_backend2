@@ -109,7 +109,7 @@ public class HarmonyRoom {
 	/**
 	 * 하모니룸 정보 수정 - null이 아닌 값만 업데이트
 	 */
-	public void update(String name, List<String> category, String intro, String profileImageUrl, Boolean isDirectAssign) {
+	public void update(String name, List<String> category, String intro, String profileImageUrl, Boolean isDirectAssign,Boolean isPrivate) {
 		if (name != null && !name.trim().isEmpty()) {
 			this.name = name;
 		}
@@ -124,6 +124,9 @@ public class HarmonyRoom {
 		}
 		if (isDirectAssign != null) {
 			this.isDirectAssign = isDirectAssign;
+		}
+		if (isPrivate != null){
+			this.isPrivate = isPrivate;
 		}
 	}
 
