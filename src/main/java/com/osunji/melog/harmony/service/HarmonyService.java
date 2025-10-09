@@ -443,6 +443,7 @@ public class HarmonyService {
 			request.getCategory(),
 			request.getIntro(),
 			request.getProfileImg(),
+			request.getIsPrivate(),
 			request.getIsDirectAssign()
 		);
 
