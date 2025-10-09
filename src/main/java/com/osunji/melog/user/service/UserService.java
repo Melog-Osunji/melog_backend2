@@ -1,16 +1,23 @@
 package com.osunji.melog.user.service;
 
 import com.osunji.melog.global.dto.ApiMessage;
+import com.osunji.melog.harmony.entity.HarmonyRoom;
+import com.osunji.melog.harmony.repository.HarmonyRoomBookmarkRepository;
+import com.osunji.melog.harmony.repository.HarmonyRoomRepository;
+import com.osunji.melog.review.dto.response.FilterPostResponse;
+import com.osunji.melog.review.service.PostService;
 import com.osunji.melog.user.domain.Agreement;
 import com.osunji.melog.user.domain.Follow;
 import com.osunji.melog.user.domain.Onboarding;
 import com.osunji.melog.user.domain.User;
+import com.osunji.melog.user.domain.enums.FollowStatus;
 import com.osunji.melog.user.dto.request.UserRequest;
 import com.osunji.melog.user.dto.response.UserResponse;
 import com.osunji.melog.user.repository.AgreementRepository;
 import com.osunji.melog.user.repository.FollowRepository;
 import com.osunji.melog.user.repository.OnboardingRepository;
 import com.osunji.melog.user.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -21,6 +28,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class UserService {
 
@@ -28,12 +36,20 @@ public class UserService {
     private final AgreementRepository agreementRepository;
     private final OnboardingRepository onboardingRepository;
     private final FollowRepository followRepository;
+    private final HarmonyRoomRepository harmonyRoomRepository;
+    private final HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository;
+    private final PostService postService;
+    private final UserProfileMusicService userProfileMusicService;
 
-    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository) {
+    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository, HarmonyRoomRepository harmonyRoomRepository, HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository, PostService postService, UserProfileMusicService userProfileMusicService) {
         this.userRepository = userRepository;
         this.agreementRepository = agreementRepository;
         this.onboardingRepository = onboardingRepository;
         this.followRepository = followRepository;
+        this.harmonyRoomRepository = harmonyRoomRepository;
+        this.harmonyRoomBookmarkRepository = harmonyRoomBookmarkRepository;
+        this.postService = postService;
+        this.userProfileMusicService = userProfileMusicService;
     }
 
     private static final Set<String> PROFILE_UPDATABLE_FIELDS = Set.of(
@@ -379,5 +395,62 @@ public class UserService {
                 .result(iFollow)
                 .build();
         return ApiMessage.success(HttpStatus.OK.value(), "팔로우 정보 조회 성공", body);
+    }
+
+    public ApiMessage<UserResponse.MyPageResponse> getMyPage(UUID userId) {
+        // 1) 유저 조회
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return ApiMessage.fail(HttpStatus.NOT_FOUND.value(), "user_not_found");
+        }
+
+        // 2) 팔로워/팔로잉 카운트 (ACCEPTED만 집계) followingid
+        long followers = followRepository.countByFollowing_IdAndStatus(userId, FollowStatus.ACCEPTED);
+        long followings = followRepository.countByFollower_IdAndStatus(userId, FollowStatus.ACCEPTED);
+
+        // 3) 하모니룸: 내가 소유한 방(=매니저) 기준 + 북마크 여부
+        List<HarmonyRoom> ownedRooms = harmonyRoomRepository.findByOwner_Id(userId);
+        List<UserResponse.HarmonyRoomItem> roomItems = ownedRooms.stream()
+                .map(r -> UserResponse.HarmonyRoomItem.builder()
+                        .roomId(r.getId())
+                        .roomName(r.getName())
+                        .isManager(true) // owner == manager
+                        .roomImg(r.getProfileImageUrl())
+                        .bookmark(harmonyRoomBookmarkRepository.existsByHarmonyRoom_IdAndUser_Id(r.getId(), userId))
+                        .build())
+                .toList();
+
+        UserResponse.ProfileMusic profileMusic = userProfileMusicService.getActive(userId)
+                .map(m -> UserResponse.ProfileMusic.builder()
+                        .youtube(m.getYoutubeUrl() != null
+                                ? m.getYoutubeUrl()
+                                : (m.getYoutubeVideoId() != null ? "https://www.youtube.com/watch?v=" + m.getYoutubeVideoId() : null))
+                        .title(m.getTitle())
+                        .build())
+                .orElse(null);
+
+
+        // 5) 사용자 게시글 (기존 API 22번과 동일 구조 포함)
+        FilterPostResponse.UserPostList posts = null;
+        try {
+            var postsMsg = postService.getUserPosts(userId.toString());
+            if (postsMsg != null) posts = postsMsg.getData();
+        } catch (Exception e) {
+            log.warn("getUserPosts 실패: {}", e.getMessage());
+        }
+
+        // 6) 응답 DTO
+        UserResponse.MyPageResponse body = UserResponse.MyPageResponse.builder()
+                .profileImg(user.getProfileImageUrl())
+                .nickname(user.getNickname())
+                .introduction(user.getIntro())
+                .profileMusic(profileMusic)
+                .followers(followers)
+                .followings(followings)
+                .harmonyRooms(roomItems)
+                .posts(posts)
+                .build();
+
+        return ApiMessage.success(200, "response successful", body);
     }
 }

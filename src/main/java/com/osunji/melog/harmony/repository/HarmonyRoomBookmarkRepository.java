@@ -16,7 +16,8 @@ import io.lettuce.core.dynamic.annotation.Param;
 @Repository
 public interface HarmonyRoomBookmarkRepository extends JpaRepository<HarmonyRoomBookmark, UUID> {
 
-	@Query("SELECT hb FROM HarmonyRoomBookmark hb WHERE hb.user.id = :userId AND hb.harmonyRoom.id = :harmonyRoomId")
+
+    @Query("SELECT hb FROM HarmonyRoomBookmark hb WHERE hb.user.id = :userId AND hb.harmonyRoom.id = :harmonyRoomId")
 	Optional<HarmonyRoomBookmark> findByUserIdAndHarmonyRoomId(@Param("userId") UUID userId,
 		@Param("harmonyRoomId") UUID harmonyRoomId);
 
@@ -39,4 +40,7 @@ public interface HarmonyRoomBookmarkRepository extends JpaRepository<HarmonyRoom
 	void deleteByHarmonyRoomId(@Param("harmonyRoomId") UUID harmonyRoomId);
 	@Query("SELECT COUNT(hb) FROM HarmonyRoomBookmark hb WHERE hb.harmonyRoom.id = :harmonyRoomId")
 	Long countByHarmonyRoomId(@Param("harmonyRoomId") UUID harmonyRoomId);
+	boolean existsByHarmonyRoom_IdAndUser_Id(UUID harmonyRoomId, UUID userId);
+
+
 }
