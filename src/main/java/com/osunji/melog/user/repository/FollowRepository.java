@@ -75,4 +75,8 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
      * 내가 팔로우 '하는' 입장일 때(=follower == me), 특정 상태의 관계 목록 조회
      */
     List<Follow> findByFollower_IdAndStatus(UUID followerId, FollowStatus status);
+
+    long countByFollowing_IdAndStatus(UUID followingUserId, FollowStatus status); // followers
+    long countByFollower_IdAndStatus(UUID followerUserId, FollowStatus status);   // followings
+
 }

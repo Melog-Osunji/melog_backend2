@@ -38,36 +38,22 @@ public class SecurityConfig {
 
     // 공개 엔드포인트 (JwtAuthFilter.shouldNotFilter와 1:1 동기화)
     private static final String[] AUTH_WHITELIST = {
-            "/auth/oidc/start",
-            "/auth/oidc/callback",
-            "/auth/refresh",
-            "/auth/logout",
             "/api/auth/oidc/start",        // /auth → /api/auth 수정
             "/api/auth/oidc/callback",     // /auth → /api/auth 수정
             "/api/auth/refresh",           // /auth → /api/auth 수정
-            "/api/auth/logout",
+            "/api/auth/logout",            // /auth → /api/auth 수정
             "/health",
-            "/api/auth/login/**",
-            "/api/dev/**",      // 개발용 (있다면)
-            "/api/*",
-            "/secure/ping",
-            "/api/calendar/**",
+            "/api/dev/**",
             "/docs/**",
+            "/secure/ping",
+            "/api/auth/login/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
-            "/api/posts/**",
-            "/api/posts",
-            "/api/users/*/posts",
-            "/api/posts/*/bookmarks",
-            "/api/posts/*/comments/*",
+
             "/api/youtube/*",
-            "/api/search/**",
-            "/api/search",
-            "/api/harmony/**",
-            "/api/harmony",
-        "/api/secretMelog/notices0128",
-        "/api/secretMelog/notices0128/**"
+
+            "/api/secretMelog/notices0128/**"
 
 
 

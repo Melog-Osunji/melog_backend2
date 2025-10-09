@@ -22,16 +22,16 @@ import java.time.Instant;
 import java.util.Objects;
 
 @Component
-public class OidcUtil {
+public class KakaoOidcUtil {
 
-    private static final Logger log = LoggerFactory.getLogger(OidcUtil.class);
+    private static final Logger log = LoggerFactory.getLogger(KakaoOidcUtil.class);
 
     private final String kakaoIssuer;
     private final String kakaoClientId;
     private final JWKSource<SecurityContext> kakaoJwkSource;
     private final ConfigurableJWTProcessor<SecurityContext> kakaoJwtProcessor;
 
-    public OidcUtil(
+    public KakaoOidcUtil(
             @Qualifier("kakaoJwkSource") JWKSource<SecurityContext> kakaoJwkSource,
             @Value("${oidc.providers.kakao.issuer}") String kakaoIssuer,
             @Value("${oidc.providers.kakao.client-id}") String kakaoClientId
@@ -40,7 +40,7 @@ public class OidcUtil {
         this.kakaoClientId = kakaoClientId;
         this.kakaoJwkSource = kakaoJwkSource;
 
-        log.info("🔧 Initializing OidcUtil with issuer={}, clientId={}", kakaoIssuer, kakaoClientId);
+        log.info("🔧 Initializing KakaoOidcUtil with issuer={}, clientId={}", kakaoIssuer, kakaoClientId);
 
         // Nimbus Processor 1회 구성 후 재사용
         var proc = new DefaultJWTProcessor<SecurityContext>();

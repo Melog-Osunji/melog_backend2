@@ -63,4 +63,9 @@ public interface HarmonyRoomRepository extends JpaRepository<HarmonyRoom, UUID> 
 	 */
 	@Query("SELECT COUNT(h) + 1 FROM HarmonyRoom h WHERE h.bookMarkNum > :bookMarkNum")
 	Long findRankingByBookMarkNum(@Param("bookMarkNum") Integer bookMarkNum);
+
+	List<HarmonyRoom> findByOwner_Id(UUID ownerId);
+
+
+
 }

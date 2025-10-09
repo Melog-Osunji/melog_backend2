@@ -4,7 +4,7 @@ import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.proc.BadJOSEException;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.osunji.melog.global.util.JWTUtil;
-import com.osunji.melog.global.util.OidcUtil;
+import com.osunji.melog.global.util.KakaoOidcUtil;
 import com.osunji.melog.user.dto.request.OauthLoginRequestDTO;
 import com.osunji.melog.user.dto.response.LoginResponseDTO;
 import com.osunji.melog.user.repository.UserRepository;
@@ -36,14 +36,14 @@ public class AuthService {
     private final long accessTtlMs;
     private final long refreshTtlMs;
     private final long refreshRoateBelow;
-    private final OidcUtil oidcUtil;
+    private final KakaoOidcUtil kakaoOidcUtil;
 
     public AuthService(
             @Value("${jwt.access-expiration}") long accessTtlMs,
             @Value("${jwt.refresh-expiration}") long refreshTtlMs,
             @Value("${jwt.refresh-below}") long refreshRoateBelow,
             OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo,
-            UserRepository userRepository, OidcUtil oidcUtil) {
+            UserRepository userRepository, KakaoOidcUtil kakaoOidcUtil) {
 
         this.accessTtlMs = accessTtlMs;
         this.refreshTtlMs = refreshTtlMs;
@@ -52,7 +52,7 @@ public class AuthService {
         this.jwtUtil = jwtUtil;
         this.refreshRepo = refreshRepo;
         this.userRepository = userRepository;
-        this.oidcUtil = oidcUtil;
+        this.kakaoOidcUtil = kakaoOidcUtil;
 
         log.info("✅ AuthService initialized (accessTtlMs={}ms, refreshTtlMs={}ms, rotateBelow={}s)",
                 accessTtlMs, refreshTtlMs, refreshRoateBelow);
@@ -65,7 +65,7 @@ public class AuthService {
                 request.getPlatform(), request.getIdToken() != null ? request.getIdToken().length() : 0);
 
         // 1. ID 토큰 검증
-        JWTClaimsSet claims = oidcUtil.verifyKakaoIdToken(request.getIdToken());
+        JWTClaimsSet claims = kakaoOidcUtil.verifyKakaoIdToken(request.getIdToken());
         log.debug("✅ ID Token verified. Claims: sub={}, email={}, nickname={}",
                 claims.getSubject(), claims.getStringClaim("email"), claims.getStringClaim("nickname"));
 

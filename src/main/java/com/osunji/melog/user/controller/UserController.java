@@ -4,10 +4,12 @@ import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.global.security.JwtAuthFilter;
 import com.osunji.melog.user.dto.request.UserRequest;
 import com.osunji.melog.user.dto.response.UserResponse;
+import com.osunji.melog.user.service.UserProfileMusicService;
 import com.osunji.melog.user.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -15,9 +17,11 @@ import java.util.UUID;
 public class UserController {
 
     private final UserService userService;
+    private final UserProfileMusicService userProfileMusicService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, UserProfileMusicService userProfileMusicService) {
         this.userService = userService;
+        this.userProfileMusicService = userProfileMusicService;
     }
 
 
@@ -123,7 +127,23 @@ public class UserController {
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
+    @GetMapping("/myPage")
+    public ResponseEntity<?> myPage(
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+    ) {
+        ApiMessage<UserResponse.MyPageResponse> response = userService.getMyPage(userId);
+        return ResponseEntity.status(response.getCode()).body(response);
+    }
 
-
+//    @PostMapping("/myPage/musicChange")
+//    public ResponseEntity<?> updateProfileMusic(
+//            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId,
+//            @RequestBody Map<String, String> body
+//    ) {
+//        String youtube = body.get("youtube");
+//        String title   = body.get("title");
+//        userProfileMusicService.setActive(userId, youtube, title);
+//        return ResponseEntity.ok(ApiMessage.success(200,"success",title));
+//    }
 
 }
