@@ -1,8 +1,10 @@
 package com.osunji.melog.user.dto.response;
 
+import com.osunji.melog.review.dto.response.FilterPostResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 import java.util.UUID;
@@ -60,5 +62,38 @@ public class UserResponse {
     public static class followingCheckResponse{
         private boolean result;
     }
+    @Getter @Builder
+    @AllArgsConstructor @NoArgsConstructor
+    public static class MyPageResponse {
+        private String profileImg;
+        private String nickname;
+        private String introduction;
 
+        private ProfileMusic profileMusic;
+
+        private long followers;   // 나를 팔로우하는 사람 수
+        private long followings;  // 내가 팔로우하는 사람 수
+
+        private List<HarmonyRoomItem> harmonyRooms;
+
+        // 하단 포스트(기존 API 22번과 동일 구조 포함)
+        private FilterPostResponse.UserPostList posts;
+    }
+
+    @Getter  @Builder
+    @AllArgsConstructor @NoArgsConstructor
+    public static class ProfileMusic {
+        private String youtube;   // 예: https://youtube.com/watch?v=...
+        private String title;     // 예: Example Song
+    }
+
+    @Getter @Builder
+    @AllArgsConstructor @NoArgsConstructor
+    public static class HarmonyRoomItem {
+        private UUID roomId;
+        private String roomName;
+        private boolean isManager;
+        private String roomImg;
+        private boolean bookmark;
+    }
 }

@@ -4,7 +4,7 @@ import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.proc.BadJOSEException;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.osunji.melog.global.util.JWTUtil;
-import com.osunji.melog.global.util.OidcUtil;
+import com.osunji.melog.global.util.KakaoOidcUtil;
 import com.osunji.melog.user.dto.request.OauthLoginRequestDTO;
 import com.osunji.melog.user.dto.response.LoginResponseDTO;
 import com.osunji.melog.user.repository.UserRepository;
@@ -13,6 +13,8 @@ import com.osunji.melog.user.domain.enums.Platform;
 import com.osunji.melog.user.dto.RefreshResult;
 import com.osunji.melog.user.repository.RefreshTokenRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -21,9 +23,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.text.ParseException;
 import java.util.List;
 
-
 @Service
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private final OidcService oidcService;
     private final JWTUtil jwtUtil;
@@ -33,14 +36,15 @@ public class AuthService {
     private final long accessTtlMs;
     private final long refreshTtlMs;
     private final long refreshRoateBelow;
-    private final OidcUtil oidcUtil;
+    private final KakaoOidcUtil kakaoOidcUtil;
 
     public AuthService(
-            @Value("${jwt.access-expiration}") long accessTtlMs, //15분
-            @Value("${jwt.refresh-expiration}") long refreshTtlMs, //14일
+            @Value("${jwt.access-expiration}") long accessTtlMs,
+            @Value("${jwt.refresh-expiration}") long refreshTtlMs,
             @Value("${jwt.refresh-below}") long refreshRoateBelow,
-            OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo, UserRepository userRepository,
-            OidcUtil oidcUtil) {
+            OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo,
+            UserRepository userRepository, KakaoOidcUtil kakaoOidcUtil) {
+
         this.accessTtlMs = accessTtlMs;
         this.refreshTtlMs = refreshTtlMs;
         this.refreshRoateBelow = refreshRoateBelow;
@@ -48,122 +52,114 @@ public class AuthService {
         this.jwtUtil = jwtUtil;
         this.refreshRepo = refreshRepo;
         this.userRepository = userRepository;
-        this.oidcUtil = oidcUtil;
-    }
+        this.kakaoOidcUtil = kakaoOidcUtil;
 
+        log.info("✅ AuthService initialized (accessTtlMs={}ms, refreshTtlMs={}ms, rotateBelow={}s)",
+                accessTtlMs, refreshTtlMs, refreshRoateBelow);
+    }
 
     public LoginResponseDTO upsertUserFromKakaoIdToken(OauthLoginRequestDTO request)
             throws BadJOSEException, ParseException, JOSEException {
 
-        // ✅ 1. ID 토큰 검증
-        JWTClaimsSet claims = oidcUtil.verifyKakaoIdToken(request.getIdToken());
+        log.debug("🟡 [AuthService] upsertUserFromKakaoIdToken() called for platform={}, idToken length={}",
+                request.getPlatform(), request.getIdToken() != null ? request.getIdToken().length() : 0);
 
-        // ✅ 2. 페이로드에서 값 추출
+        // 1. ID 토큰 검증
+        JWTClaimsSet claims = kakaoOidcUtil.verifyKakaoIdToken(request.getIdToken());
+        log.debug("✅ ID Token verified. Claims: sub={}, email={}, nickname={}",
+                claims.getSubject(), claims.getStringClaim("email"), claims.getStringClaim("nickname"));
+
+        // 2. 페이로드에서 값 추출
         String sub = claims.getSubject();
-        if (sub == null)
+        if (sub == null) {
+            log.error("❌ Missing sub claim");
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_sub");
+        }
 
         String email = requireClaim(claims, "email");
         String nickname = requireClaim(claims, "nickname");
         String picture = requireClaim(claims, "picture");
-
         Platform platform = request.getPlatform();
 
-        // ✅ 3. DB 조회 → 있으면 기존 유저, 없으면 새 유저 생성
+        log.debug("📦 Extracted user info: sub={}, email={}, nickname={}, platform={}", sub, email, nickname, platform);
+
+        // 3. DB 조회 → 있으면 기존 유저, 없으면 새 유저 생성
         return userRepository.findByOidcAndPlatform(sub, platform)
-                .map(user -> LoginResponseDTO.builder()
-                        .isNewUser(false)
-                        .user(convertToUserDTO(user))
-                        .build()
-                )
+                .map(user -> {
+                    log.info("👤 Existing user found (oidc={}, platform={})", sub, platform);
+                    return LoginResponseDTO.builder()
+                            .isNewUser(false)
+                            .user(convertToUserDTO(user))
+                            .build();
+                })
                 .orElseGet(() -> {
+                    log.info("🆕 No existing user found. Creating new user (email={}, platform={})", email, platform);
                     User newUser = new User(email, platform, nickname, picture, null);
                     newUser.setOidc(sub);
                     User saved = userRepository.save(newUser);
+                    log.info("✅ New user created with ID={}", saved.getId());
                     return LoginResponseDTO.builder()
                             .isNewUser(true)
                             .user(convertToUserDTO(saved))
                             .build();
                 });
     }
-//    public User upsertUserFromKakaoIdToken(OauthLoginRequestDTO request)
-//            throws BadJOSEException, ParseException, JOSEException {
-//
-//        // id token 검증
-//        JWTClaimsSet claims = oidcUtil.verifyKakaoIdToken(request.getIdToken());
-//
-//        // 페이로드에서 값 추출 (변수명 유지)
-//        String sub = claims.getSubject();
-//        if (sub == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_sub");
-//        String email = requireClaim(claims, "email");
-//        String nickname = requireClaim(claims, "nickname");
-//        String picture = requireClaim(claims, "picture");
-//
-//        // platform 꺼내기 (변수명 유지)
-//        Platform platform = request.getPlatform();
-//
-//        // 1. DB 조회, 없으면 생성 (변수명 유지: user)
-//
-//        return userRepository.findByOidcAndPlatform(sub, platform)
-//                .orElseGet(() -> {
-//                    User newUser = new User(email, platform, nickname, picture, null);
-//                    newUser.setOidc(sub);
-//                    return userRepository.save(newUser);
-//                });
-//    }
 
-    /** 2) 주어진 유저로 JWT 발급 + refresh 저장 (변수명 유지) */
     public RefreshResult issueJwtForUser(String userId) {
-        // 토큰 생성 (변수명 유지)
+        log.debug("🔑 [AuthService] issueJwtForUser() called for userId={}", userId);
         String access  = jwtUtil.createAccessToken(userId, accessTtlMs);
         String refresh = jwtUtil.createRefreshToken(userId, refreshTtlMs);
-
-        // refresh 저장 (변수명 유지)
         String jti = jwtUtil.getJtiFromRefresh(refresh);
         long ttlSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(refresh));
+
+        log.info("✅ JWTs issued for userId={} (accessTTL={}ms, refreshTTL={}ms, refreshJti={})",
+                userId, accessTtlMs, refreshTtlMs, jti);
+
         refreshRepo.save(userId, jti, refresh, ttlSec);
+        log.debug("💾 Refresh token saved in repository (ttlSec={})", ttlSec);
 
         return new RefreshResult(access, refresh, ttlSec);
     }
 
-
-    /** 컨트롤러 시그니처: rotateTokens(String refreshCookie, HttpServletRequest req) */
     public RefreshResult rotateTokens(String refreshCookie, HttpServletRequest req) {
+        log.debug("♻️ [AuthService] rotateTokens() called");
+
         if (refreshCookie == null) {
+            log.error("❌ No refresh cookie found");
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_refresh_cookie");
         }
 
-        // (선택) CSRF 완화: Origin / Custom Header 확인
         String origin = req.getHeader("Origin");
         if (!isAllowedOrigin(origin)) {
+            log.warn("⚠️ Forbidden origin attempted: {}", origin);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "invalid_origin");
         }
         if (!"XMLHttpRequest".equals(req.getHeader("X-Requested-With"))) {
+            log.warn("⚠️ Missing or invalid X-Requested-With header");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing_xrw");
         }
 
         try {
-            // 1) 토큰 검증
             jwtUtil.validateRefresh(refreshCookie);
             String userId = jwtUtil.getUserIdFromRefresh(refreshCookie);
             String oldJti = jwtUtil.getJtiFromRefresh(refreshCookie);
+            log.debug("🧾 Refresh token validated (userId={}, jti={})", userId, oldJti);
 
-            // 2) 재사용/위조 탐지
             if (!refreshRepo.existsAndMatch(userId, oldJti, refreshCookie)) {
+                log.error("❌ Refresh reuse or revoked (userId={}, jti={})", userId, oldJti);
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "refresh_reuse_or_revoked");
             }
 
-            // 3) 남은 TTL 계산
             long remainingSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(refreshCookie));
+            log.debug("🕒 Remaining TTL for refresh token: {}s", remainingSec);
 
-            // 4) 액세스만 재발급 (리프레시 충분히 남음)
             if (remainingSec > refreshRoateBelow) {
+                log.info("🔁 Access token reissued only (refresh still valid)");
                 String newAccess = jwtUtil.createAccessToken(userId, accessTtlMs);
-                // 저장소 변경 없음, 기존 refresh 그대로 사용
                 return new RefreshResult(newAccess, refreshCookie, remainingSec);
             }
 
-            // 5) 리프레시 교체 (만료 임박)
+            log.info("⏳ Refresh token nearing expiration, issuing new refresh...");
             String newAccess  = jwtUtil.createAccessToken(userId, accessTtlMs);
             String newRefresh = jwtUtil.createRefreshToken(userId, refreshTtlMs);
 
@@ -173,24 +169,32 @@ public class AuthService {
             // 저장은 새 키를 먼저, 그 다음 기존 키 삭제(짧은 경합 윈도우 최소화)
             refreshRepo.save(userId, newJti, newRefresh, newTtlSec);
             refreshRepo.delete(userId, oldJti);
+            log.info("✅ Tokens rotated successfully (userId={}, newJti={})", userId, newJti);
 
             return new RefreshResult(newAccess, newRefresh, newTtlSec);
 
         } catch (ResponseStatusException e) {
+            log.error("❌ Token rotation failed: {}", e.getReason());
             throw e;
         } catch (Exception e) {
+            log.error("❌ Unexpected error during token rotation", e);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid_refresh");
         }
     }
 
     public void logout(String refreshCookie) {
-        if (refreshCookie == null) return;
+        log.debug("🚪 [AuthService] logout() called");
+        if (refreshCookie == null) {
+            log.warn("⚠️ logout() called with null cookie");
+            return;
+        }
         try {
             String userId = jwtUtil.getUserIdFromRefresh(refreshCookie);
             String jti = jwtUtil.getJtiFromRefresh(refreshCookie);
             refreshRepo.delete(userId, jti);
-        } catch (Exception ignored) {
-            // 이미 만료/삭제 등
+            log.info("✅ User logged out (userId={}, jti deleted={})", userId, jti);
+        } catch (Exception e) {
+            log.warn("⚠️ logout() ignored error: {}", e.getMessage());
         }
     }
 
@@ -202,26 +206,32 @@ public class AuthService {
 
     private boolean isAllowedOrigin(String origin) {
         if (origin == null) return false;
-        return List.of(
-                "https://app.melog.com",
-                "https://staging.melog.com",
+        boolean allowed = List.of(
+                "https://melog.org",
+                "http://yanggang.iptime.org",
                 "http://localhost:3000",
                 "http://10.0.2.2:8080"
         ).contains(origin);
+        if (!allowed) log.debug("❌ Disallowed origin detected: {}", origin);
+        return allowed;
     }
 
     private String requireClaim(JWTClaimsSet claims, String key) {
         try {
             String value = claims.getStringClaim(key);
-            if (value == null)
+            if (value == null) {
+                log.error("❌ Missing claim: {}", key);
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "missing_" + key);
+            }
             return value;
         } catch (ParseException e) {
+            log.error("❌ Invalid claim format for {}", key);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid_" + key);
         }
     }
 
     private LoginResponseDTO.UserDTO convertToUserDTO(User user) {
+        log.debug("🧩 Converting User entity to DTO (userId={})", user.getId());
         return LoginResponseDTO.UserDTO.builder()
                 .id(String.valueOf(user.getId()))
                 .email(user.getEmail())
@@ -231,6 +241,4 @@ public class AuthService {
                 .intro(user.getIntro())
                 .build();
     }
-
 }
-

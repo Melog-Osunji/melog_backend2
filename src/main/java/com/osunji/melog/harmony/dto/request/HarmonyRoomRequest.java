@@ -36,6 +36,7 @@ public class HarmonyRoomRequest {
 		private List<String> category;      // 카테고리 리스트 (선택)
 		private String profileImg;          // 프로필 이미지 (선택)
 		private Boolean isDirectAssign;     // 바로 승인 여부 (선택)
+		private Boolean isPrivate;
 	}
 
 	/**
