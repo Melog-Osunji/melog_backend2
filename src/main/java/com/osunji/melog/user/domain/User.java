@@ -62,7 +62,7 @@ public class User {
     private String oidc;
 
     @Column
-    private boolean active;
+    private boolean active = false;
 
 
     //생성자 - 필수 정보로만 이루어짐

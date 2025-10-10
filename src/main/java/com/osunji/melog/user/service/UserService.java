@@ -4,7 +4,9 @@ import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.harmony.entity.HarmonyRoom;
 import com.osunji.melog.harmony.repository.HarmonyRoomBookmarkRepository;
 import com.osunji.melog.harmony.repository.HarmonyRoomRepository;
+import com.osunji.melog.review.dto.response.BookmarkResponse;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
+import com.osunji.melog.review.service.BookmarkService;
 import com.osunji.melog.review.service.PostService;
 import com.osunji.melog.user.domain.Agreement;
 import com.osunji.melog.user.domain.Follow;
@@ -40,8 +42,9 @@ public class UserService {
     private final HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository;
     private final PostService postService;
     private final UserProfileMusicService userProfileMusicService;
+    private final BookmarkService bookmarkService;
 
-    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository, HarmonyRoomRepository harmonyRoomRepository, HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository, PostService postService, UserProfileMusicService userProfileMusicService) {
+    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository, HarmonyRoomRepository harmonyRoomRepository, HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository, PostService postService, UserProfileMusicService userProfileMusicService, BookmarkService bookmarkService) {
         this.userRepository = userRepository;
         this.agreementRepository = agreementRepository;
         this.onboardingRepository = onboardingRepository;
@@ -50,6 +53,7 @@ public class UserService {
         this.harmonyRoomBookmarkRepository = harmonyRoomBookmarkRepository;
         this.postService = postService;
         this.userProfileMusicService = userProfileMusicService;
+        this.bookmarkService = bookmarkService;
     }
 
     private static final Set<String> PROFILE_UPDATABLE_FIELDS = Set.of(
@@ -408,7 +412,7 @@ public class UserService {
                 .map(r -> UserResponse.HarmonyRoomItem.builder()
                         .roomId(r.getId())
                         .roomName(r.getName())
-                        .isManager(true) // owner == manager
+                        .isManager(true)
                         .roomImg(r.getProfileImageUrl())
                         .bookmark(harmonyRoomBookmarkRepository.existsByHarmonyRoom_IdAndUser_Id(r.getId(), userId))
                         .build())
@@ -442,7 +446,6 @@ public class UserService {
         // 5-1) 사용자 '미디어 포함' 게시글 (분리)
         List<FilterPostResponse.UserPostData> mediaPosts = Collections.emptyList();
         try {
-            // MyPage면 조회자 == 페이지 주인일 가능성이 높으므로 currentUserIdStr에 userId를 전달
             var mediaMsg = postService.getUserMediaPosts(userId.toString(), userId.toString());
             if (mediaMsg == null) {
                 log.warn("getUserMediaPosts: ApiMessage가 null");
@@ -455,6 +458,21 @@ public class UserService {
             if (log.isWarnEnabled()) log.warn("getUserMediaPosts 예외: {}", e, e);
         }
 
+        // 5-2) 사용자 북마크 목록
+        List<BookmarkResponse.BookmarkData> bookmarks = Collections.emptyList();
+        try {
+            var bmMsg = bookmarkService.getBookmarksByUser(userId.toString()); // ← API 23번 서비스 호출
+            if (bmMsg == null) {
+                log.warn("getBookmarksByUser: ApiMessage가 null");
+            } else if (bmMsg.isSuccess() && bmMsg.getData() != null) {
+                bookmarks = Optional.ofNullable(bmMsg.getData().getResults()).orElse(List.of());
+            } else {
+                log.warn("getBookmarksByUser 실패: code={}, message={}", bmMsg.getCode(), bmMsg.getMessage());
+            }
+        } catch (Exception e) {
+            if (log.isWarnEnabled()) log.warn("getBookmarksByUser 예외: {}", e, e);
+        }
+
         // 6) 응답 DTO
         UserResponse.MyPageResponse body = UserResponse.MyPageResponse.builder()
                 .profileImg(user.getProfileImageUrl())
@@ -464,11 +482,11 @@ public class UserService {
                 .followers(followers)
                 .followings(followings)
                 .harmonyRooms(roomItems)
-                .posts(posts)              // 이제 바로 List<UserPostData>
-                .mediaPosts(mediaPosts)    // 이것도 List<UserPostData>
+                .posts(posts)
+                .mediaPosts(mediaPosts)
+                .bookmarks(bookmarks)
                 .build();
 
         return ApiMessage.success(200, "response successful", body);
     }
-
 }
