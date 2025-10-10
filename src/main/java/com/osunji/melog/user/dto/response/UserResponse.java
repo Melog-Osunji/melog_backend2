@@ -1,5 +1,6 @@
 package com.osunji.melog.user.dto.response;
 
+import com.osunji.melog.review.dto.response.BookmarkResponse;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 public class UserResponse {
+
     @Getter
     @Builder
     public static class AgreementResponse {
@@ -26,7 +28,6 @@ public class UserResponse {
         private List<String> composer;
         private List<String> period;
         private List<String> instrument;
-
     }
 
     @Getter
@@ -62,6 +63,7 @@ public class UserResponse {
     public static class followingCheckResponse{
         private boolean result;
     }
+
     @Getter @Builder
     @AllArgsConstructor @NoArgsConstructor
     public static class MyPageResponse {
@@ -76,8 +78,10 @@ public class UserResponse {
 
         private List<HarmonyRoomItem> harmonyRooms;
 
-        // 하단 포스트(기존 API 22번과 동일 구조 포함)
-        private FilterPostResponse.UserPostList posts;
+        private List<FilterPostResponse.UserPostData> posts;
+        private List<FilterPostResponse.UserPostData> mediaPosts;
+        private List<BookmarkResponse.BookmarkData> bookmarks;
+
     }
 
     @Getter  @Builder
