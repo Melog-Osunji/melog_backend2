@@ -4,7 +4,9 @@ import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.harmony.entity.HarmonyRoom;
 import com.osunji.melog.harmony.repository.HarmonyRoomBookmarkRepository;
 import com.osunji.melog.harmony.repository.HarmonyRoomRepository;
+import com.osunji.melog.review.dto.response.BookmarkResponse;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
+import com.osunji.melog.review.service.BookmarkService;
 import com.osunji.melog.review.service.PostService;
 import com.osunji.melog.user.domain.Agreement;
 import com.osunji.melog.user.domain.Follow;
@@ -40,8 +42,9 @@ public class UserService {
     private final HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository;
     private final PostService postService;
     private final UserProfileMusicService userProfileMusicService;
+    private final BookmarkService bookmarkService;
 
-    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository, HarmonyRoomRepository harmonyRoomRepository, HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository, PostService postService, UserProfileMusicService userProfileMusicService) {
+    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository, HarmonyRoomRepository harmonyRoomRepository, HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository, PostService postService, UserProfileMusicService userProfileMusicService, BookmarkService bookmarkService) {
         this.userRepository = userRepository;
         this.agreementRepository = agreementRepository;
         this.onboardingRepository = onboardingRepository;
@@ -50,6 +53,7 @@ public class UserService {
         this.harmonyRoomBookmarkRepository = harmonyRoomBookmarkRepository;
         this.postService = postService;
         this.userProfileMusicService = userProfileMusicService;
+        this.bookmarkService = bookmarkService;
     }
 
     private static final Set<String> PROFILE_UPDATABLE_FIELDS = Set.of(
@@ -363,17 +367,11 @@ public class UserService {
             // 없으면 새로 팔로우
             rel = Follow.createFollow(me, target);
             followRepository.save(rel);
-            msg = "followed";
-        } else if (Boolean.TRUE.equals(rel.getStatus())) {
-            // 이미 팔로우 중이면 언팔로우
-            rel.deactivate();          // 아래 엔티티 메서드 참고
-            // JPA dirty checking으로 업데이트 반영
-            msg = "unfollowed";
         } else {
             // 기존 기록은 있는데 비활성 상태면 다시 팔로우
             rel.activate(LocalDateTime.now());
-            msg = "followed";
         }
+        msg = "followed";
 
         UserResponse.followingResponse body = UserResponse.followingResponse.builder()
                 .userId(me.getId().toString())
@@ -404,7 +402,7 @@ public class UserService {
             return ApiMessage.fail(HttpStatus.NOT_FOUND.value(), "user_not_found");
         }
 
-        // 2) 팔로워/팔로잉 카운트 (ACCEPTED만 집계) followingid
+        // 2) 팔로워/팔로잉 카운트 (ACCEPTED만 집계)
         long followers = followRepository.countByFollowing_IdAndStatus(userId, FollowStatus.ACCEPTED);
         long followings = followRepository.countByFollower_IdAndStatus(userId, FollowStatus.ACCEPTED);
 
@@ -414,12 +412,13 @@ public class UserService {
                 .map(r -> UserResponse.HarmonyRoomItem.builder()
                         .roomId(r.getId())
                         .roomName(r.getName())
-                        .isManager(true) // owner == manager
+                        .isManager(true)
                         .roomImg(r.getProfileImageUrl())
                         .bookmark(harmonyRoomBookmarkRepository.existsByHarmonyRoom_IdAndUser_Id(r.getId(), userId))
                         .build())
                 .toList();
 
+        // 프로필 음악
         UserResponse.ProfileMusic profileMusic = userProfileMusicService.getActive(userId)
                 .map(m -> UserResponse.ProfileMusic.builder()
                         .youtube(m.getYoutubeUrl() != null
@@ -429,14 +428,49 @@ public class UserService {
                         .build())
                 .orElse(null);
 
-
-        // 5) 사용자 게시글 (기존 API 22번과 동일 구조 포함)
-        FilterPostResponse.UserPostList posts = null;
+        // 5) 사용자 게시글 (전체)
+        List<FilterPostResponse.UserPostData> posts = Collections.emptyList();
         try {
             var postsMsg = postService.getUserPosts(userId.toString());
-            if (postsMsg != null) posts = postsMsg.getData();
+            if (postsMsg == null) {
+                log.warn("getUserPosts: ApiMessage가 null");
+            } else if (postsMsg.isSuccess() && postsMsg.getData() != null) {
+                posts = Optional.ofNullable(postsMsg.getData().getResults()).orElse(List.of());
+            } else {
+                log.warn("getUserPosts 실패: code={}, message={}", postsMsg.getCode(), postsMsg.getMessage());
+            }
         } catch (Exception e) {
-            log.warn("getUserPosts 실패: {}", e.getMessage());
+            if (log.isWarnEnabled()) log.warn("getUserPosts 예외: {}", e, e);
+        }
+
+        // 5-1) 사용자 '미디어 포함' 게시글 (분리)
+        List<FilterPostResponse.UserPostData> mediaPosts = Collections.emptyList();
+        try {
+            var mediaMsg = postService.getUserMediaPosts(userId.toString(), userId.toString());
+            if (mediaMsg == null) {
+                log.warn("getUserMediaPosts: ApiMessage가 null");
+            } else if (mediaMsg.isSuccess() && mediaMsg.getData() != null) {
+                mediaPosts = Optional.ofNullable(mediaMsg.getData().getResults()).orElse(List.of());
+            } else {
+                log.warn("getUserMediaPosts 실패: code={}, message={}", mediaMsg.getCode(), mediaMsg.getMessage());
+            }
+        } catch (Exception e) {
+            if (log.isWarnEnabled()) log.warn("getUserMediaPosts 예외: {}", e, e);
+        }
+
+        // 5-2) 사용자 북마크 목록
+        List<BookmarkResponse.BookmarkData> bookmarks = Collections.emptyList();
+        try {
+            var bmMsg = bookmarkService.getBookmarksByUser(userId.toString()); // ← API 23번 서비스 호출
+            if (bmMsg == null) {
+                log.warn("getBookmarksByUser: ApiMessage가 null");
+            } else if (bmMsg.isSuccess() && bmMsg.getData() != null) {
+                bookmarks = Optional.ofNullable(bmMsg.getData().getResults()).orElse(List.of());
+            } else {
+                log.warn("getBookmarksByUser 실패: code={}, message={}", bmMsg.getCode(), bmMsg.getMessage());
+            }
+        } catch (Exception e) {
+            if (log.isWarnEnabled()) log.warn("getBookmarksByUser 예외: {}", e, e);
         }
 
         // 6) 응답 DTO
@@ -449,6 +483,8 @@ public class UserService {
                 .followings(followings)
                 .harmonyRooms(roomItems)
                 .posts(posts)
+                .mediaPosts(mediaPosts)
+                .bookmarks(bookmarks)
                 .build();
 
         return ApiMessage.success(200, "response successful", body);

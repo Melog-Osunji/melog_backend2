@@ -14,6 +14,7 @@ import com.osunji.melog.review.dto.response.PostResponse;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
 import com.osunji.melog.user.repository.UserRepository;
 import com.osunji.melog.user.repository.FollowRepository;
+import io.micrometer.common.lang.Nullable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -524,6 +525,38 @@ public class PostService {
 			return ApiMessage.fail(500, "사용자 게시글 조회 실패: " + e.getMessage());
 		}
 	}
+
+	/** 특정 유저의 '미디어가 포함된' 모든 게시글 GET */
+	@Transactional(readOnly = true)
+	public ApiMessage<FilterPostResponse.UserPostList> getUserMediaPosts(String userIdStr, @Nullable String currentUserIdStr) {
+		try {
+			UUID userId = UUID.fromString(userIdStr);
+			UUID currentUserId = null;
+
+			if (currentUserIdStr != null && !currentUserIdStr.isBlank()) {
+				currentUserId = UUID.fromString(currentUserIdStr);
+			}
+
+			List<Post> posts = postRepository.findMediaPostsByUserIdOrderByCreatedAtDesc(userId, currentUserId);
+
+			List<FilterPostResponse.UserPostData> userPostList = posts.stream()
+					.map(postMapper::toUserPostData)
+					.toList();
+
+			FilterPostResponse.UserPostList response = FilterPostResponse.UserPostList.builder()
+					.results(userPostList)
+					.build();
+
+			return ApiMessage.success(200, "사용자 미디어 게시글 조회 성공", response);
+
+		} catch (IllegalArgumentException e) {
+			// UUID 파싱 실패 등
+			return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다.");
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "사용자 미디어 게시글 조회 실패: " + e.getMessage());
+		}
+	}
+
 
 
 
