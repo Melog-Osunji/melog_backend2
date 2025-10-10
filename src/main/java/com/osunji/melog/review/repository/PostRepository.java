@@ -93,4 +93,16 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 	List<Post> findAllPostsByUserIdIncludingHarmony(@Param("userId") UUID userId,
 		@Param("currentUserId") UUID currentUserId);
 
+	/** 특정 유저의 '미디어가 있는' 게시글만 조회 + hiddenUsers 제외 */
+	@Query("""
+        SELECT p FROM Post p
+        WHERE p.user.id = :userId
+          AND p.mediaUrl IS NOT NULL
+          AND p.mediaUrl <> ''
+          AND (:currentUserId IS NULL OR :currentUserId NOT MEMBER OF p.hiddenUsers)
+        ORDER BY p.createdAt DESC
+        """)
+	List<Post> findMediaPostsByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId,
+														  @Param("currentUserId") UUID currentUserId);
+
 }
