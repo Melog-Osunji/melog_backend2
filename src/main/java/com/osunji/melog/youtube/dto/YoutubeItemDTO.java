@@ -1,13 +1,13 @@
-package com.osunji.melog.youtube.entity;
+package com.osunji.melog.youtube.dto;
 
-public class YoutubeItem {
+public class YoutubeItemDTO {
 
 	private String url;
 	private String title;
 	private String thumbnail;
 	private String description;
 
-	public YoutubeItem(String url, String title, String thumbnail, String description) {
+	public YoutubeItemDTO(String url, String title, String thumbnail, String description) {
 		this.url = url;
 		this.title = title;
 		this.thumbnail = thumbnail;
