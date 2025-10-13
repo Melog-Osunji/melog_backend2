@@ -2,14 +2,15 @@ package com.osunji.melog.user.controller;
 
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.global.security.JwtAuthFilter;
+import com.osunji.melog.user.domain.UserProfileMusic;
 import com.osunji.melog.user.dto.request.UserRequest;
 import com.osunji.melog.user.dto.response.UserResponse;
 import com.osunji.melog.user.service.UserProfileMusicService;
 import com.osunji.melog.user.service.UserService;
+import com.osunji.melog.youtube.dto.YoutubeItemDTO;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -135,15 +136,13 @@ public class UserController {
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
-//    @PostMapping("/myPage/musicChange")
-//    public ResponseEntity<?> updateProfileMusic(
-//            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId,
-//            @RequestBody Map<String, String> body
-//    ) {
-//        String youtube = body.get("youtube");
-//        String title   = body.get("title");
-//        userProfileMusicService.setActive(userId, youtube, title);
-//        return ResponseEntity.ok(ApiMessage.success(200,"success",title));
-//    }
+    @PostMapping("/myPage/musicChange")
+    public ResponseEntity<?> updateProfileMusic(
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId,
+            @RequestBody YoutubeItemDTO body
+    ) {
+        YoutubeItemDTO saved = userProfileMusicService.setProfileMusic(userId,body);
+        return ResponseEntity.ok(ApiMessage.success(200,"success",saved ));
+    }
 
 }

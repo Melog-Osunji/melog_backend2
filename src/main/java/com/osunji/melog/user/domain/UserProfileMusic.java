@@ -13,7 +13,7 @@ import java.util.UUID;
 @Table(name = "user_profile_music",
         indexes = {
                 @Index(name = "idx_upm_user", columnList = "user_id"),
-                @Index(name = "idx_upm_user_active", columnList = "user_id,is_active")
+//                @Index(name = "idx_upm_user_active", columnList = "user_id,is_active")
         })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -24,41 +24,43 @@ public class UserProfileMusic {
     @Column(columnDefinition = "uuid")
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, columnDefinition = "uuid")
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    @Column(name = "youtube_video_id", length = 32)
-    private String youtubeVideoId; // 선택
-
-    @Column(name = "youtube_url", length = 512)
+    @Column(name = "youtube_url")
     private String youtubeUrl;
 
-    @Column(name = "title", length = 255)
+    @Column(name = "title")
     private String title;
 
-    @Column(name = "thumbnail_url", length = 512)
-    private String thumbnailUrl; // 선택
+    @Column(name = "thumbnail_url")
+    private String thumbnailUrl;
 
-    @Column(name = "is_active", nullable = false)
-    private boolean isActive;
+    @Column(name = "description")
+    private String description;
 
     @Column(name = "selected_at", nullable = false)
     private LocalDateTime selectedAt;
 
     // 생성 팩토리
-    public static UserProfileMusic select(User user, String videoId, String url, String title, String thumbnailUrl) {
+    public static UserProfileMusic select(User user, String url, String title, String description, String thumbnailUrl) {
         UserProfileMusic upm = new UserProfileMusic();
         upm.user = user;
-        upm.youtubeVideoId = videoId;
-        upm.youtubeUrl = url;
+       upm.youtubeUrl = url;
         upm.title = title;
+        upm.description = description;
         upm.thumbnailUrl = thumbnailUrl;
-        upm.isActive = true;
-        upm.selectedAt = LocalDateTime.now();
+       upm.selectedAt = LocalDateTime.now();
         return upm;
     }
 
-    public void deactivate() { this.isActive = false; }
+    public void change(String url, String title, String thumbnailUrl, String description) {
+        this.youtubeUrl = url;
+        this.title = title;
+        this.thumbnailUrl = thumbnailUrl;
+        this.description = description;
+        this.selectedAt = LocalDateTime.now();
+    }
 }
 
