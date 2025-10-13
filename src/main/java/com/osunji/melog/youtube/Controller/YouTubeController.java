@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.osunji.melog.youtube.service.YouTubeService;
-import com.osunji.melog.youtube.entity.YoutubeItem;
+import com.osunji.melog.youtube.dto.YoutubeItemDTO;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,7 @@ public class YouTubeController {
 	private final YouTubeService youTubeService;
 
 	@GetMapping("/search")
-	public ResponseEntity<List<YoutubeItem>> searchYouTube(
+	public ResponseEntity<List<YoutubeItemDTO>> searchYouTube(
 		@RequestParam(value = "word", required = true) String search,
 		@RequestParam(value = "items", required = false, defaultValue = "5") int items) {
 
@@ -32,7 +32,7 @@ public class YouTubeController {
 		log.info("요청 파라미터 - word: {}, items: {}", search, items);
 
 		try {
-			List<YoutubeItem> results = youTubeService.searchYouTube(search, items);
+			List<YoutubeItemDTO> results = youTubeService.searchYouTube(search, items);
 			log.info("Controller: 검색 결과 {}개 반환", results.size());
 			return ResponseEntity.ok(results);
 

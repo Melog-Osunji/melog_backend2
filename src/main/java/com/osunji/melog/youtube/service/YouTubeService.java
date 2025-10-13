@@ -8,7 +8,7 @@ import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.youtube.YouTube;
 import com.google.api.services.youtube.model.SearchListResponse;
 import com.google.api.services.youtube.model.SearchResult;
-import com.osunji.melog.youtube.entity.YoutubeItem;
+import com.osunji.melog.youtube.dto.YoutubeItemDTO;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -60,13 +60,13 @@ public class YouTubeService {
 		log.info("YouTubeService 초기화 완료");
 	}
 
-	public List<YoutubeItem> searchYouTube(String searchQuery, int maxResults) {
+	public List<YoutubeItemDTO> searchYouTube(String searchQuery, int maxResults) {
 		log.info("=== YouTube 검색 시작 ===");
 		log.info("검색어: {}", searchQuery);
 		log.info("최대 결과 수: {}", maxResults);
 		log.info("API 키 상태: {}", youtubeApiKey != null ? "있음" : "없음");
 
-		List<YoutubeItem> results = new ArrayList<>();
+		List<YoutubeItemDTO> results = new ArrayList<>();
 
 		try {
 			if (youtube == null) {
@@ -98,7 +98,7 @@ public class YouTubeService {
 			log.info("검색 결과 개수: {}", searchResultList.size());
 
 			for (SearchResult result : searchResultList) {
-				YoutubeItem item = new YoutubeItem(
+				YoutubeItemDTO item = new YoutubeItemDTO(
 					GOOGLE_YOUTUBE_URL + result.getId().getVideoId(),
 					result.getSnippet().getTitle(),
 					result.getSnippet().getThumbnails().getDefault().getUrl(),
@@ -131,7 +131,7 @@ public class YouTubeService {
 	/**
 	 * 클래식 음악 검색 (자동으로 "클래식" 키워드 추가)
 	 */
-	public List<YoutubeItem> searchClassicalMusic(String query, int maxResults) {
+	public List<YoutubeItemDTO> searchClassicalMusic(String query, int maxResults) {
 		String searchQuery = query.trim().isEmpty() ? "클래식 음악" : query + " 클래식";
 		return searchYouTube(searchQuery, maxResults);
 	}
@@ -139,7 +139,7 @@ public class YouTubeService {
 	/**
 	 * 인기 클래식 음악 조회
 	 */
-	public List<YoutubeItem> getTrendingClassical(int maxResults) {
+	public List<YoutubeItemDTO> getTrendingClassical(int maxResults) {
 		return searchYouTube("클래식 음악 인기", maxResults);
 	}
 }
