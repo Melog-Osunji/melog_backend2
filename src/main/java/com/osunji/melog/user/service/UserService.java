@@ -421,9 +421,7 @@ public class UserService {
         // 프로필 음악
         UserResponse.ProfileMusic profileMusic = userProfileMusicService.getActive(userId)
                 .map(m -> UserResponse.ProfileMusic.builder()
-                        .youtube(m.getYoutubeUrl() != null
-                                ? m.getYoutubeUrl()
-                                : (m.getYoutubeVideoId() != null ? "https://www.youtube.com/watch?v=" + m.getYoutubeVideoId() : null))
+                        .youtube(m.getUrl())
                         .title(m.getTitle())
                         .build())
                 .orElse(null);
