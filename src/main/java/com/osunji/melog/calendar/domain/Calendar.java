@@ -9,7 +9,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-
 @Entity
 @Table(
         name = "calendars",
@@ -26,15 +25,14 @@ public class Calendar {
     @Column(name = "id", columnDefinition = "uuid")
     private UUID id;
 
-
     @Column(name = "source", nullable = false, length = 40)
-    private String source;           // ex) KCISA_CNV_060
+    private String source;
 
     @Column(name = "external_id", nullable = false, length = 100)
-    private String externalId;       // ex) 59125
+    private String externalId;
 
     @Column(name = "detail_url", length = 1000)
-    private String detailUrl;        // ex) ...cultureView.jsp?pSeq=59125
+    private String detailUrl;
 
     @Column(name = "title", nullable = false, length = 500)
     private String title;
@@ -51,8 +49,7 @@ public class Calendar {
     @Column(name = "end_date")
     private LocalDate endDate;
 
-    @Lob
-    @Column(name = "description")
+    @Column(name = "description", columnDefinition = "text")
     private String description;
 
     @Column(name = "image_url", length = 1000)
@@ -61,16 +58,23 @@ public class Calendar {
     @Column(name = "created_at", nullable = false)
     private LocalDate createdAt;
 
-    // 기존 생성자 확장
-    public Calendar(String source, String externalId, String detailUrl,
-                    String title, String classification,
-                    LocalDate startDate, LocalDate endDate, String description, String imageUrl) {
+    // ✅ region 파라미터 추가하고 필드에 대입
+    public Calendar(String source,
+                    String externalId,
+                    String detailUrl,
+                    String title,
+                    String classification,
+                    String region,            // ← 추가
+                    LocalDate startDate,
+                    LocalDate endDate,
+                    String description,
+                    String imageUrl) {
         this.source = source;
         this.externalId = externalId;
         this.detailUrl = detailUrl;
         this.title = title;
         this.classification = classification;
-        this.region = region;
+        this.region = region;          // ← 이제 정상 대입
         this.startDate = startDate;
         this.endDate = endDate;
         this.description = description;
@@ -78,16 +82,21 @@ public class Calendar {
         this.createdAt = LocalDate.now();
     }
 
-    // KCISA 전용 팩토리 (편의)
-    public static Calendar fromKcisa(String externalId, String detailUrl,
-                                     String title, String region,
-                                     LocalDate startDate, LocalDate endDate,
-                                     String description, String imageUrl) {
+    // ✅ 순서 맞춰서 region 전달
+    public static Calendar fromKcisa(String externalId,
+                                     String detailUrl,
+                                     String title,
+                                     String region,
+                                     LocalDate startDate,
+                                     LocalDate endDate,
+                                     String description,
+                                     String imageUrl) {
         return new Calendar(
                 "KCISA_CNV_060",
                 externalId,
                 detailUrl,
                 title,
+                /* classification= */ null, // 원한다면 분류값 채워도 됨
                 region,
                 startDate,
                 endDate,
