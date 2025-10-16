@@ -42,7 +42,7 @@ public class HarmonyService {
 	private final HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository;
 	private final HarmonyRoomReportRepository harmonyRoomReportRepository;
 	private final AuthHelper authHelper;
-	private final PostService postService;
+	private final HarmonyCommentRepository harmonyCommentRepository;
 	/**
 	 * 1. 하모니룸 생성
 	 */
@@ -65,9 +65,6 @@ public class HarmonyService {
 		HarmonyRoomMembers ownerMember = HarmonyRoomMembers.createOwner(harmonyRoom, user);
 		harmonyRoomMembersRepository.save(ownerMember);
 
-		// 3 = 게시글 목록 생성
-		HarmonyRoomPosts harmonyRoomPosts = HarmonyRoomPosts.create(harmonyRoom);
-		harmonyRoomPostsRepository.save(harmonyRoomPosts);
 
 		// 4 = 가입 대기 목록 생성
 		HarmonyRoomAssignWait assignWait = HarmonyRoomAssignWait.create(harmonyRoom);
@@ -133,21 +130,73 @@ public class HarmonyService {
 	}
 
 	/**
-	 * 3. 최근 업로드 미디어 조회
+	 * 하모니룸 게시글 작성
 	 */
-	@Transactional(readOnly = true)
-	public HarmonyRoomResponse.RecentMedia getRecentMedia(String authHeader) {
-		// 0 = 토큰으로 유저 인식 및 유저 체크
+	@Transactional
+	public void createHarmonyRoomPost(String harmonyId, HarmonyRoomRequest.CreateHarmonyPost request, String authHeader) {
+		// 사용자 인증
 		UUID userId = authHelper.authHelperAsUUID(authHeader);
 		User user = userRepository.findById(userId)
 			.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
 
-		// 1 = 내가 속한 하모니룸들 조회
+		// 하모니룸 조회
+		UUID harmonyRoomId = UUID.fromString(harmonyId);
+		HarmonyRoom harmonyRoom = harmonyRoomRepository.findById(harmonyRoomId)
+			.orElseThrow(() -> new IllegalArgumentException("하모니룸을 찾을 수 없습니다"));
+
+		// 하모니룸 멤버 여부 확인
+		boolean isMember = harmonyRoomMembersRepository
+			.existsByHarmonyRoomAndUser(harmonyRoom, user);
+
+		if (!isMember) {
+			throw new SecurityException("하모니룸 멤버만 게시글을 작성할 수 있습니다.");
+		}
+
+		// 실제 게시글 생성
+		HarmonyRoomPosts post;
+
+		if (request.getMediaUrl() != null && !request.getMediaUrl().trim().isEmpty()) {
+			// 미디어가 있는 게시글
+			post = HarmonyRoomPosts.builder()
+				.harmonyRoom(harmonyRoom)
+				.user(user)
+				.content(request.getContent())
+				.mediaType(request.getMediaType())
+				.mediaUrl(request.getMediaUrl())
+				.build();
+		} else {
+			// 텍스트만 있는 게시글
+			post = HarmonyRoomPosts.createTextPost(harmonyRoom, user, request.getContent());
+		}
+
+		// 태그 추가
+		if (request.getTags() != null) {
+			request.getTags().forEach(post::addTag);
+		}
+
+		// 저장
+		HarmonyRoomPosts savedPost = harmonyRoomPostsRepository.save(post);
+
+		log.info("✅ 하모니룸 게시글 작성 완료: roomId={}, userId={}, postId={}, mediaType={}",
+			harmonyId, userId, savedPost.getId(), savedPost.getMediaType());
+	}
+
+	/**
+	 * 3. 최근 업로드 미디어 조회
+	 */
+	@Transactional(readOnly = true)
+	public HarmonyRoomResponse.RecentMedia getRecentMedia(String authHeader) {
+		// 사용자 인증
+		UUID userId = authHelper.authHelperAsUUID(authHeader);
+		User user = userRepository.findById(userId)
+			.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
+
+		// 내가 속한 하모니룸들 조회
 		List<HarmonyRoomMembers> membershipList = harmonyRoomMembersRepository.findByUser(user);
 		List<HarmonyRoom> myHarmonyRooms = membershipList.stream()
 			.map(HarmonyRoomMembers::getHarmonyRoom)
 			.collect(Collectors.toList());
-		// 1.1 = 속한 하모니룸이 없을 때 예외
+
 		if (myHarmonyRooms.isEmpty()) {
 			log.info("📺 속한 하모니룸이 없어서 최근 미디어 없음");
 			return HarmonyRoomResponse.RecentMedia.builder()
@@ -155,40 +204,30 @@ public class HarmonyService {
 				.build();
 		}
 
-		// 2 = 하모니룸들의 게시글 조회
-		List<HarmonyRoomPosts> harmonyRoomPostsList = harmonyRoomPostsRepository.findByHarmonyRoomIn(myHarmonyRooms);
+		// 하모니룸 게시글에서 미디어가 있는 것만 조회
+		List<HarmonyRoomPosts> mediaPostsList = harmonyRoomPostsRepository
+			.findByHarmonyRoomInAndMediaTypeIsNotNullOrderByCreatedAtDesc(myHarmonyRooms);
 
 		List<HarmonyRoomResponse.RecentMedia.RecentMediaInfo> recentMediaList = new ArrayList<>();
 
+		for (HarmonyRoomPosts post : mediaPostsList) {
+			if (post.getMediaType() != null && post.getMediaUrl() != null) {
+				String createdAgo = calculateCreatedAgo(post.getCreatedAt());
 
-		for (HarmonyRoomPosts harmonyRoomPosts : harmonyRoomPostsList) {
-			List<String> postIds = harmonyRoomPosts.getPostIds();
-			if (postIds.isEmpty()) continue;
-
-			List<UUID> postUuids = postIds.stream()
-				.map(UUID::fromString)
-				.collect(Collectors.toList());
-
-			List<Post> posts = postRepository.findAllById(postUuids);
-			posts.stream()
-				.filter(post -> "youtube".equals(post.getMediaType()) && post.getMediaUrl() != null)
-				.sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
-				.forEach(post -> {
-					String createdAgo = calculateCreatedAgo(post.getCreatedAt());
-					recentMediaList.add(HarmonyRoomResponse.RecentMedia.RecentMediaInfo.builder()
-						.harmonyRoomId(harmonyRoomPosts.getHarmonyRoom().getId().toString()) // ✅ 하모니룸 ID 추가
-						.userNickname(post.getUser().getNickname())
-						.userProfileImgLink(post.getUser().getProfileImageUrl())
-						.harmonyRoomName(harmonyRoomPosts.getHarmonyRoom().getName())
-						.postID(post.getId().toString())
-						.mediaUrl(post.getMediaUrl())
-						.mediaType(post.getMediaType())
-						.createdAgo(createdAgo)
-						.build());
-				});
+				recentMediaList.add(HarmonyRoomResponse.RecentMedia.RecentMediaInfo.builder()
+					.harmonyRoomId(post.getHarmonyRoom().getId().toString())
+					.userNickname(post.getUser().getNickname())
+					.userProfileImgLink(post.getUser().getProfileImageUrl())
+					.harmonyRoomName(post.getHarmonyRoom().getName())
+					.postID(post.getId().toString())
+					.mediaUrl(post.getMediaUrl())
+					.mediaType(post.getMediaType())
+					.createdAgo(createdAgo)
+					.build());
+			}
 		}
 
-		log.info("📺 SERVICELine 119 최근 미디어 조회 완료: {}개", recentMediaList.size());
+		log.info("📺 최근 미디어 조회 완료: {}개", recentMediaList.size());
 
 		return HarmonyRoomResponse.RecentMedia.builder()
 			.recentMedia(recentMediaList.stream().limit(10).collect(Collectors.toList()))
@@ -248,58 +287,171 @@ public class HarmonyService {
 			.recommendedRooms(recommendedRooms)
 			.build();
 	}
-
 	/**
-	 * 5. 하모니룸 게시글 조회
+	 * 5. 하모니룸 게시글 조회 (성능 최적화 버전)
 	 */
 	@Transactional(readOnly = true)
-	public HarmonyRoomResponse.HarmonyRoomPosts getHarmonyRoomPosts(String harmonyId) {
-		// 0 = 하모니룸 아이디로 하모니룸 찾기
+	public HarmonyRoomResponse.HarmonyRoomPosts getHarmonyRoomPosts(String harmonyId, String authHeader) {
+		String currentUserId = null;
+		try {
+			if (authHeader != null) {
+				UUID userId = authHelper.authHelperAsUUID(authHeader);
+				currentUserId = userId.toString();
+			}
+		} catch (Exception e) {
+			log.debug("비로그인 사용자 하모니룸 게시글 조회");
+		}
+
 		UUID harmonyRoomId = UUID.fromString(harmonyId);
 		HarmonyRoom harmonyRoom = harmonyRoomRepository.findById(harmonyRoomId)
 			.orElseThrow(() -> new IllegalArgumentException("하모니룸을 찾을 수 없습니다"));
 
-		// 1 = 하모니룸의 게시글 목록 조회
-		Optional<HarmonyRoomPosts> harmonyRoomPostsOpt = harmonyRoomPostsRepository.findByHarmonyRoom(harmonyRoom);
-		if (harmonyRoomPostsOpt.isEmpty() || harmonyRoomPostsOpt.get().getPostIds().isEmpty()) {
+		// 연관 데이터와 함께 조회 (N+1 문제 해결)
+		List<HarmonyRoomPosts> harmonyRoomPostsList = harmonyRoomPostsRepository
+			.findByHarmonyRoomWithAllAssociations(harmonyRoom);
+
+		if (harmonyRoomPostsList.isEmpty()) {
 			log.info("📝 하모니룸 {}에 게시글이 없음", harmonyRoom.getName());
 			return HarmonyRoomResponse.HarmonyRoomPosts.builder()
+				.harmonyRoomId(harmonyRoom.getId().toString())
+				.harmonyRoomName(harmonyRoom.getName())
 				.recommend(List.of())
 				.popular(List.of())
 				.build();
 		}
 
-		List<String> postIds = harmonyRoomPostsOpt.get().getPostIds();
-		List<UUID> postUuids = postIds.stream()
-			.map(UUID::fromString)
-			.collect(Collectors.toList());
+		final String finalCurrentUserId = currentUserId;
 
-		List<Post> posts = postRepository.findAllById(postUuids);
-		//todo: 추후 추천 post 리턴하기
-		// 2 = 추천 (최신순)
-		List<HarmonyRoomResponse.HarmonyRoomPosts.PostResult> recommend = posts.stream()
+		// 베스트 댓글을 미리 한 번에 조회 (배치 처리)
+		Map<UUID, HarmonyPostComment> bestCommentsMap = getBestCommentsForPosts(
+			harmonyRoomPostsList.stream().map(HarmonyRoomPosts::getId).collect(Collectors.toList())
+		);
+
+		// 추천 (최신순)
+		List<HarmonyRoomResponse.HarmonyRoomPosts.PostResult> recommend = harmonyRoomPostsList.stream()
 			.sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
-			.map(this::createPostResult)
+			.map(post -> createHarmonyPostResult(post, finalCurrentUserId, bestCommentsMap.get(post.getId())))
 			.collect(Collectors.toList());
 
-		// 3 =  인기 (좋아요순)
-		List<HarmonyRoomResponse.HarmonyRoomPosts.PostResult> popular = posts.stream()
+		// 인기 (좋아요순)
+		List<HarmonyRoomResponse.HarmonyRoomPosts.PostResult> popular = harmonyRoomPostsList.stream()
 			.sorted((a, b) -> {
 				int likesA = a.getLikes() != null ? a.getLikes().size() : 0;
 				int likesB = b.getLikes() != null ? b.getLikes().size() : 0;
 				return Integer.compare(likesB, likesA);
 			})
-			.map(this::createPostResult)
+			.map(post -> createHarmonyPostResult(post, finalCurrentUserId, bestCommentsMap.get(post.getId())))
 			.collect(Collectors.toList());
 
-		log.info("📝 하모니룸 게시글 조회 완료: {}개", posts.size());
-
 		return HarmonyRoomResponse.HarmonyRoomPosts.builder()
-			.harmonyRoomId(harmonyRoom.getId().toString())  // ✅ 하모니룸 ID 추가
+			.harmonyRoomId(harmonyRoom.getId().toString())
 			.harmonyRoomName(harmonyRoom.getName())
 			.recommend(recommend)
 			.popular(popular)
 			.build();
+	}
+
+	/**
+	 *수정된 createHarmonyPostResult (베스트 댓글을 파라미터로 받음)
+	 */
+	private HarmonyRoomResponse.HarmonyRoomPosts.PostResult createHarmonyPostResult(
+		HarmonyRoomPosts post, String currentUserId, HarmonyPostComment bestComment) {
+
+		// 좋아요 수
+		int likeCount = post.getLikes() != null ? post.getLikes().size() : 0;
+
+		// 댓글 수
+		int commentCount = post.getComments() != null ? post.getComments().size() : 0;
+
+		// 현재 사용자의 좋아요 여부
+		boolean isLiked = false;
+		if (currentUserId != null && post.getLikes() != null) {
+			isLiked = post.getLikes().stream()
+				.anyMatch(like -> like.getUser().getId().toString().equals(currentUserId));
+		}
+
+		// 현재 사용자의 북마크 여부
+		boolean isBookmarked = false;
+		if (currentUserId != null && post.getBookmarks() != null) {
+			isBookmarked = post.getBookmarks().stream()
+				.anyMatch(bookmark -> bookmark.getUser().getId().toString().equals(currentUserId));
+		}
+
+		// 생성 시간 (초 단위)
+		Integer createdAgo = calculateCreatedAgoInSeconds(post.getCreatedAt());
+
+		HarmonyRoomResponse.HarmonyRoomPosts.PostResult.PostDetail.BestComment bestCommentDto = null;
+		if (bestComment != null) {
+			log.debug("🎯 베스트 댓글 발견: postId={}, commentId={}, content={}",
+				post.getId(), bestComment.getId(), bestComment.getContent());
+
+			bestCommentDto = HarmonyRoomResponse.HarmonyRoomPosts.PostResult.PostDetail.BestComment.builder()
+				.userId(bestComment.getUser().getId().toString())
+				.content(bestComment.getContent())
+				.build();
+		} else {
+			log.debug("🔍 베스트 댓글 없음: postId={}", post.getId());
+		}
+
+		// PostDetail 생성
+		HarmonyRoomResponse.HarmonyRoomPosts.PostResult.PostDetail postDetail =
+			HarmonyRoomResponse.HarmonyRoomPosts.PostResult.PostDetail.builder()
+				.id(post.getId().toString())
+				.content(post.getContent())
+				.mediaType(post.getMediaType())
+				.mediaUrl(post.getMediaUrl())
+				.tags(post.getTags() != null ? post.getTags() : List.of())
+				.createdAgo(createdAgo)
+				.likeCount(likeCount)
+				.hiddenUser(List.of())  // 숨김 사용자 (추후 구현)
+				.commentCount(commentCount)
+				.bestComment(bestCommentDto)
+				.build();
+
+		// UserInfo 생성
+		HarmonyRoomResponse.HarmonyRoomPosts.PostResult.UserInfo userInfo =
+			HarmonyRoomResponse.HarmonyRoomPosts.PostResult.UserInfo.builder()
+				.id(post.getUser().getId().toString())
+				.nickName(post.getUser().getNickname())
+				.profileImg(post.getUser().getProfileImageUrl())
+				.build();
+
+		// PostResult 생성
+		return HarmonyRoomResponse.HarmonyRoomPosts.PostResult.builder()
+			.post(postDetail)
+			.user(userInfo)
+			.build();
+	}
+
+	/**
+	 *여러 게시글의 베스트 댓글을 한 번에 조회 (배치 처리)
+	 */
+	private Map<UUID, HarmonyPostComment> getBestCommentsForPosts(List<UUID> postIds) {
+		if (postIds.isEmpty()) {
+			return new HashMap<>();
+		}
+
+		// 모든 게시글의 베스트 댓글을 한 번에 조회
+		List<HarmonyPostComment> allBestComments = harmonyCommentRepository
+			.findBestCommentsForMultiplePosts(postIds);
+
+		// 게시글 ID별로 그룹화
+		return allBestComments.stream()
+			.collect(Collectors.toMap(
+				comment -> comment.getHarmonyPost().getId(),
+				comment -> comment,
+				(existing, replacement) -> existing  // 중복시 첫 번째 댓글 유지 (이미 정렬되어 있음)
+			));
+	}
+
+	/**
+	 * 생성 시간을 초 단위로 계산
+	 */
+	private Integer calculateCreatedAgoInSeconds(LocalDateTime createdAt) {
+		if (createdAt == null) return 0;
+
+		LocalDateTime now = LocalDateTime.now();
+		return (int) java.time.Duration.between(createdAt, now).getSeconds();
 	}
 
 	/**
@@ -344,8 +496,9 @@ public class HarmonyService {
 	}
 
 	/**
-	 * 7. 하모니룸 상세 정보 조회 (북마크 기능 완성)
+	 * 7. 하모니룸 상세 정보 조회
 	 */
+
 	@Transactional(readOnly = true)
 	public HarmonyRoomResponse.Detail getHarmonyRoomDetail(String harmonyId, String authHeader) {
 		// 0 = 사용자 인증 및 조회
@@ -361,24 +514,29 @@ public class HarmonyService {
 		// 2 = 멤버 수 조회
 		Long memberCount = harmonyRoomMembersRepository.countByHarmonyRoom(harmonyRoom);
 
-		// ✅ 3 = 실제 북마크 수 기준 랭킹 조회
-		Long actualBookmarkCount = harmonyRoomBookmarkRepository.countByHarmonyRoomId(harmonyRoomId);
-		Long ranking = harmonyRoomRepository.findRankingByActualBookMarkCount(actualBookmarkCount);
+		// 3 = 북마크 수 조회 (Entity의 필드 사용)
+		Long actualBookmarkCount = (long) harmonyRoom.getBookMarkNum();
 
-		// 4 = 게시글 수 조회
-		Optional<HarmonyRoomPosts> harmonyRoomPostsOpt = harmonyRoomPostsRepository.findByHarmonyRoom(harmonyRoom);
-		int postCount = harmonyRoomPostsOpt.map(posts -> posts.getPostIds().size()).orElse(0);
+		//  랭킹 조회 (북마크 수 기준, 없으면 기본값)
+		Long ranking = 1L; // 기본값
+		try {
+			ranking = harmonyRoomRepository.findRankingByBookMarkCount(actualBookmarkCount);
+			if (ranking == null) ranking = 1L;
+		} catch (Exception e) {
+			log.warn("랭킹 조회 실패, 기본값 사용: {}", e.getMessage());
+		}
+
+		//  4 = 실제 게시글 수 조회 (HarmonyRoomPosts 테이블에서)
+		Long postCount = harmonyRoomPostsRepository.countByHarmonyRoom(harmonyRoom);
 
 		// 5 = 내가 멤버인지 확인
 		boolean isAssign = harmonyRoomMembersRepository.existsByHarmonyRoomAndUser(harmonyRoom, user);
 
-		// ✅ 6 = 내가 북마크했는지 확인 (실제 구현)
-		boolean isBookmark = harmonyRoomBookmarkRepository
-			.findByUserIdAndHarmonyRoomId(userId, harmonyRoomId)
-			.isPresent();
+		//  6 = 내가 북마크했는지 확인
+		boolean isBookmark = harmonyRoomBookmarkRepository.existsByUserAndHarmonyRoom(user, harmonyRoom);
 
-		log.info("📋 하모니룸 상세정보 조회 완료: {} (멤버 {}명, 북마크 {}개, 랭킹 {}위, 내 북마크: {})",
-			harmonyRoom.getName(), memberCount, actualBookmarkCount, ranking, isBookmark);
+		log.info("📋 하모니룸 상세정보 조회 완료: {} (멤버 {}명, 게시글 {}개, 북마크 {}개, 랭킹 {}위, 내 북마크: {})",
+			harmonyRoom.getName(), memberCount, postCount, actualBookmarkCount, ranking, isBookmark);
 
 		return HarmonyRoomResponse.Detail.builder()
 			.id(harmonyRoom.getId().toString())
@@ -388,11 +546,12 @@ public class HarmonyService {
 			.intro(harmonyRoom.getIntro())
 			.memberNum(memberCount.intValue())
 			.ranking(ranking.intValue())
-			.countPosts(postCount)
-			.isBookmark(isBookmark)      // ✅ 실제 북마크 상태 반환
+			.countPosts(postCount.intValue())
+			.isBookmark(isBookmark)
 			.isAssign(isAssign)
 			.build();
 	}
+
 
 	/**
 	 * 8. 멤버 여부 확인
@@ -562,6 +721,42 @@ public class HarmonyService {
 			.waitingUsers(waitingUserInfos)
 			.build();
 	}
+
+	/**
+	 * 11-1 나 하모니룸 가입대기중임?
+	 */
+	@Transactional(readOnly = true)
+	public HarmonyRoomResponse.IsMember isWaitingUser(String harmonyId,String authHeader) {
+		// 0 = 유저 체크
+		UUID currentUserId = authHelper.authHelperAsUUID(authHeader);
+		if (currentUserId == null) {
+			throw new IllegalArgumentException("사용자 오류.");
+		}
+
+		// 1 = 하모니룸 체크
+		UUID harmonyRoomId = UUID.fromString(harmonyId);
+		HarmonyRoom harmonyRoom = harmonyRoomRepository.findById(harmonyRoomId)
+			.orElseThrow(() -> new IllegalArgumentException("하모니룸을 찾을 수 없습니다"));
+		// 2 = 해당 하모니룸의 대기목록 가져오기
+		Optional<HarmonyRoomAssignWait> assignWaitOpt = harmonyRoomAssignWaitRepository.findByHarmonyRoom(harmonyRoom);
+
+		boolean isWaiting = false;
+
+		if (assignWaitOpt.isPresent()){
+			List<User> waitingUsers = assignWaitOpt.get().getWaitingUsers();
+			isWaiting = waitingUsers.stream().anyMatch(user -> user.getId().equals(currentUserId));
+		}
+
+		HarmonyRoomResponse.IsMember responses = HarmonyRoomResponse.IsMember.builder()
+			.harmonyRoomId(harmonyRoom.getId().toString())
+			.harmonyRoomName(harmonyRoom.getName())
+			.isMember(isWaiting)
+			.build();
+
+		return responses;
+
+	}
+
 
 	/**
 	 * 12-1. 가입 승인
@@ -885,7 +1080,7 @@ public class HarmonyService {
 	@Transactional(readOnly = true)
 	public HarmonyRoomResponse.HarmonyRoomPosts getRecommendPosts(String harmonyId, String authHeader) {
 		// getHarmonyRoomPosts와 동일한 로직
-		return getHarmonyRoomPosts(harmonyId);
+		return getHarmonyRoomPosts(harmonyId,authHeader);
 	}
 
 
@@ -909,143 +1104,5 @@ public class HarmonyService {
 	}
 
 
-	/**
-	 * Post Entity를 PostResult DTO로 변환
-	 */
-	private HarmonyRoomResponse.HarmonyRoomPosts.PostResult createPostResult(Post post) {
-		return HarmonyRoomResponse.HarmonyRoomPosts.PostResult.builder()
-			.post(HarmonyRoomResponse.HarmonyRoomPosts.PostResult.PostDetail.builder()
-				.id(post.getId().toString())
-				.title(post.getTitle())
-				.content(post.getContent())
-				.mediaType(post.getMediaType())
-				.mediaUrl(post.getMediaUrl())
-				.tags(post.getTags())
-				.createdAgo(calculateHoursFromDateTime(post.getCreatedAt()))
-				.likeCount(post.getLikes() != null ? post.getLikes().size() : 0)
-				.hiddenUser(post.getHiddenUsers() != null ?
-					post.getHiddenUsers().stream()
-						.map(user -> user.getId().toString())
-						.collect(Collectors.toList()) : List.of())
-				.commentCount(getCommentCount(post))
-				.bestComment(getBestComment(post))
-				.build())
-			.user(HarmonyRoomResponse.HarmonyRoomPosts.PostResult.UserInfo.builder()
-				.id(post.getUser().getId().toString())
-				.nickName(post.getUser().getNickname())
-				.profileImg(post.getUser().getProfileImageUrl())
-				.build())
-			.build();
-	}
-	/**
-	 * LocalDateTime을 일수로 변환
-	 */
-	private Integer calculateDaysFromDateTime(LocalDateTime createdAt) {
-		if (createdAt == null) return 0;
 
-		LocalDateTime now = LocalDateTime.now();
-		return (int) ChronoUnit.DAYS.between(createdAt.toLocalDate(), now.toLocalDate());
-	}
-	/**
-	 * LocalDate를 시간으로 변환
-	 */
-	private Integer calculateHoursFromDateTime(LocalDateTime createdAt) {
-		if (createdAt == null) return 0;
-
-		LocalDateTime now = LocalDateTime.now();
-		return (int) ChronoUnit.HOURS.between(createdAt, now);
-	}
-
-
-	/**
-	 * 댓글 수 조회 - FeedCommentRepository 활용 ✅
-	 */
-	private Integer getCommentCount(Post post) {
-		try {
-			return commentRepository.countCommentByPostId(post.getId());
-		} catch (Exception e) {
-			log.error("댓글 수 조회 실패: {}", e.getMessage());
-			return 0;
-		}
-	}
-
-	/**
-	 * 베스트 댓글 조회 - FeedCommentRepository 활용 ✅
-	 */
-	private HarmonyRoomResponse.HarmonyRoomPosts.PostResult.PostDetail.BestComment getBestComment(Post post) {
-		try {
-			Optional<PostComment> bestCommentOpt = commentRepository.findBestComment(post.getId());
-
-			if (bestCommentOpt.isEmpty()) {
-				return null;
-			}
-
-			PostComment bestComment = bestCommentOpt.get();
-			return HarmonyRoomResponse.HarmonyRoomPosts.PostResult.PostDetail.BestComment.builder()
-				.userId(bestComment.getUser().getId().toString())
-				.content(bestComment.getContent())
-				.build();
-
-		} catch (Exception e) {
-			log.error("베스트 댓글 조회 실패: {}", e.getMessage());
-			return null;
-		}
-	}
-
-	/**
-	 * 하모니룸 게시글 생성 (PostService 활용)
-	 */
-	public void createHarmonyRoomPost(String harmonyId, PostRequest.Create request, String authHeader) {
-		log.info("📝 하모니룸 게시글 생성 시작: {}", harmonyId);
-
-		// 1. 사용자 및 하모니룸 조회
-		UUID userId = authHelper.authHelperAsUUID(authHeader);
-		User user = userRepository.findById(userId)
-			.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
-
-		UUID harmonyRoomId = UUID.fromString(harmonyId);
-		HarmonyRoom harmonyRoom = harmonyRoomRepository.findById(harmonyRoomId)
-			.orElseThrow(() -> new IllegalArgumentException("하모니룸을 찾을 수 없습니다"));
-
-		// 2. 멤버 권한 확인
-		if (!harmonyRoomMembersRepository.existsByHarmonyRoomAndUser(harmonyRoom, user)) {
-			throw new SecurityException("하모니룸 멤버만 게시글을 작성할 수 있습니다");
-		}
-
-		// 3. PostService로 게시글 생성 (기존 로직 활용)
-		log.info("📝 PostService를 통한 게시글 생성 시작");
-		ApiMessage<String> createResult = postService.createPost(request, authHeader);
-
-		if (!createResult.isSuccess()) {
-			throw new RuntimeException("게시글 생성 실패: " + createResult.getMessage());
-		}
-
-		// 4. 생성된 게시글 ID 가져오기 ✅ 이제 간단함
-		String postId = createResult.getData();
-		log.info("📝 생성된 게시글 ID: {}", postId);
-
-		// 5. HarmonyRoomPosts에 게시글 ID 추가
-		HarmonyRoomPosts harmonyRoomPosts = harmonyRoomPostsRepository.findByHarmonyRoom(harmonyRoom)
-			.orElseThrow(() -> new IllegalArgumentException("하모니룸 게시글 목록을 찾을 수 없습니다"));
-
-		harmonyRoomPosts.getPostIds().add(postId);
-		harmonyRoomPostsRepository.save(harmonyRoomPosts);
-
-		log.info("✅ 하모니룸 게시글 생성 완료: {} (하모니룸: {})", postId, harmonyRoom.getName());
-	}
-
-	/**
-	 * PostService 응답에서 게시글 ID 추출
-	 */
-	private String extractPostIdFromResponse(String responseData) {
-		try {
-			// "게시글이 생성되었습니다. ID: uuid-string" 형태에서 ID 추출
-			if (responseData.contains("ID: ")) {
-				return responseData.split("ID: ")[1].trim();
-			}
-			throw new RuntimeException("응답에서 게시글 ID를 찾을 수 없습니다");
-		} catch (Exception e) {
-			throw new RuntimeException("게시글 ID 추출 실패: " + e.getMessage());
-		}
-	}
 }

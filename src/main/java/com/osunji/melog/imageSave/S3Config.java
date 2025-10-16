@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-@Configuration  // ✅ 이 어노테이션이 있는지 확인!
+@Configuration
 public class S3Config {
 
 	@Value("${aws.s3.access-key}")

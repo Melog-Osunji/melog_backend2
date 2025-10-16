@@ -113,7 +113,19 @@ services:
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - bootstrap.memory_lock=true
       - xpack.security.enabled=true
-      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      # 메모리 제한
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:G1HeapRegionSize=16m"      # 인덱싱 성능 최적화
+      - indices.memory.index_buffer_size=15%  # 인덱싱 성능 향상
+      - indices.fielddata.cache.size=15%  # 집계 성능 향상
+      - indices.queries.cache.size=10%  # 쿼리 캐시 증가
+      #  I/O 최적화
+      - thread_pool.search.size= 10
+      - thread_pool.search.queue_size= 500
+      #  샤드 설정
+      - cluster.max_shards_per_node=1000
+      - action.auto_create_index=true
+
+      # SSL설정
       - xpack.security.http.ssl.enabled=true
       - xpack.security.http.ssl.key=certs/es01/es01.key
       - xpack.security.http.ssl.certificate=certs/es01/es01.crt
