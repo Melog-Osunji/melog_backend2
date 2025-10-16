@@ -137,7 +137,7 @@ public class HarmonyController {
 		}
 	}
 
-	/**
+	/**ddddddd
 	 * 7. 하모니룸 상세 정보 조회 - GET /api/harmony/{harmonyID}/detail
 	 */
 	@GetMapping("/harmony/{harmonyId}/detail")
