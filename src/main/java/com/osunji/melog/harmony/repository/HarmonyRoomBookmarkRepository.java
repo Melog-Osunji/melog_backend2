@@ -9,14 +9,29 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import com.osunji.melog.harmony.entity.HarmonyRoom;
 import com.osunji.melog.harmony.entity.HarmonyRoomBookmark;
+import com.osunji.melog.user.domain.User;
 
 import io.lettuce.core.dynamic.annotation.Param;
 
 @Repository
 public interface HarmonyRoomBookmarkRepository extends JpaRepository<HarmonyRoomBookmark, UUID> {
 
+	/**
+	 * 사용자와 하모니룸으로 북마크 존재 여부 확인
+	 */
+	boolean existsByUserAndHarmonyRoom(User user, HarmonyRoom harmonyRoom);
 
+	/**
+	 * 사용자와 하모니룸으로 북마크 조회
+	 */
+	Optional<HarmonyRoomBookmark> findByUserAndHarmonyRoom(User user, HarmonyRoom harmonyRoom);
+
+	/**
+	 * 특정 하모니룸의 북마크 수 조회
+	 */
+	Long countByHarmonyRoom(HarmonyRoom harmonyRoom);
     @Query("SELECT hb FROM HarmonyRoomBookmark hb WHERE hb.user.id = :userId AND hb.harmonyRoom.id = :harmonyRoomId")
 	Optional<HarmonyRoomBookmark> findByUserIdAndHarmonyRoomId(@Param("userId") UUID userId,
 		@Param("harmonyRoomId") UUID harmonyRoomId);

@@ -94,18 +94,18 @@ public class HarmonyController {
 			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "조회에 실패했습니다"));
 		}
 	}
-
 	/**
 	 * 5. 하모니룸 게시글 조회 - GET /api/harmony/{harmonyID}/posts
 	 */
 	@GetMapping("/harmony/{harmonyId}/posts")
 	public ResponseEntity<ApiMessage<HarmonyRoomResponse.HarmonyRoomPosts>> getHarmonyRoomPosts(
-		@PathVariable String harmonyId) {
+		@PathVariable String harmonyId,
+		@RequestHeader(value = "Authorization", required = false) String authHeader) {
 
 		log.info("📝 controller line 100~ 하모니룸 게시글 조회 요청: {}", harmonyId);
 
 		try {
-			HarmonyRoomResponse.HarmonyRoomPosts response = harmonyService.getHarmonyRoomPosts(harmonyId);
+			HarmonyRoomResponse.HarmonyRoomPosts response = harmonyService.getHarmonyRoomPosts(harmonyId, authHeader);
 			return ResponseEntity.ok(ApiMessage.success(200, "조회 성공", response));
 		} catch (IllegalArgumentException e) {
 			return ResponseEntity.badRequest().body(ApiMessage.fail(400, e.getMessage()));
@@ -114,6 +114,7 @@ public class HarmonyController {
 			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "조회에 실패했습니다"));
 		}
 	}
+
 
 	/**
 	 * 6. 하모니룸 범용 정보 조회 - GET /api/harmony/{harmonyID}/information
@@ -136,7 +137,7 @@ public class HarmonyController {
 		}
 	}
 
-	/**
+	/**ddddddd
 	 * 7. 하모니룸 상세 정보 조회 - GET /api/harmony/{harmonyID}/detail
 	 */
 	@GetMapping("/harmony/{harmonyId}/detail")
@@ -242,6 +243,29 @@ public class HarmonyController {
 			return ResponseEntity.badRequest().body(ApiMessage.fail(400, e.getMessage()));
 		} catch (Exception e) {
 			log.error("가입 대기 유저 조회 실패: {}", e.getMessage(), e);
+			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "조회에 실패했습니다"));
+		}
+	}
+	/**
+	 * 11-2 나 가입중? 하모니룸에? - GET /api/harmony/{harmonyID}/isWaiting
+	 */
+	@GetMapping("/harmony/{harmonyId}/isWaiting")
+	public ResponseEntity<ApiMessage<HarmonyRoomResponse.IsMember>> isWaitingUser(
+		@PathVariable String harmonyId,
+		@RequestHeader("Authorization") String authHeader){
+		try {
+			System.out.println("🔍 하모니룸 대기 상태 확인: " + harmonyId);
+
+			HarmonyRoomResponse.IsMember response = harmonyService.isWaitingUser(harmonyId, authHeader);
+
+			return ResponseEntity.ok(ApiMessage.success(200, "대기 상태 조회 완료", response));
+
+		} catch (IllegalArgumentException e) {
+			log.warn("하모니룸 대기 상태 확인 실패: {}", e.getMessage());
+			return ResponseEntity.badRequest().body(ApiMessage.fail(400, e.getMessage()));
+
+		} catch (Exception e) {
+			log.error("하모니룸 대기 상태 확인 오류: {}", e.getMessage());
 			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "조회에 실패했습니다"));
 		}
 	}
@@ -439,10 +463,10 @@ public class HarmonyController {
 	@PostMapping("/harmony/{harmonyId}/posts")
 	public ResponseEntity<ApiMessage<Void>> createHarmonyRoomPost(
 		@PathVariable String harmonyId,
-		@RequestBody PostRequest.Create request,
+		@RequestBody HarmonyRoomRequest.CreateHarmonyPost request,  // ✅ 타입 변경
 		@RequestHeader("Authorization") String authHeader) {
 
-		log.info("📝 하모니룸 게시글 생성 요청: {} - 제목: {}", harmonyId, request.getTitle());
+		log.info("📝 하모니룸 게시글 생성 요청: {} - 내용: {}", harmonyId, request.getContent());
 
 		try {
 			harmonyService.createHarmonyRoomPost(harmonyId, request, authHeader);
@@ -456,6 +480,7 @@ public class HarmonyController {
 			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "게시글 생성에 실패했습니다"));
 		}
 	}
+
 
 
 }
