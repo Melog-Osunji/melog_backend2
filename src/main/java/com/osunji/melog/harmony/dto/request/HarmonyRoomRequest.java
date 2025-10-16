@@ -1,5 +1,6 @@
 package com.osunji.melog.harmony.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -49,6 +50,23 @@ public class HarmonyRoomRequest {
 	public static class Delete {
 		private String reason;
 	}
+
+	/**
+	 * 하모니룸 게시글 생성 요청 DTO
+	 */
+	@Data
+	@Builder
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class CreateHarmonyPost {
+		@NotBlank(message = "게시글 내용은 필수입니다")
+		private String content;
+		private String mediaType;
+		private String mediaUrl;
+		private List<String> tags;
+	}
+
+
 
 	/**
 	 * 하모니룸 공유 요청 DTO - 딥링크용

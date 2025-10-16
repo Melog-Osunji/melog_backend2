@@ -145,7 +145,7 @@ public class HarmonyRoom {
 			this.bookMarkNum--;
 		}
 	}
-	// ✅ 프로필 이미지 업데이트 메서드 추가
+	// ✅ 프로필 이미지 업데이트 메Q서드 추가
 	public void updateProfileImage(String profileImageUrl) {
 		this.profileImageUrl = profileImageUrl;
 	}

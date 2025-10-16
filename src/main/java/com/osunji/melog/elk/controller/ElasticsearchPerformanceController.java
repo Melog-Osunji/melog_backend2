@@ -22,7 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @RestController
-@RequestMapping("/api/performance")
+@RequestMapping("/api/dev/performance")
 @RequiredArgsConstructor
 @Slf4j
 public class ElasticsearchPerformanceController {
