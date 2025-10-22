@@ -53,7 +53,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
-
             "/api/youtube/*",
             "/api/**",
             "/api/*",

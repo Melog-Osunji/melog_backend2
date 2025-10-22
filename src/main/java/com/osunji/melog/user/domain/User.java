@@ -62,8 +62,7 @@ public class User {
     private String oidc;
 
     @Column
-    private boolean active = false;
-
+    private Boolean active = false;
 
     //생성자 - 필수 정보로만 이루어짐
     public User(String email, Platform platform) {
