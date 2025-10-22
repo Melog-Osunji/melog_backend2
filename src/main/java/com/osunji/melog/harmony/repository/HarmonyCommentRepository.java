@@ -87,10 +87,10 @@ public interface HarmonyCommentRepository extends JpaRepository<HarmonyPostComme
 	/**
 	 * 최상위 댓글들만 조회 (parentComment가 null인 것들)
 	 */
-//	@Query("SELECT c FROM HarmonyPostComment c JOIN FETCH c.user " +
-//		"WHERE c.harmonyPost.i = :harmonyPostId AND c.parentComment IS NULL " +
-//		"ORDER BY c.createdAt ASC")
-//	List<HarmonyPostComment> findRootCommentsByHarmonyPostId(@Param("harmonyPostId") UUID harmonyPostId);
+	@Query("SELECT c FROM HarmonyPostComment c JOIN FETCH c.user " +
+		"WHERE c.harmonyPost.id = :harmonyPostId AND c.parentComment IS NULL " +
+		"ORDER BY c.createdAt ASC")
+	List<HarmonyPostComment> findRootCommentsByHarmonyPostId(@Param("harmonyPostId") UUID harmonyPostId);
 
 	/**
 	 * 특정 댓글과 모든 대댓글 조회 (재귀)

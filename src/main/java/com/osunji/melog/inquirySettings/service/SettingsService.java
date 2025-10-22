@@ -40,7 +40,7 @@ public class SettingsService {
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
 
         // protect가 null이면 false로 기본 처리
-        boolean active = user.isActive();
+        boolean active = Boolean.TRUE.equals(user.getActive());
 
         // 언어 저장소가 아직 없으므로 기본값 kor 사용 (후에 교체)
         String language = resolveLanguageFor(user);
