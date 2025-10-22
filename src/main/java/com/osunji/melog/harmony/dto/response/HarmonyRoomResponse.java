@@ -111,7 +111,6 @@ public class HarmonyRoomResponse {
 			@Builder
 			public static class PostDetail {
 				private String id;
-				private String title;
 				private String content;
 				private String mediaType;
 				private String mediaUrl;

@@ -57,7 +57,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             "/secure/ping",
 
             "/api/youtube/*",
-
+            "/api/**",
+            "/api/*",
             "/api/secretMelog/notices0128/**"
 
         };
