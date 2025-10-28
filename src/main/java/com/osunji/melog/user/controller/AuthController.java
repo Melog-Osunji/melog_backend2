@@ -6,13 +6,12 @@ import com.osunji.melog.elk.repository.ELKUserRepository;
 import com.osunji.melog.global.common.RefreshCookieHelper;
 import com.osunji.melog.user.dto.request.OauthLoginRequestDTO;
 import com.osunji.melog.user.dto.response.LoginResponseDTO;
+import com.osunji.melog.user.dto.response.RefreshResponse;
 import com.osunji.melog.user.service.AuthService;
 import com.osunji.melog.user.dto.RefreshResult;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import java.text.ParseException;
@@ -95,16 +94,24 @@ public class AuthController {
 //        // 3) 직접 연결된 클라이언트
 //        return request.getRemoteAddr();
 //    }
-
     @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(
-            @CookieValue(name = REFRESH_COOKIE_NAME, required = false) String refresh,
-            HttpServletRequest req,
-            HttpServletResponse res
+    public ResponseEntity<RefreshResponse> refresh(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @RequestHeader(value = "X-Refresh-Token", required = false) String xRefreshToken,
+            HttpServletRequest req
     ) {
-        RefreshResult result = authService.rotateTokens(refresh, req);
-        cookieHelper.setRefreshCookie(res, result.refreshToken(), result.refreshTtlSeconds());
-        return ResponseEntity.ok(Map.of("accessToken", result.accessToken()));
+        String refreshToken = authService.extractRefreshFromHeaders(authorization, xRefreshToken);
+        RefreshResult result = authService.rotateTokens(refreshToken, req);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setCacheControl("no-store");
+        headers.add("Pragma", "no-cache");
+
+        RefreshResponse body = (result.refreshToken() == null)
+                ? RefreshResponse.accessOnly(result.accessToken())
+                : RefreshResponse.rotated(result.accessToken(), result.refreshToken(), result.refreshTtlSeconds());
+
+        return new ResponseEntity<>(body, headers, HttpStatus.OK);
     }
 
     @PostMapping("/logout")
