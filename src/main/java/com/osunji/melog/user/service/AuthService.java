@@ -41,13 +41,13 @@ public class AuthService {
     public AuthService(
             @Value("${jwt.access-expiration}") long accessTtlMs,
             @Value("${jwt.refresh-expiration}") long refreshTtlMs,
-            @Value("${jwt.refresh-below}") long refreshRoateBelow,
+            @Value("${jwt.refresh-below}") long refreshRotateBelow,
             OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo,
             UserRepository userRepository, KakaoOidcUtil kakaoOidcUtil) {
 
         this.accessTtlMs = accessTtlMs;
         this.refreshTtlMs = refreshTtlMs;
-        this.refreshRoateBelow = refreshRoateBelow;
+        this.refreshRoateBelow = refreshRotateBelow;
         this.oidcService = oidcService;
         this.jwtUtil = jwtUtil;
         this.refreshRepo = refreshRepo;
@@ -55,7 +55,7 @@ public class AuthService {
         this.kakaoOidcUtil = kakaoOidcUtil;
 
         log.info("✅ AuthService initialized (accessTtlMs={}ms, refreshTtlMs={}ms, rotateBelow={}s)",
-                accessTtlMs, refreshTtlMs, refreshRoateBelow);
+                accessTtlMs, refreshTtlMs, refreshRotateBelow);
     }
 
     public LoginResponseDTO upsertUserFromKakaoIdToken(OauthLoginRequestDTO request)
@@ -121,52 +121,60 @@ public class AuthService {
         return new RefreshResult(access, refresh, ttlSec);
     }
 
-    public RefreshResult rotateTokens(String refreshCookie, HttpServletRequest req) {
+    public RefreshResult rotateTokens(String refreshToken, HttpServletRequest req) {
         log.debug("♻️ [AuthService] rotateTokens() called");
 
-        if (refreshCookie == null) {
-            log.error("❌ No refresh cookie found");
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_refresh_cookie");
+        // 1) 헤더 기반이므로 null/blank 먼저 차단
+        if (refreshToken == null || refreshToken.isBlank()) {
+            log.error("❌ Missing refresh token in headers");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "missing_refresh_token");
         }
 
+        // 2) RN 고려: Origin은 null일 수 있음 → null은 허용, 값이 있을 때만 화이트리스트 검사
         String origin = req.getHeader("Origin");
-        if (!isAllowedOrigin(origin)) {
+        if (origin != null && !isAllowedOrigin(origin)) {
             log.warn("⚠️ Forbidden origin attempted: {}", origin);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "invalid_origin");
         }
-        if (!"XMLHttpRequest".equals(req.getHeader("X-Requested-With"))) {
-            log.warn("⚠️ Missing or invalid X-Requested-With header");
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing_xrw");
-        }
+
+//        // 3) X-Requested-With 정책: 필요시만 검사 (프로퍼티로 온/오프 권장)
+//        String xrw = req.getHeader("X-Requested-With");
+//        if (requireXrw && !"XMLHttpRequest".equals(xrw)) {
+//            log.warn("⚠️ Missing or invalid X-Requested-With header");
+//            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing_xrw");
+//        }
 
         try {
-            jwtUtil.validateRefresh(refreshCookie);
-            String userId = jwtUtil.getUserIdFromRefresh(refreshCookie);
-            String oldJti = jwtUtil.getJtiFromRefresh(refreshCookie);
+            // 4) 토큰 검증/파싱
+            jwtUtil.validateRefresh(refreshToken);
+            String userId = jwtUtil.getUserIdFromRefresh(refreshToken);
+            String oldJti = jwtUtil.getJtiFromRefresh(refreshToken);
             log.debug("🧾 Refresh token validated (userId={}, jti={})", userId, oldJti);
 
-            if (!refreshRepo.existsAndMatch(userId, oldJti, refreshCookie)) {
+            // 5) 재사용/폐기 여부
+            if (!refreshRepo.existsAndMatch(userId, oldJti, refreshToken)) {
                 log.error("❌ Refresh reuse or revoked (userId={}, jti={})", userId, oldJti);
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "refresh_reuse_or_revoked");
             }
 
-            long remainingSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(refreshCookie));
+            Long remainingSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(refreshToken));
             log.debug("🕒 Remaining TTL for refresh token: {}s", remainingSec);
 
             if (remainingSec > refreshRoateBelow) {
                 log.info("🔁 Access token reissued only (refresh still valid)");
                 String newAccess = jwtUtil.createAccessToken(userId, accessTtlMs);
-                return new RefreshResult(newAccess, refreshCookie, remainingSec);
+                return new RefreshResult(newAccess, refreshToken, remainingSec);
             }
 
+            // 7) 회전
             log.info("⏳ Refresh token nearing expiration, issuing new refresh...");
             String newAccess  = jwtUtil.createAccessToken(userId, accessTtlMs);
             String newRefresh = jwtUtil.createRefreshToken(userId, refreshTtlMs);
 
-            String newJti = jwtUtil.getJtiFromRefresh(newRefresh);
+            String newJti  = jwtUtil.getJtiFromRefresh(newRefresh);
             long newTtlSec = ttlSecondsFromNow(jwtUtil.getRefreshExpiryEpochMillis(newRefresh));
 
-            // 저장은 새 키를 먼저, 그 다음 기존 키 삭제(짧은 경합 윈도우 최소화)
+            // 새 키 저장 → 기존 키 삭제 (경합 최소화)
             refreshRepo.save(userId, newJti, newRefresh, newTtlSec);
             refreshRepo.delete(userId, oldJti);
             log.info("✅ Tokens rotated successfully (userId={}, newJti={})", userId, newJti);
@@ -180,6 +188,18 @@ public class AuthService {
             log.error("❌ Unexpected error during token rotation", e);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid_refresh");
         }
+    }
+
+
+    public String extractRefreshFromHeaders(String authorization, String xRefreshToken) {
+        if (xRefreshToken != null && !xRefreshToken.isBlank()) {
+            return xRefreshToken.trim();
+        }
+        if (authorization != null && authorization.startsWith("Bearer ")) {
+            String token = authorization.substring("Bearer ".length()).trim();
+            return token.isBlank() ? null : token;
+        }
+        return null;
     }
 
     public void logout(String refreshCookie) {
@@ -241,4 +261,5 @@ public class AuthService {
                 .intro(user.getIntro())
                 .build();
     }
+
 }
