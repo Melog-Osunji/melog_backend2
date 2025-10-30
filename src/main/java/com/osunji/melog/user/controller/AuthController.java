@@ -117,6 +117,7 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<?> logout(
             @CookieValue(name = REFRESH_COOKIE_NAME, required = false) String refresh,
+            // TODO: Refresh cookie 받는 부분을 리펙토링 (쿠키를 더 이상 사용하지 않음)
             HttpServletResponse res
     ) {
         authService.logout(refresh);
