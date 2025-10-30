@@ -24,10 +24,13 @@ public class CalendarService {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     public ApiMessage<CalendarResponse> calendarMain(UUID userId, Integer year, Integer month) {
+        log.debug("📅 [calendarMain] called with userId={}, year={}, month={}", userId, year, month);
+
         // year/month 없으면 오늘 기준
         LocalDate today = LocalDate.now(KST);
-        int y = (year  != null) ? year  : today.getYear();
+        int y = (year != null) ? year : today.getYear();
         int m = (month != null) ? month : today.getMonthValue();
+        log.debug("🕒 기준 연월 결정: year={}, month={}", y, m);
 
         // 1) 달력 그리드 from/to 계산
         LocalDate firstOfMonth = LocalDate.of(y, m, 1);
@@ -36,18 +39,24 @@ public class CalendarService {
 
         LocalDate fromDate = firstOfMonth.with(TemporalAdjusters.previousOrSame(WEEK_START));
         LocalDate toDate   = lastOfMonth.with(TemporalAdjusters.nextOrSame(weekEnd));
+        log.debug("🗓️ 달력 기간 계산: fromDate={}, toDate(beforeAdjust)={}", fromDate, toDate);
 
         long days = ChronoUnit.DAYS.between(fromDate, toDate) + 1;
-        if (days < 35) toDate = fromDate.plusDays(34);
+        if (days < 35) {
+            toDate = fromDate.plusDays(34);
+            log.debug("⚙️ 최소 35일 보정 적용됨 → toDate(afterAdjust)={}", toDate);
+        }
 
         // 2) 내 일정 조회 (from/to와 겹치는 것만)
         List<EventSchedule> schedules =
                 eventScheduleRepository.findByUser_IdAndEventDateBetween(userId, fromDate, toDate);
+        log.debug("📘 조회된 일정 개수 = {}", schedules.size());
 
         // 3) items 매핑
         List<CalendarResponse.Item> items = schedules.stream()
                 .map(this::toItem)
                 .toList();
+        log.debug("🧩 매핑된 CalendarResponse.Item 개수 = {}", items.size());
 
         // 3-1) 날짜별 event 집계
         Map<LocalDate, List<UUID>> eventsByDate = new HashMap<>();
@@ -63,9 +72,11 @@ public class CalendarService {
                 eventsByDate.computeIfAbsent(d, __ -> new ArrayList<>()).add(es.getId());
             }
         }
+        log.debug("📆 날짜별 이벤트 집계 완료: 총 {}일에 이벤트 존재", eventsByDate.size());
 
         // 4) 그리드 생성
         List<List<CalendarResponse.Day>> weeks = buildWeeksGrid(fromDate, toDate, eventsByDate);
+        log.debug("🧱 달력 주차 수 = {}", weeks.size());
 
         CalendarResponse body = CalendarResponse.builder()
                 .meta(CalendarResponse.Meta.builder()
@@ -81,12 +92,14 @@ public class CalendarService {
                 .items(items)
                 .build();
 
+        log.debug("✅ CalendarResponse 생성 완료 (items={}, weeks={})", items.size(), weeks.size());
         return ApiMessage.success(200, "캘린더 전송 성공", body);
     }
 
     private List<List<CalendarResponse.Day>> buildWeeksGrid(
             LocalDate fromDate, LocalDate toDate, Map<LocalDate, List<UUID>> eventsByDate
     ) {
+        log.debug("📅 [buildWeeksGrid] fromDate={}, toDate={}", fromDate, toDate);
         List<List<CalendarResponse.Day>> weeks = new ArrayList<>();
         LocalDate cursor = fromDate;
 
@@ -96,16 +109,17 @@ public class CalendarService {
                 LocalDate cur = cursor.plusDays(i);
                 List<UUID> ids = eventsByDate.getOrDefault(cur, Collections.emptyList());
                 boolean hasEvent = !ids.isEmpty();
-
                 week.add(CalendarResponse.Day.builder()
                         .date(cur.toString())
                         .event(hasEvent)
                         .eventList(hasEvent ? List.copyOf(ids) : Collections.emptyList())
                         .build());
             }
+            log.trace("🧭 주차 데이터 추가: 시작일={}", cursor);
             weeks.add(week);
             cursor = cursor.plusWeeks(1);
         }
+        log.debug("📋 buildWeeksGrid 완료: 총 {}주 생성", weeks.size());
         return weeks;
     }
 
@@ -118,16 +132,21 @@ public class CalendarService {
                 ? (int) ChronoUnit.DAYS.between(LocalDate.now(KST), start)
                 : 0;
 
+        log.trace("🗂️ toItem(): id={}, title={}, start={}, end={}, dDay={}",
+                es.getId(), c.getTitle(), start, end, dDay);
+
         return CalendarResponse.Item.builder()
                 .id(es.getId())
                 .title(c.getTitle())
                 .category(c.getClassification())
-                .thumbnailUrl(null)            // 필요시 도메인 필드로 교체
-                .venue(c.getRegion())          // region만 있는 경우 우선 사용
+                .thumbnailUrl(null)
+                .venue(c.getRegion())
                 .startDateTime(start != null ? start.atStartOfDay().atOffset(ZoneOffset.ofHours(9)) : null)
                 .endDateTime(end   != null ? end  .atStartOfDay().atOffset(ZoneOffset.ofHours(9))   : null)
                 .dDay(dDay)
-                .bookmarked(false)             // 별도 주입 지점에서 true 처리
+                .bookmarked(false)
                 .build();
     }
+
+
 }
