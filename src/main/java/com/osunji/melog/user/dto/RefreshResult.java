@@ -4,9 +4,9 @@ package com.osunji.melog.user.dto;
 public class RefreshResult {
     private final String accessToken;
     private final String refreshToken;
-    private final long refreshTtlSeconds;
+    private final Long refreshTtlSeconds;
 
-    public RefreshResult(String accessToken, String refreshToken, long refreshTtlSeconds) {
+    public RefreshResult(String accessToken, String refreshToken, Long refreshTtlSeconds) {
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
         this.refreshTtlSeconds = refreshTtlSeconds;
@@ -15,5 +15,6 @@ public class RefreshResult {
     // 컨트롤러에서 쓰는 메서드 이름과 정확히 일치시켰음
     public String accessToken() { return accessToken; }
     public String refreshToken() { return refreshToken; }
-    public long refreshTtlSeconds() { return refreshTtlSeconds; }
+    public Long refreshTtlSeconds() { return refreshTtlSeconds; }
 }
+

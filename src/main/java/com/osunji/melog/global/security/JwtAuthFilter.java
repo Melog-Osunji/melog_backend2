@@ -44,22 +44,24 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         AntPathMatcher m = new AntPathMatcher();
         String[] skip = {
-            "/api/auth/oidc/start",
-            "/api/auth/oidc/callback",
-            "/api/auth/refresh",
-            "/api/auth/logout",
-            "/health",
-            "/api/dev/**",
-            "/docs/**",
-            "/secure/ping",
-            "/api/auth/login/**",
-            "/v3/api-docs/**",
-            "/swagger-ui/**",
-            "/swagger-ui.html",
-            "/api/dev/token",
-            "/secure/ping",
-            "/api/youtube/*",
-            "/api/secretMelog/notices0128/**"
+                "/api/auth/oidc/start",
+                "/api/auth/oidc/callback",
+                "/api/auth/refresh",
+                "/api/auth/logout",
+                "/health",
+                "/api/dev/**",
+                "/docs/**",
+                "/secure/ping",
+                "/api/auth/login/**",
+                "/v3/api-docs/**",
+                "/swagger-ui/**",
+                "/swagger-ui.html",
+                "/api/dev/token",
+                "/secure/ping",
+                "/api/youtube/*",
+//                "/api/**",
+//                "/api/*",
+                "/api/secretMelog/notices0128/**"
         };
         for (String p : skip) {
             if (m.match(p, uri)) {
@@ -79,11 +81,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         final String method = req.getMethod();
         log.debug("➡️ JwtAuthFilter in: {} {}", method, uri);
 
+        final String uri = req.getRequestURI();
+        final String method = req.getMethod();
+        log.debug("➡️ JwtAuthFilter in: {} {}", method, uri);
+
         // 이미 인증되어 있으면 통과하며, USER_ID_ATTR도 보정
         Authentication existing = SecurityContextHolder.getContext().getAuthentication();
         if (existing != null && existing.isAuthenticated() && !(existing instanceof AnonymousAuthenticationToken)) {
             log.debug("ℹ️ existing Authentication found: principal={}, name={}",
-                existing.getPrincipal(), existing.getName());
+                    existing.getPrincipal(), existing.getName());
             if (existing.getPrincipal() instanceof UUID uuid) {
                 req.setAttribute(USER_ID_ATTR, uuid);
                 log.debug("🆔 setAttribute(USER_ID_ATTR) from principal={}", uuid);
@@ -180,3 +186,4 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     //                .collect(Collectors.toList());
     //    }
 }
+

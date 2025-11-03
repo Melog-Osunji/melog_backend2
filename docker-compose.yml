@@ -1,15 +1,15 @@
 
 services:
-#  app:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-#    container_name: melog-app
-#    restart: always
-#    ports:
-#      - "8080:8080"
-#    depends_on:
-#      - db
+ # app:
+  #  build:
+   #   context: .
+    #  dockerfile: Dockerfile
+   # container_name: melog-app
+   # restart: always
+   # ports:
+   #   - "8080:8080"
+   # depends_on:
+   #   - db
   db:
     image: postgres:16
     container_name: melog-db
@@ -98,7 +98,7 @@ services:
     depends_on:
       setup:
         condition: service_healthy
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.18.4
     labels:
       co.elastic.logs/module: elasticsearch
     volumes:
