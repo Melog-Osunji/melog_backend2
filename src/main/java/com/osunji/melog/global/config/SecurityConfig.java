@@ -38,20 +38,23 @@ public class SecurityConfig {
 
     // 공개 엔드포인트 (JwtAuthFilter.shouldNotFilter와 1:1 동기화)
     private static final String[] AUTH_WHITELIST = {
-            "/api/auth/oidc/start",        // /auth → /api/auth 수정
-            "/api/auth/oidc/callback",     // /auth → /api/auth 수정
-            "/api/auth/refresh",           // /auth → /api/auth 수정
-            "/api/auth/logout",            // /auth → /api/auth 수정
-            "/health",
-            "/api/dev/**",
-            "/docs/**",
-            "/secure/ping",
-            "/api/auth/login/**",
-            "/v3/api-docs/**",
-            "/swagger-ui/**",
-            "/swagger-ui.html",
-            "/api/youtube/*",
-            "/api/secretMelog/notices0128/**"
+
+        "/api/auth/oidc/start",        // /auth → /api/auth 수정
+        "/api/auth/oidc/callback",     // /auth → /api/auth 수정
+        "/api/auth/refresh",           // /auth → /api/auth 수정
+        "/api/auth/logout",            // /auth → /api/auth 수정
+        "/health",
+        "/api/dev/**",
+        "/docs/**",
+        "/secure/ping",
+        "/api/auth/login/**",
+        "/v3/api-docs/**",
+        "/swagger-ui/**",
+        "/swagger-ui.html",
+        "/api/dev/token",
+        "/secure/ping",
+        "/api/youtube/*",
+        "/api/secretMelog/notices0128/**"
 
 
 
@@ -60,23 +63,23 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .csrf(csrf -> csrf.disable())
-                .formLogin(f -> f.disable())
-                .httpBasic(b -> b.disable())
-                .cors(c -> c.configurationSource(corsConfigurationSource()))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(AUTH_WHITELIST).permitAll()
-                        .anyRequest().authenticated()
-                )
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((req, res, e) -> {
-                            res.setHeader("WWW-Authenticate", "Bearer");
-                            res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                        })
-                        .accessDeniedHandler((req, res, e) -> res.setStatus(HttpServletResponse.SC_FORBIDDEN))
-                );
+            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(csrf -> csrf.disable())
+            .formLogin(f -> f.disable())
+            .httpBasic(b -> b.disable())
+            .cors(c -> c.configurationSource(corsConfigurationSource()))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(AUTH_WHITELIST).permitAll()
+                .anyRequest().authenticated()
+            )
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((req, res, e) -> {
+                    res.setHeader("WWW-Authenticate", "Bearer");
+                    res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                })
+                .accessDeniedHandler((req, res, e) -> res.setStatus(HttpServletResponse.SC_FORBIDDEN))
+            );
 
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
@@ -91,10 +94,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         var c = new CorsConfiguration();
         c.setAllowedOrigins(List.of(
-                "https://app.melog.com",     // 실서비스 앱이 호출할 API 오리진
-                "https://staging.melog.com", // 스테이징
-                "http://10.0.2.2:8080",      // 필요 시 에뮬레이터/로컬 맵핑
-                "http://localhost:3000"      // 개발용 (RN 디버그에서 프록시를 쓴다면)
+            "https://app.melog.com",     // 실서비스 앱이 호출할 API 오리진
+            "https://staging.melog.com", // 스테이징
+            "http://10.0.2.2:8080",      // 필요 시 에뮬레이터/로컬 맵핑
+            "http://localhost:3000"      // 개발용 (RN 디버그에서 프록시를 쓴다면)
         ));
         c.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         c.setAllowedHeaders(List.of("*"));

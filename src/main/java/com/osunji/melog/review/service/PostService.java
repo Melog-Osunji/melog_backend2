@@ -3,6 +3,8 @@ import com.osunji.melog.global.util.JWTUtil;
 
 import com.osunji.melog.global.common.AuthHelper;
 import com.osunji.melog.global.dto.ApiMessage;
+import com.osunji.melog.harmony.entity.HarmonyRoomPosts;
+import com.osunji.melog.harmony.repository.HarmonyRoomPostsRepository;
 import com.osunji.melog.review.entity.Post;
 import com.osunji.melog.review.entity.PostComment;
 import com.osunji.melog.user.domain.User;
@@ -30,6 +32,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PostService {
+	private final HarmonyRoomPostsRepository harmonyRoomPostsRepository;
 	private final FollowRepository followRepository;
 	private final PostRepository postRepository;
 	private final CommentRepository commentRepository;
@@ -278,6 +281,28 @@ public class PostService {
 			e.printStackTrace();
 			return ApiMessage.fail(500, "좋아요 처리 실패: " + e.getMessage());
 		}
+	}
+
+
+	@Transactional(readOnly = true)
+	public boolean isPostLikedByUser(String postId, String authHeader) {
+		UUID userId = authHelper.authHelperAsUUID(authHeader);
+		UUID postUUID = UUID.fromString(postId);
+
+		// 먼저 일반 게시글에서 조회
+		Optional<Post> feedPostOpt = postRepository.findById(postUUID);
+		if (feedPostOpt.isPresent()) {
+			return feedPostOpt.get().getLikes().stream()
+				.anyMatch(user -> user.getId().equals(userId));
+		}
+		// 아니면 하모니룸 게시글에서 조회
+		Optional<HarmonyRoomPosts> harmonyPostOpt = harmonyRoomPostsRepository.findById(postUUID);
+		if (harmonyPostOpt.isPresent()) {
+			return harmonyPostOpt.get().getLikes().stream()
+				.anyMatch(like -> like.getUser().getId().equals(userId));
+		}
+
+		throw new IllegalArgumentException("해당 ID에 해당하는 게시글이 없습니다.");
 	}
 
 
