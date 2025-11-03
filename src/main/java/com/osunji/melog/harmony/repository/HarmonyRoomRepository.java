@@ -72,4 +72,15 @@ public interface HarmonyRoomRepository extends JpaRepository<HarmonyRoom, UUID> 
 	@Query("SELECT COUNT(h) + 1 FROM HarmonyRoom h WHERE h.bookMarkNum > :bookmarkCount")
 	Long findRankingByBookMarkCount(@Param("bookmarkCount") Long bookmarkCount);
 
+
+	@Query("""
+    SELECT h FROM HarmonyRoom h
+    WHERE LOWER(h.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+       OR LOWER(h.intro) LIKE LOWER(CONCAT('%', :keyword, '%'))
+    """)
+	List<HarmonyRoom> searchByKeyword(@Param("keyword") String keyword);
+
+
+
+
 }

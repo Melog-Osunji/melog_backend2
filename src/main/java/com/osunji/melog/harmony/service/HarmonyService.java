@@ -1083,6 +1083,24 @@ public class HarmonyService {
 		return getHarmonyRoomPosts(harmonyId,authHeader);
 	}
 
+	@Transactional(readOnly = true)
+	public List<HarmonyRoomResponse.Simple> searchHarmonyRooms(String keyword) {
+
+		if (keyword == null || keyword.isBlank()) throw new IllegalArgumentException("검색어를 입력하세요");
+
+		List<HarmonyRoom> rooms = harmonyRoomRepository.searchByKeyword(keyword.trim());
+
+		// 원하는 형태로 DTO 변환
+		return rooms.stream()
+			.map(room -> HarmonyRoomResponse.Simple.builder()
+				.id(room.getId().toString())
+				.name(room.getName())
+				.intro(room.getIntro())
+				.category(room.getCategory())
+				.profileImgLink(room.getProfileImageUrl())
+				.build())
+			.collect(Collectors.toList());
+	}
 
 
 	// ========== 헬퍼 메서드 ==========

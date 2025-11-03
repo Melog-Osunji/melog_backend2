@@ -78,6 +78,22 @@ public class PostController {
 	) {
 		return postService.likeOrUnlikePost(postId, authHeader);
 	}
+	@GetMapping("/posts/{postId}/islike")
+	public ResponseEntity<ApiMessage<Boolean>> isPostLiked(
+		@PathVariable String postId,
+		@RequestHeader("Authorization") String authHeader) {
+
+		try {
+			boolean isLiked = postService.isPostLikedByUser(postId, authHeader);
+			return ResponseEntity.ok(ApiMessage.success(200, "좋아요 여부 조회 성공", isLiked));
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.badRequest().body(ApiMessage.fail(400, e.getMessage()));
+		} catch (Exception e) {
+			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "좋아요 조회 실패"));
+		}
+	}
+
+
 	//---------------댓글 관련-----------------//
 
 	/** 16. 특정 게시글 모든 댓글 조회 GET /api/posts/{postID}/comments */
