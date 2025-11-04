@@ -75,7 +75,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
-            throws ServletException, IOException {
+        throws ServletException, IOException {
+
+        final String uri = req.getRequestURI();
+        final String method = req.getMethod();
+        log.debug("➡️ JwtAuthFilter in: {} {}", method, uri);
 
         final String uri = req.getRequestURI();
         final String method = req.getMethod();
@@ -120,7 +124,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             UUID userId = UUID.fromString(userIdStr); // UUID 확정
             var authorities = Collections.<SimpleGrantedAuthority>emptyList();
             UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(userId, null, authorities);
+                new UsernamePasswordAuthenticationToken(userId, null, authorities);
             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
             SecurityContextHolder.getContext().setAuthentication(auth);
 
@@ -160,26 +164,26 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
 
 
-//    /** roles 클레임을 권한으로 매핑(없어도 무방) */
-//    @SuppressWarnings("unchecked")
-//    private Collection<SimpleGrantedAuthority> extractAuthorities(String token) {
-//        if (raw == null) return Collections.emptyList();
-//
-//        if (raw instanceof Collection<?>) {
-//            return ((Collection<?>) raw).stream()
-//                    .map(String::valueOf)
-//                    .filter(s -> !s.isBlank())
-//                    .map(r -> new SimpleGrantedAuthority("ROLE_" + r))
-//                    .collect(Collectors.toList());
-//        }
-//        // 문자열로 들어온 경우: "USER,ADMIN"
-//        String s = String.valueOf(raw);
-//        if (s.isBlank()) return Collections.emptyList();
-//        return Arrays.stream(s.split(","))
-//                .map(String::trim)
-//                .filter(t -> !t.isEmpty())
-//                .map(r -> new SimpleGrantedAuthority("ROLE_" + r))
-//                .collect(Collectors.toList());
-//    }
+    //    /** roles 클레임을 권한으로 매핑(없어도 무방) */
+    //    @SuppressWarnings("unchecked")
+    //    private Collection<SimpleGrantedAuthority> extractAuthorities(String token) {
+    //        if (raw == null) return Collections.emptyList();
+    //
+    //        if (raw instanceof Collection<?>) {
+    //            return ((Collection<?>) raw).stream()
+    //                    .map(String::valueOf)
+    //                    .filter(s -> !s.isBlank())
+    //                    .map(r -> new SimpleGrantedAuthority("ROLE_" + r))
+    //                    .collect(Collectors.toList());
+    //        }
+    //        // 문자열로 들어온 경우: "USER,ADMIN"
+    //        String s = String.valueOf(raw);
+    //        if (s.isBlank()) return Collections.emptyList();
+    //        return Arrays.stream(s.split(","))
+    //                .map(String::trim)
+    //                .filter(t -> !t.isEmpty())
+    //                .map(r -> new SimpleGrantedAuthority("ROLE_" + r))
+    //                .collect(Collectors.toList());
+    //    }
 }
 

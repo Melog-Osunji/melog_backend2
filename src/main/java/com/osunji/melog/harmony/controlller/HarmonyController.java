@@ -1,5 +1,7 @@
 package com.osunji.melog.harmony.controlller;
 
+import java.util.List;
+
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.harmony.dto.request.HarmonyRoomRequest;
 import com.osunji.melog.harmony.dto.response.HarmonyRoomResponse;
@@ -481,6 +483,17 @@ public class HarmonyController {
 		}
 	}
 
+	@GetMapping("/harmony/roomSearch")
+	public ResponseEntity<ApiMessage<List<HarmonyRoomResponse.Simple>>> searchHarmonyRoom(
+		@RequestParam("keyword") String keyword) {
+
+		try {
+			List<HarmonyRoomResponse.Simple> list = harmonyService.searchHarmonyRooms(keyword);
+			return ResponseEntity.ok(ApiMessage.success(200, "하모니룸 검색 성공", list));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(ApiMessage.fail(400, e.getMessage()));
+		}
+	}
 
 
 }

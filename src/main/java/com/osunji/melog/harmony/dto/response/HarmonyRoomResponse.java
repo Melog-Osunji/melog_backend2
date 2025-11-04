@@ -183,7 +183,15 @@ public class HarmonyRoomResponse {
 		private Boolean isBookmark;             // 내가 즐겨찾기 했는지
 		private Boolean isAssign;               // 내가 멤버인지
 	}
-
+	@Data
+	@Builder
+	public static class Simple {
+		private String id;
+		private String name;
+		private String intro;
+		private List<String> category;
+		private String profileImgLink;
+	}
 	/**
 	 * 멤버 여부 확인 응답 DTO
 	 */
