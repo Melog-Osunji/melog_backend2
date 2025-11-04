@@ -77,7 +77,7 @@ public class HarmonyRoomPosts {
 	private List<String> tags;
 
 	/**
-	 * 생성 시간 필수/자동 dddd
+	 * 생성 시간 필수/자동 dddddddd
 	 */
 	@Column(name = "created_at", nullable = false)
 	@Builder.Default
