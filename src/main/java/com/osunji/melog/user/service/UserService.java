@@ -260,7 +260,7 @@ public class UserService {
         Map<String, String> updates = dtoMapperUtil.toMapWithoutNulls(request);
         boolean changed = false;
 
-        for (Map.Entry<String, String> e : updates.entrySet()) {
+        for (Map.Entry<String, String> e : updates.entrySet()) { // TODO: 조금 더 가독성 좋게 변경
             String key = e.getKey();
             if (!PROFILE_UPDATABLE_FIELDS.contains(key)) {
                 // 허용되지 않은 키는 무시
