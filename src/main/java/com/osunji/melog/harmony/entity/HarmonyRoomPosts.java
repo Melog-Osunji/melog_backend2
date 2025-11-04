@@ -77,7 +77,7 @@ public class HarmonyRoomPosts {
 	private List<String> tags;
 
 	/**
-	 * 생성 시간 필수/자동
+	 * 생성 시간 필수/자동 dddddddd
 	 */
 	@Column(name = "created_at", nullable = false)
 	@Builder.Default
@@ -85,14 +85,17 @@ public class HarmonyRoomPosts {
 
 	//  좋아요 관계
 	@OneToMany(mappedBy = "harmonyPost", cascade = CascadeType.ALL, orphanRemoval = true)
+	@Builder.Default
 	private Set<HarmonyPostLike> likes = new HashSet<>();
 
 	//  댓글 관계
 	@OneToMany(mappedBy = "harmonyPost", cascade = CascadeType.ALL, orphanRemoval = true)
+	@Builder.Default
 	private List<HarmonyPostComment> comments = new ArrayList<>();
 
 	// 북마크 관계
 	@OneToMany(mappedBy = "harmonyPost", cascade = CascadeType.ALL, orphanRemoval = true)
+	@Builder.Default
 	private Set<HarmonyPostBookmark> bookmarks = new HashSet<>();
 	// ========== 정적 팩토리 메서드 ==========
 	/**
