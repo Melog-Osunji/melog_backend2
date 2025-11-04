@@ -81,10 +81,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         final String method = req.getMethod();
         log.debug("➡️ JwtAuthFilter in: {} {}", method, uri);
 
-        final String uri = req.getRequestURI();
-        final String method = req.getMethod();
-        log.debug("➡️ JwtAuthFilter in: {} {}", method, uri);
-
         // 이미 인증되어 있으면 통과하며, USER_ID_ATTR도 보정
         Authentication existing = SecurityContextHolder.getContext().getAuthentication();
         if (existing != null && existing.isAuthenticated() && !(existing instanceof AnonymousAuthenticationToken)) {
