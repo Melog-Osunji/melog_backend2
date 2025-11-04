@@ -8,6 +8,7 @@ import com.osunji.melog.user.dto.response.UserResponse;
 import com.osunji.melog.user.service.UserProfileMusicService;
 import com.osunji.melog.user.service.UserService;
 import com.osunji.melog.youtube.dto.YoutubeItemDTO;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -85,9 +86,9 @@ public class UserController {
     }
 
     // 프로필 업데이트
-    @PatchMapping("/profile")
+    @PatchMapping(value = "/profile", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> profile(
-            @RequestBody UserRequest.profilePatch request,
+            @RequestBody UserRequest.profile request,
             @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
     ) {
         ApiMessage<UserResponse.ProfileResponse> response = userService.profile(request, userId);
