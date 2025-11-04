@@ -21,7 +21,7 @@ public class UserLogService {
     private final ElasticsearchClient elasticsearchClient;
 
     /**
-     * 유저 이벤트 로그 기록 - null/빈값 안전 처리
+     * 유저 이벤트 로그 기록 - null/빈값 안전 처리ddd
      */
     public void logUserEvent(String userId, String eventType, String ip, String userAgent, String metaJson) {
         try {
