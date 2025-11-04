@@ -1,6 +1,7 @@
 package com.osunji.melog.user.service;
 
 import com.osunji.melog.global.dto.ApiMessage;
+import com.osunji.melog.global.util.DtoMapperUtil;
 import com.osunji.melog.harmony.entity.HarmonyRoom;
 import com.osunji.melog.harmony.repository.HarmonyRoomBookmarkRepository;
 import com.osunji.melog.harmony.repository.HarmonyRoomRepository;
@@ -43,8 +44,9 @@ public class UserService {
     private final PostService postService;
     private final UserProfileMusicService userProfileMusicService;
     private final BookmarkService bookmarkService;
+    private final DtoMapperUtil dtoMapperUtil;
 
-    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository, HarmonyRoomRepository harmonyRoomRepository, HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository, PostService postService, UserProfileMusicService userProfileMusicService, BookmarkService bookmarkService) {
+    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository, HarmonyRoomRepository harmonyRoomRepository, HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository, PostService postService, UserProfileMusicService userProfileMusicService, BookmarkService bookmarkService, DtoMapperUtil dtoMapperUtil) {
         this.userRepository = userRepository;
         this.agreementRepository = agreementRepository;
         this.onboardingRepository = onboardingRepository;
@@ -54,6 +56,7 @@ public class UserService {
         this.postService = postService;
         this.userProfileMusicService = userProfileMusicService;
         this.bookmarkService = bookmarkService;
+        this.dtoMapperUtil = dtoMapperUtil;
     }
 
     private static final Set<String> PROFILE_UPDATABLE_FIELDS = Set.of(
@@ -242,9 +245,9 @@ public class UserService {
     }
 
     @Transactional
-    public ApiMessage<UserResponse.ProfileResponse> profile(UserRequest.profilePatch request, UUID userId) {
+    public ApiMessage<UserResponse.ProfileResponse> profile(UserRequest.profile request, UUID userId) {
 
-        if (request == null || request.getUpdates() == null || request.getUpdates().isEmpty()) {
+        if (request == null) {
             return ApiMessage.fail(HttpStatus.BAD_REQUEST.value(), "업데이트할 필드가 없습니다.");
         }
 
@@ -253,10 +256,11 @@ public class UserService {
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
 
         // 2) 업데이트 적용 (화이트리스트 & sanitize)
-        Map<String, String> updates = request.getUpdates();
+
+        Map<String, String> updates = dtoMapperUtil.toMapWithoutNulls(request);
         boolean changed = false;
 
-        for (Map.Entry<String, String> e : updates.entrySet()) {
+        for (Map.Entry<String, String> e : updates.entrySet()) { // TODO: 조금 더 가독성 좋게 변경
             String key = e.getKey();
             if (!PROFILE_UPDATABLE_FIELDS.contains(key)) {
                 // 허용되지 않은 키는 무시

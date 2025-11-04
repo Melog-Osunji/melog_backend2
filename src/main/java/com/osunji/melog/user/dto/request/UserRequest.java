@@ -24,6 +24,14 @@ public class UserRequest {
         List<String> instrument;
     }
 
+    @Getter
+    @Builder
+    public static class profile{
+        String nickName;
+        String intro;
+        String profileImg;
+    }
+
 
     @Getter
     @Setter
