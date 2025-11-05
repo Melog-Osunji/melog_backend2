@@ -18,7 +18,9 @@ public class CalendarResponse {
 
     private Meta meta;
     private Calendar calendar;
+    private List<Item> schedule;
     private List<Item> items;
+
 
     @Getter
     @NoArgsConstructor
