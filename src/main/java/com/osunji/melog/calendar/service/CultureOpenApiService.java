@@ -22,6 +22,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.time.Duration;
 
+import static io.micrometer.common.util.StringUtils.truncate;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -89,37 +91,70 @@ public class CultureOpenApiService {
         return new ArrayList<>(uniq.values());
     }
 
-    /** CNV_060 실제 호출: dtype/ title(2자+) 필수, 타임아웃/에러처리 포함 */
+    /** CNV_060 실제 호출: dtype/ title(2자+) 필수, 타임아웃/에러처리 + 로깅 */
     private JsonNode callCnV060(String dtype, String titleKeyword) {
+        // title은 2자 이상 필요 → 한 글자면 즉시 폴백이 일어나게끔 로그로 표시
+        if (titleKeyword == null || titleKeyword.trim().length() < 2) {
+            log.warn("⚠️ titleKeyword가 2자 미만입니다. KCISA가 204/빈응답을 줄 수 있음: '{}'", titleKeyword);
+        }
+
         try {
-            return cultureWebClient.get()
-                    .uri(b -> b.path(CNV060)
-                            .queryParam("serviceKey", serviceKey)
-                            .queryParam("numOfRows", 20)
-                            .queryParam("pageNo", 1)
-                            .queryParam("dtype", dtype)           // ★ 필수
-                            .queryParam("title", titleKeyword)    // ★ 필수(2자 이상)
-                            .build())
+            // 원시 응답 바디(String)로 먼저 수신 후, ObjectMapper로 JsonNode 파싱
+            String body = cultureWebClient.get()
+                    .uri(b -> {
+                        var uri = b.path(CNV060)
+                                .queryParam("serviceKey", serviceKey)
+                                .queryParam("numOfRows", 20)
+                                .queryParam("pageNo", 1)
+                                .queryParam("dtype", dtype)           // ★ 필수
+                                .queryParam("title", titleKeyword)    // ★ 필수(2자 이상)
+                                .build();
+                        log.debug("🌐 KCISA 요청 URI -> {}", uri);
+                        return uri;
+                    })
                     .header("Accept", "application/json")
                     .retrieve()
-                    .onStatus(st -> st.value() >= 400, resp -> resp
-                            .bodyToMono(String.class)
-                            .defaultIfEmpty("")
-                            .map(body -> new IllegalStateException(
-                                    "KCISA HTTP " + resp.statusCode() + " body=" + body)))
-                    .bodyToMono(JsonNode.class)
-                    .timeout(Duration.ofSeconds(12))              // 응답 타임아웃
-                    .onErrorResume(ex -> {
-                        log.warn("KCISA CNV_060 call failed: dtype={}, title={}, err={}",
-                                dtype, titleKeyword, ex.toString());
-                        return Mono.empty();
-                    })
+                    .onStatus(
+                            st -> st.value() >= 400,
+                            resp -> resp.bodyToMono(String.class)
+                                    .defaultIfEmpty("")
+                                    .map(errBody -> {
+                                        log.error("❌ KCISA HTTP {} 에러, body={}", resp.statusCode(), truncate(errBody, 2000));
+                                        return new IllegalStateException("KCISA HTTP " + resp.statusCode());
+                                    })
+                    )
+                    .bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(12))
+                    .doOnSubscribe(s -> log.debug("➡️ KCISA 호출 시작: dtype='{}', title='{}'", dtype, titleKeyword))
+                    .doOnError(ex -> log.warn("⚠️ KCISA 호출 오류: dtype={}, title={}, err={}", dtype, titleKeyword, ex.toString()))
+                    .onErrorResume(ex -> Mono.empty())
                     .block();
+
+            if (body == null) {
+                log.warn("⚠️ KCISA 응답 바디가 null입니다. (dtype='{}', title='{}')", dtype, titleKeyword);
+                return null;
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(body);
+
+            // 응답 최상위 구조 요약 로그
+
+            // items.item 위치 실제 확인
+            ArrayNode items = findArray(root, "response", "body", "items", "item");
+            if (items == null || items.isEmpty()) {
+                log.warn("⚠️ items.item 배열을 찾지 못했거나 비어 있습니다. (dtype='{}', title='{}')", dtype, titleKeyword);
+            } else {
+                log.info("✅ items.item 크기: {}", items.size());
+            }
+            return root;
+
         } catch (Exception e) {
             log.warn("KCISA CNV_060 call unexpected error: {}, dtype={}, title={}", e.toString(), dtype, titleKeyword);
             return null;
         }
     }
+
 
     /** 여러 응답에서 data 배열만 합치기 */
     private static ArrayNode mergeAllDataArrays(List<JsonNode> roots) {
@@ -140,7 +175,7 @@ public class CultureOpenApiService {
     private CalendarResponse.Item mapNodeToItem(JsonNode n, CultureCategory reqCat) {
         String title    = text(n, "title");
         String type     = text(n, "type");         // 분야(연극/뮤지컬/…)
-        String period   = text(n, "period");       // “yyyy.MM.dd ~ yyyy.MM.dd”
+        String period   = text(n, "period", "eventPeriod"); // “yyyy.MM.dd ~ yyyy.MM.dd”
         String eventSite= text(n, "eventSite");    // 장소
         String image    = text(n, "imageObject");  // 썸네일 URL
         String url      = text(n, "url");          // 상세 URL(있으면 UUID 생성 근거로 사용)
