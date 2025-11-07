@@ -28,9 +28,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     public static final String USER_ID_ATTR = "USER_ID";
     private final JWTUtil jwtUtil;
+    private final WhitelistPaths whitelistPaths;
 
-    public JwtAuthFilter(JWTUtil jwtUtil) {
+    public JwtAuthFilter(JWTUtil jwtUtil,  WhitelistPaths whitelistPaths) {
         this.jwtUtil = jwtUtil;
+        this.whitelistPaths = whitelistPaths;
     }
 
     @Override
@@ -43,27 +45,27 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         AntPathMatcher m = new AntPathMatcher();
-        String[] skip = {
-                "/api/auth/oidc/start",
-                "/api/auth/oidc/callback",
-                "/api/auth/refresh",
-                "/api/auth/logout",
-                "/health",
-                "/api/dev/**",
-                "/docs/**",
-                "/secure/ping",
-                "/api/auth/login/**",
-                "/v3/api-docs/**",
-                "/swagger-ui/**",
-                "/swagger-ui.html",
-                "/api/dev/token",
-                "/secure/ping",
-                "/api/youtube/*",
-//                "/api/**",
-//                "/api/*",
-                "/api/secretMelog/notices0128/**"
-        };
-        for (String p : skip) {
+//        String[] skip = {
+//                "/api/auth/oidc/start",
+//                "/api/auth/oidc/callback",
+//                "/api/auth/refresh",
+//                "/api/auth/logout",
+//                "/health",
+//                "/api/dev/**",
+//                "/docs/**",
+//                "/secure/ping",
+//                "/api/auth/login/**",
+//                "/v3/api-docs/**",
+//                "/swagger-ui/**",
+//                "/swagger-ui.html",
+//                "/api/dev/token",
+//                "/secure/ping",
+//                "/api/youtube/*",
+////                "/api/**",
+////                "/api/*",
+//                "/api/secretMelog/notices0128/**"
+//        };
+        for (String p : whitelistPaths.getAuthWhitelist()) {
             if (m.match(p, uri)) {
                 log.debug("🔕 shouldNotFilter = true (matched `{}`) {} {}", p, method, uri);
                 return true;
