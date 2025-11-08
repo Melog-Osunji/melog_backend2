@@ -3,13 +3,21 @@ package com.osunji.melog.elk.service;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.IndexRequest;
 import com.osunji.melog.elk.entity.HarmonyReportLog;
+
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -17,6 +25,14 @@ import java.util.List;
 public class HarmonyReportLogService {
 
 	private final ElasticsearchClient elasticsearchClient;
+	private final BlockingQueue<HarmonyReportLog> logQueue = new LinkedBlockingQueue<>(500);
+	private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+	private final int BATCH_SIZE = 100;
+
+	@PostConstruct
+	public void startScheduler() {
+		scheduler.scheduleAtFixedRate(this::flushIfNeeded, 5, 5, TimeUnit.SECONDS);
+	}
 
 	/**
 	 * 하모니룸 신고 로그 기록 - 간소화 버전 (Field 오류 해결)
@@ -24,7 +40,6 @@ public class HarmonyReportLogService {
 	public void logHarmonyReport(String reportId, String harmonyId, String harmonyName,
 		String reporterId, String reason, String details) {
 		try {
-			// 안전한 필드 처리
 			String safeReportId = processReportId(reportId);
 			String safeHarmonyId = processHarmonyId(harmonyId);
 			String safeHarmonyName = processHarmonyName(harmonyName);
@@ -42,22 +57,45 @@ public class HarmonyReportLogService {
 				.reportTime(LocalDateTime.now())
 				.build();
 
-			IndexRequest<HarmonyReportLog> request = IndexRequest.of(i -> i
-				.index("harmony_reports")
-				.document(reportLog)
-			);
+			boolean offered = logQueue.offer(reportLog);
+			if (!offered) {
+				log.error("하모니룸 신고 로그 큐 가득참, 로그 폐기: reportId={}, harmonyId={}", safeReportId, safeHarmonyId);
+				return;
+			}
 
-			elasticsearchClient.index(request);
-
-			log.info("📊 하모니룸 신고 로그 저장 완료: reportId='{}', harmonyId='{}', reason='{}'",
-				safeReportId, safeHarmonyId, safeReason);
+			if (logQueue.size() >= BATCH_SIZE) {
+				scheduler.execute(this::flushLogQueue);
+			}
 
 		} catch (Exception e) {
-			log.error("💥 하모니룸 신고 로그 저장 실패: reportId='{}', error: {}",
-				reportId, e.getMessage());
+			log.error("하모니룸 신고 로그 기록 실패: reportId='{}', error={}", reportId, e.getMessage(), e);
 		}
 	}
 
+	private void flushIfNeeded() {
+		if (!logQueue.isEmpty()) {
+			flushLogQueue();
+		}
+	}
+	private void flushLogQueue() {
+		List<HarmonyReportLog> batch = new ArrayList<>();
+		logQueue.drainTo(batch, BATCH_SIZE);
+
+		if (batch.isEmpty()) return;
+
+		try {
+			elasticsearchClient.bulk(b -> {
+				for (HarmonyReportLog log : batch) {
+					b.operations(op -> op.index(idx -> idx.index("harmony_reports").document(log)));
+				}
+				return b;
+			});
+			log.info("벌크 하모니룸 신고 로그 저장 완료 ({}건)", batch.size());
+		} catch (Exception e) {
+			log.error("벌크 하모니룸 신고 로그 저장 실패: {}", e.getMessage(), e);
+			// 필요 시 재시도 로직 추가 가능
+		}
+	}
 	/**
 	 * reportId 필드 처리
 	 */

@@ -726,7 +726,7 @@ public class HarmonyService {
 	 * 11-1 나 하모니룸 가입대기중임?
 	 */
 	@Transactional(readOnly = true)
-	public HarmonyRoomResponse.IsMember isWaitingUser(String harmonyId,String authHeader) {
+	public HarmonyRoomResponse.IsWaiting isWaitingUser(String harmonyId, String authHeader) {
 		// 0 = 유저 체크
 		UUID currentUserId = authHelper.authHelperAsUUID(authHeader);
 		if (currentUserId == null) {
@@ -737,25 +737,24 @@ public class HarmonyService {
 		UUID harmonyRoomId = UUID.fromString(harmonyId);
 		HarmonyRoom harmonyRoom = harmonyRoomRepository.findById(harmonyRoomId)
 			.orElseThrow(() -> new IllegalArgumentException("하모니룸을 찾을 수 없습니다"));
-		// 2 = 해당 하모니룸의 대기목록 가져오기
-		Optional<HarmonyRoomAssignWait> assignWaitOpt = harmonyRoomAssignWaitRepository.findByHarmonyRoom(harmonyRoom);
 
+		// 2 = 대기목록 조회
+		Optional<HarmonyRoomAssignWait> assignWaitOpt = harmonyRoomAssignWaitRepository.findByHarmonyRoom(harmonyRoom);
 		boolean isWaiting = false;
 
-		if (assignWaitOpt.isPresent()){
+		if (assignWaitOpt.isPresent()) {
 			List<User> waitingUsers = assignWaitOpt.get().getWaitingUsers();
 			isWaiting = waitingUsers.stream().anyMatch(user -> user.getId().equals(currentUserId));
 		}
 
-		HarmonyRoomResponse.IsMember responses = HarmonyRoomResponse.IsMember.builder()
+		// 3 = 응답 DTO 구성
+		return HarmonyRoomResponse.IsWaiting.builder()
 			.harmonyRoomId(harmonyRoom.getId().toString())
 			.harmonyRoomName(harmonyRoom.getName())
-			.isMember(isWaiting)
+			.isWaiting(isWaiting)
 			.build();
-
-		return responses;
-
 	}
+
 
 
 	/**
