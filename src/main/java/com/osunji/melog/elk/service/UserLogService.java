@@ -3,15 +3,23 @@ package com.osunji.melog.elk.service;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.IndexRequest;
 import com.osunji.melog.elk.entity.UserLog;
+
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -19,42 +27,102 @@ import java.util.UUID;
 public class UserLogService {
 
     private final ElasticsearchClient elasticsearchClient;
+    private final BlockingQueue<UserLog> logQueue = new LinkedBlockingQueue<>(500);
+    private final BlockingQueue<UserLog> retryQueue = new LinkedBlockingQueue<>(2000);
+
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private final int BATCH_SIZE = 100;
+    private final int RETRY_MAX_ATTEMPTS = 5;
+
+
+    @PostConstruct
+    public void startScheduler() {
+        // 주기적 기본 로그 플러시
+        scheduler.scheduleAtFixedRate(this::flushIfNeeded, 5, 5, TimeUnit.SECONDS);
+        // 주기적 재전송 큐 플러시
+        scheduler.scheduleAtFixedRate(this::flushRetryQueue, 10, 10, TimeUnit.SECONDS);
+    }
 
     /**
      * 유저 이벤트 로그 기록 - null/빈값 안전 처리ddd
      */
     public void logUserEvent(String userId, String eventType, String ip, String userAgent, String metaJson) {
         try {
-            String safeUserId    = processUserId(userId);
-            String safeEventType = processEventType(eventType);
-            String safeIp        = processIp(ip);               // null 허용
-            String safeUA        = processUserAgent(userAgent); // null 허용
-            String safeMeta      = processMetaJson(metaJson);   // null → "{}"
-
             UserLog logDoc = UserLog.builder()
-                    .id(UUID.randomUUID().toString())
-                    .userId(safeUserId)
-                    .eventType(safeEventType)
-                    .eventTime(LocalDateTime.now())
-                    .ip(safeIp)
-                    .userAgent(safeUA)
-                    .metaJson(safeMeta)
-                    .build();
+                .id(UUID.randomUUID().toString())
+                .userId(processUserId(userId))
+                .eventType(processEventType(eventType))
+                .eventTime(LocalDateTime.now())
+                .ip(processIp(ip))
+                .userAgent(processUserAgent(userAgent))
+                .metaJson(processMetaJson(metaJson))
+                .build();
 
-            IndexRequest<UserLog> request = IndexRequest.of(i -> i
-                    .index("user_logs")
-                    .document(logDoc)
-            );
+            if (!logQueue.offer(logDoc)) {
+                log.error("로그 큐 가득 참, 로그 폐기: userId={}, eventType={}", logDoc.getUserId(), logDoc.getEventType());
+                return;
+            }
 
-            elasticsearchClient.index(request);
-            log.info("유저 로그 저장 완료: userId='{}', eventType='{}'", safeUserId, safeEventType);
-
+            if (logQueue.size() >= BATCH_SIZE) {
+                scheduler.execute(this::flushLogQueue);
+            }
         } catch (Exception e) {
             log.error("유저 로그 기록 실패: userId='{}', eventType='{}', error={}",
-                    userId, eventType, e.getMessage());
+                userId, eventType, e.getMessage(), e);
+        }
+    }
+    private void flushIfNeeded() {
+        if (!logQueue.isEmpty()) {
+            flushLogQueue();
         }
     }
 
+    private void flushLogQueue() {
+        List<UserLog> batch = new ArrayList<>();
+        logQueue.drainTo(batch, BATCH_SIZE);
+
+        if (batch.isEmpty()) return;
+
+        try {
+            elasticsearchClient.bulk(b -> {
+                for (UserLog log : batch) {
+                    b.operations(op -> op.index(idx -> idx.index("user_logs").document(log)));
+                }
+                return b;
+            });
+            log.info("벌크 로그 저장 성공 ({}건)", batch.size());
+        } catch (Exception e) {
+            log.error("벌크 로그 저장 실패: {}, 재전송 큐에 적재", e.getMessage());
+            // 실패한 로그는 retry 큐에 적재
+            for (UserLog log : batch) {
+                if (!retryQueue.offer(log)) {
+                }
+            }
+        }
+    }
+    private void flushRetryQueue() {
+        List<UserLog> retryBatch = new ArrayList<>();
+        retryQueue.drainTo(retryBatch, BATCH_SIZE);
+
+        if (retryBatch.isEmpty()) return;
+
+        try {
+            elasticsearchClient.bulk(b -> {
+                for (UserLog log : retryBatch) {
+                    b.operations(op -> op.index(idx -> idx.index("user_logs").document(log)));
+                }
+                return b;
+            });
+            log.info("재전송 큐 벌크 저장 성공 ({}건)", retryBatch.size());
+        } catch (Exception e) {
+            log.error("재전송 큐 벌크 저장 실패: {}", e.getMessage(), e);
+            // 재전송 실패 시 다시 큐에 적재 (백오프 재시도 정책 필요)
+            for (UserLog log : retryBatch) {
+                if (!retryQueue.offer(log)) {
+                }
+            }
+        }
+    }
     /* ===================== 편의 메서드들 (필요 시 선택 사용) ===================== */
 
     public void logLogin(String userId, String ip, String userAgent, String provider) {
@@ -108,9 +176,7 @@ public class UserLogService {
                 IndexRequest<UserLog> req = IndexRequest.of(i -> i.index("user_logs").document(safe));
                 elasticsearchClient.index(req);
             }
-            log.info("벌크 유저 로그 저장 완료: {}개", logs.size());
         } catch (Exception e) {
-            log.error("벌크 유저 로그 저장 실패: {}", e.getMessage());
         }
     }
 

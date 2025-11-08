@@ -252,13 +252,13 @@ public class HarmonyController {
 	 * 11-2 나 가입중? 하모니룸에? - GET /api/harmony/{harmonyID}/isWaiting
 	 */
 	@GetMapping("/harmony/{harmonyId}/isWaiting")
-	public ResponseEntity<ApiMessage<HarmonyRoomResponse.IsMember>> isWaitingUser(
+	public ResponseEntity<ApiMessage<HarmonyRoomResponse.IsWaiting>> isWaitingUser(
 		@PathVariable String harmonyId,
-		@RequestHeader("Authorization") String authHeader){
+		@RequestHeader("Authorization") String authHeader) {
 		try {
 			System.out.println("🔍 하모니룸 대기 상태 확인: " + harmonyId);
 
-			HarmonyRoomResponse.IsMember response = harmonyService.isWaitingUser(harmonyId, authHeader);
+			HarmonyRoomResponse.IsWaiting response = harmonyService.isWaitingUser(harmonyId, authHeader);
 
 			return ResponseEntity.ok(ApiMessage.success(200, "대기 상태 조회 완료", response));
 
@@ -271,6 +271,7 @@ public class HarmonyController {
 			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "조회에 실패했습니다"));
 		}
 	}
+
 
 	/**
 	 * 12-1. 가입 승인 - PATCH /api/harmony/{harmonyID}/approve

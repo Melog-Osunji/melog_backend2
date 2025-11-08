@@ -142,6 +142,18 @@ public class HarmonyRoomResponse {
 			}
 		}
 	}
+	/**
+	 * 가입 대기 여부 응답 DTO
+	 */
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
+	@Builder
+	public static class IsWaiting {
+		private String harmonyRoomId;    // 하모니룸 고유 ID
+		private String harmonyRoomName;  // 하모니룸 이름
+		private Boolean isWaiting;       // 가입 대기 상태 여부 (true = 대기중)
+	}
 
 	/**
 	 * 하모니룸 범용 정보 응답 DTO
