@@ -63,8 +63,12 @@ public class Agreement {
         return new Agreement(user, marketing, LocalDate.now());
     }
 
-    public void updateMarketing(Boolean marketing) {
-        this.marketing = marketing;           // createdAt은 최초 동의 일시로 그대로 둠
+    // 변경되었을 시 true 반환
+    public boolean updateMarketing(boolean next) {
+        if (this.marketing == next) return false;
+        this.marketing = next;
+        return true;
     }
+
 
 }

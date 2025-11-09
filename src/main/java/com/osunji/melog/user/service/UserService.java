@@ -70,12 +70,12 @@ public class UserService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
         // 2) 이미 동의가 있으면 409
-        if (agreementRepository.existsById(userId)) {
+        if (agreementRepository.existsByUser_Id(user.getId())) {
             return ApiMessage.fail(HttpStatus.CONFLICT.value(), "이미 약관 동의가 존재합니다.");
         }
 
         // 3) 생성
-        Agreement agreement = Agreement.createAgreement(user, request.isMarketing());
+        Agreement agreement = Agreement.createAgreement(user, request.getMarketing());
         agreementRepository.save(agreement);
 
         // 4) 응답
@@ -88,21 +88,25 @@ public class UserService {
 
     @Transactional
     public ApiMessage<UserResponse.AgreementResponse> updateMarketing(UserRequest.agreement request, UUID userId) {
-        // 1) 기존 동의 없으면 404
-        Agreement agreement = agreementRepository.findById(userId)
+        // 1) 유저 검증
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+
+        // 2) 기존 동의 조회 (없으면 404)
+        Agreement agreement = agreementRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new NoSuchElementException("약관 동의가 존재하지 않습니다."));
 
-        // 2) 마케팅 동의만 갱신
-        agreement.updateMarketing(request.isMarketing());
-        // JPA dirty checking으로 flush
+        // 3) 변경 감지 (무변경이면 바로 200)
+        boolean changed = agreement.updateMarketing(request.getMarketing());
 
-        // 3) 응답
+        // 4) 응답
         return ApiMessage.success(
                 HttpStatus.OK.value(),
-                "updated",
+                changed ? "updated" : "no-change",
                 toAgreementResponse(agreement)
         );
     }
+
 
     private UserResponse.AgreementResponse toAgreementResponse(Agreement agreement) {
         String createdAtIso = agreement.getCreatedAt()
@@ -116,6 +120,7 @@ public class UserService {
                 .build();
     }
 
+    // TODO: 위 엔드포인트들과 같은 방식으로 수정. (JPA 조회 문제 수정)
     @Transactional(readOnly = true)
     public ApiMessage<UserResponse.AgreementResponse> getMarketing(UUID userId) {
         Agreement agreement = agreementRepository.findById(userId)
