@@ -22,7 +22,8 @@ public class WhitelistPaths {
             "/api/youtube/*",
             "/api/secretMelog/notices0128/**",
             "/actuator/health",
-            "/actuator"
+            "/actuator",
+            "/error"
 
     };
 

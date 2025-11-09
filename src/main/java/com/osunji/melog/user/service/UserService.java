@@ -64,26 +64,18 @@ public class UserService {
     );
 
     @Transactional
-    public ApiMessage<UserResponse.AgreementResponse> createAgreement(UserRequest.agreement request, UUID userId) {
-        // 1) 유저 존재 확인
+    public ApiMessage<UserResponse.AgreementResponse> createAgreement(UserRequest.agreement req, UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
-        // 2) 이미 동의가 있으면 409
-        if (agreementRepository.existsByUser_Id(user.getId())) {
+        if (agreementRepository.existsByUserId(user.getId())) {
             return ApiMessage.fail(HttpStatus.CONFLICT.value(), "이미 약관 동의가 존재합니다.");
         }
 
-        // 3) 생성
-        Agreement agreement = Agreement.createAgreement(user, request.getMarketing());
+        Agreement agreement = Agreement.createAgreement(user, req.getMarketing());
         agreementRepository.save(agreement);
 
-        // 4) 응답
-        return ApiMessage.success(
-                HttpStatus.CREATED.value(),
-                "created",
-                toAgreementResponse(agreement)
-        );
+        return ApiMessage.success(HttpStatus.CREATED.value(), "created", toAgreementResponse(agreement));
     }
 
     @Transactional
@@ -120,20 +112,26 @@ public class UserService {
                 .build();
     }
 
-    // TODO: 위 엔드포인트들과 같은 방식으로 수정. (JPA 조회 문제 수정)
+
+    // GET: /api/user/marketing
     @Transactional(readOnly = true)
     public ApiMessage<UserResponse.AgreementResponse> getMarketing(UUID userId) {
-        Agreement agreement = agreementRepository.findById(userId)
+        // 1) 유저 검증
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+
+        // 2) 기존 동의 조회 (없으면 404)
+        Agreement agreement = agreementRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new NoSuchElementException("약관 동의가 존재하지 않습니다."));
 
-        String createdAtIso = agreement.getCreatedAt()
-                .atStartOfDay()
-                .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+//        String createdAtIso = agreement.getCreatedAt()
+//                .atStartOfDay()
+//                .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 
         UserResponse.AgreementResponse body = UserResponse.AgreementResponse.builder()
                 .id(agreement.getUserId().toString())
                 .marketing(agreement.getMarketing())
-                .createdAt(createdAtIso)
+                .createdAt(agreement.getCreatedAt().toString())
                 .build();
 
         return ApiMessage.success(HttpStatus.OK.value(), "success", body);
