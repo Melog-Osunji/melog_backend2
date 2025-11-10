@@ -37,6 +37,7 @@ public class UserController {
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
+    // 마케팅 약관 동의 변경
     @PatchMapping("/marketing")
     public ResponseEntity<?> marketing(
             @RequestBody UserRequest.agreement request,

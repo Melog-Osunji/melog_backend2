@@ -13,7 +13,8 @@ public class UserRequest {
     @Getter
     @Setter
     public static class agreement {
-        private boolean marketing;
+        private Boolean marketing;
+
     }
 
     @Getter
