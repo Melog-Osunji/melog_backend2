@@ -96,6 +96,13 @@ public class HarmonyRoomPosts {
 	@OneToMany(mappedBy = "harmonyPost", cascade = CascadeType.ALL, orphanRemoval = true)
 	@Builder.Default
 	private List<HarmonyPostComment> comments = new ArrayList<>();
+	@ManyToMany(fetch = FetchType.LAZY)
+	@JoinTable(
+		name = "harmony_post_hidden_users",
+		joinColumns = @JoinColumn(name = "harmony_post_id"),
+		inverseJoinColumns = @JoinColumn(name = "user_id")
+	)
+	private Set<User> hiddenUsers = new HashSet<>();
 
 	// 북마크 관계
 	@OneToMany(mappedBy = "harmonyPost", cascade = CascadeType.ALL, orphanRemoval = true)
