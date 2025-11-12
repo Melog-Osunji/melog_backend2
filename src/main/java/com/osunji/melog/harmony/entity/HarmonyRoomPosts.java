@@ -19,6 +19,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "harmony_room_posts")
@@ -54,18 +55,21 @@ public class HarmonyRoomPosts {
 	/**
 	 * 게시글 내용 필수
 	 */
+	@Setter
 	@Column(columnDefinition = "text", nullable = false)
 	private String content;
 
 	/**
 	 * 미디어 타입 필수x
 	 */
+	@Setter
 	@Column(name = "media_type")
 	private String mediaType;
 
 	/**
 	 * 미디어 URL 필수x
 	 */
+	@Setter
 	@Column(name = "media_url")
 	private String mediaUrl;
 
