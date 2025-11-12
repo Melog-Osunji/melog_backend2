@@ -3,6 +3,7 @@ package com.osunji.melog.user.service;
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.global.util.DtoMapperUtil;
 import com.osunji.melog.harmony.entity.HarmonyRoom;
+import com.osunji.melog.harmony.entity.HarmonyRoomMembers;
 import com.osunji.melog.harmony.repository.HarmonyRoomBookmarkRepository;
 import com.osunji.melog.harmony.repository.HarmonyRoomRepository;
 import com.osunji.melog.review.dto.response.BookmarkResponse;
@@ -414,17 +415,49 @@ public class UserService {
         long followers = followRepository.countByFollowing_IdAndStatus(userId, FollowStatus.ACCEPTED);
         long followings = followRepository.countByFollower_IdAndStatus(userId, FollowStatus.ACCEPTED);
 
-        // 3) 하모니룸(내가 소유)
-        List<HarmonyRoom> ownedRooms = harmonyRoomRepository.findByOwner_Id(userId);
-        List<UserResponse.HarmonyRoomItem> roomItems = ownedRooms.stream()
-                .map(r -> UserResponse.HarmonyRoomItem.builder()
-                        .roomId(r.getId())
-                        .roomName(r.getName())
-                        .isManager(true)
-                        .roomImg(r.getProfileImageUrl())
-                        .bookmark(harmonyRoomBookmarkRepository.existsByHarmonyRoom_IdAndUser_Id(r.getId(), userId))
-                        .build())
+        // 3) 하모니룸(내가 소유 + 내가 멤버인 모든 방)
+        List<HarmonyRoom> rooms = harmonyRoomRepository.findAllJoinedOrOwned(userId);
+        // 멤버(role) 조회
+        List<HarmonyRoomMembers> memberships =  harmonyRoomRepository.findByUserIdWithRoom(userId);
+
+        // roomId -> role 맵
+        Map<UUID, String> roleByRoomId = memberships.stream()
+                .collect(Collectors.toMap(
+                        m -> m.getHarmonyRoom().getId(),
+                        HarmonyRoomMembers::getRole,
+                        // 한 방에 여러 레코드가 있을 경우 OWNER > ADMIN > MEMBER 우선
+                        (r1, r2) -> rankRole(r1) >= rankRole(r2) ? r1 : r2
+                ));
+
+        List<UserResponse.HarmonyRoomItem> roomItems = rooms.stream()
+                .map(r -> {
+                    UUID roomId = r.getId();
+
+                    // 소유자인지
+                    boolean isOwner = r.getOwner() != null
+                            && userId.equals(r.getOwner().getId());
+
+                    // 내가 가진 역할 (없으면 null)
+                    String role = roleByRoomId.get(roomId);
+
+                    // 관리자 여부: OWNER 이거나, role 이 OWNER/ADMIN 인 경우만 true
+                    boolean isManager = isOwner
+                            || "OWNER".equalsIgnoreCase(role)
+                            || "ADMIN".equalsIgnoreCase(role);
+
+                    boolean bookmarked = harmonyRoomBookmarkRepository
+                            .existsByHarmonyRoom_IdAndUser_Id(roomId, userId);
+
+                    return UserResponse.HarmonyRoomItem.builder()
+                            .roomId(roomId)
+                            .roomName(r.getName())
+                            .roomImg(r.getProfileImageUrl())
+                            .bookmark(bookmarked)
+                            .isManager(isManager)
+                            .build();
+                })
                 .toList();
+
 
         // 4) 프로필 음악
         UserResponse.ProfileMusic profileMusic = userProfileMusicService.getActive(userId)
@@ -498,5 +531,15 @@ public class UserService {
 
         return ApiMessage.success(200, "response successful", body);
     }
+
+    private int rankRole(String role) {
+        if (role == null) return 0;
+        return switch (role.toUpperCase()) {
+            case "OWNER" -> 3;
+            case "ADMIN" -> 2;
+            default -> 1; // MEMBER 등
+        };
+    }
+
 
 }
