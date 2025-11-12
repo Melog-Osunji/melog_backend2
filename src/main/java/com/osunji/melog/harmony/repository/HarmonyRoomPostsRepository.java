@@ -34,8 +34,9 @@ public interface HarmonyRoomPostsRepository extends JpaRepository<HarmonyRoomPos
 	Optional<HarmonyRoomPosts> findByIdWithAssociations(@Param("id") UUID id);
 
 	// 좋아요 관계만 fetch join
-	@EntityGraph(attributePaths = {"likes"})
-	Optional<HarmonyRoomPosts> findByIdWithLikes(UUID id);
+	@Query("SELECT p FROM HarmonyRoomPosts p LEFT JOIN FETCH p.likes WHERE p.id = :id")
+	Optional<HarmonyRoomPosts> findByIdWithLikes(@Param("id") UUID id);
+
 	/**
 	 * ✅ 특정 미디어 타입만 조회 (예: "youtube"만)
 	 */

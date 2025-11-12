@@ -132,7 +132,9 @@ public interface HarmonyCommentRepository extends JpaRepository<HarmonyPostComme
 
 
 	// 특정 게시글 최상위 댓글 조회(대댓글 제외)
-	@Query("SELECT c FROM HarmonyPostComment c WHERE c.post.id = :postId AND c.parent IS NULL ORDER BY c.createdAt DESC")
+	@Query("SELECT c FROM HarmonyPostComment c JOIN FETCH c.user " +
+		"WHERE c.harmonyPost.id = :postId AND c.parentComment IS NULL " +
+		"ORDER BY c.createdAt ASC")
 	List<HarmonyPostComment> findRootCommentsByPostId(@Param("postId") UUID postId);
 
 

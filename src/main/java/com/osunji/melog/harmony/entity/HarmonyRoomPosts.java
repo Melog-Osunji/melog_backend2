@@ -102,6 +102,7 @@ public class HarmonyRoomPosts {
 		joinColumns = @JoinColumn(name = "harmony_post_id"),
 		inverseJoinColumns = @JoinColumn(name = "user_id")
 	)
+	@Builder.Default
 	private Set<User> hiddenUsers = new HashSet<>();
 
 	// 북마크 관계
