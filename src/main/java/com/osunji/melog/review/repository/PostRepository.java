@@ -1,6 +1,7 @@
 package com.osunji.melog.review.repository;
 
 import com.osunji.melog.review.entity.Post;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -92,17 +93,42 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 		"ORDER BY p.createdAt DESC")
 	List<Post> findAllPostsByUserIdIncludingHarmony(@Param("userId") UUID userId,
 		@Param("currentUserId") UUID currentUserId);
+    /** 특정 유저의 '미디어 포함' 게시글만 + 작성자 fetch + hiddenUsers 제외 */
+    @Query("""
+    SELECT p
+    FROM Post p
+    JOIN FETCH p.user u
+    WHERE u.id = :userId
+      AND (
+            (p.mediaUrl IS NOT NULL AND p.mediaUrl <> '')
+         OR (p.mediaType IN ('IMAGE','VIDEO'))
+      )
+      AND (
+            :currentUserId IS NULL
+         OR NOT EXISTS (
+                SELECT 1 FROM p.hiddenUsers hu
+                WHERE hu.id = :currentUserId
+            )
+      )
+    ORDER BY p.createdAt DESC
+    """)
+    List<Post> findUserMediaPostsWithAuthor(UUID userId, UUID currentUserId);
 
-	/** 특정 유저의 '미디어가 있는' 게시글만 조회 + hiddenUsers 제외 */
-	@Query("""
-        SELECT p FROM Post p
-        WHERE p.user.id = :userId
-          AND p.mediaUrl IS NOT NULL
-          AND p.mediaUrl <> ''
-          AND (:currentUserId IS NULL OR :currentUserId NOT MEMBER OF p.hiddenUsers)
-        ORDER BY p.createdAt DESC
-        """)
-	List<Post> findMediaPostsByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId,
-														  @Param("currentUserId") UUID currentUserId);
+    /** 특정 유저의 전체 게시글 + 작성자 fetch + hiddenUsers 제외 */
+    @Query("""
+    SELECT p
+    FROM Post p
+    JOIN FETCH p.user u
+    WHERE u.id = :userId
+      AND (
+            :currentUserId IS NULL
+         OR NOT EXISTS (
+                SELECT 1 FROM p.hiddenUsers hu
+                WHERE hu.id = :currentUserId
+            )
+      )
+    ORDER BY p.createdAt DESC
+    """)
+    List<Post> findUserPostsWithAuthor(UUID userId, UUID currentUserId);
 
-}
+    }
