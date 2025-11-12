@@ -602,8 +602,8 @@ public class HarmonyService {
 			request.getCategory(),
 			request.getIntro(),
 			request.getProfileImg(),
-			request.getIsPrivate(),
-			request.getIsDirectAssign()
+			request.getIsDirectAssign(),
+			request.getIsPrivate()
 		);
 
 		harmonyRoomRepository.save(harmonyRoom);
