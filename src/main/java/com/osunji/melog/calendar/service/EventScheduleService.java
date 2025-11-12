@@ -5,6 +5,7 @@ import com.osunji.melog.calendar.domain.EventAlarm;
 import com.osunji.melog.calendar.domain.EventSchedule;
 import com.osunji.melog.calendar.dto.EventScheduleRequest;
 import com.osunji.melog.calendar.dto.EventScheduleResponse;
+import com.osunji.melog.calendar.dto.EventScheduleUpdateRequest;
 import com.osunji.melog.calendar.repository.CalendarRepository;
 import com.osunji.melog.calendar.repository.EventAlarmRepository;
 import com.osunji.melog.calendar.repository.EventScheduleRepository;
@@ -178,6 +179,70 @@ public class EventScheduleService {
             log.warn("⏰ 알림 시각 파싱 실패: input='{}' -> 기본값 '{}' 사용", maybeTime, def, e);
         }
         return LocalTime.parse(def);
+    }
+
+    /**
+     * 특정 userId / eventId / eventDate에 대해
+     * - 연결된 EventAlarm 전부 삭제
+     * - EventSchedule 삭제
+     * - Calendar row는 유지
+     * 항상 200 OK로 멱등 처리하며, 결과 상태를 응답 본문으로 돌려준다.
+     */
+    @Transactional
+    public ApiMessage<EventScheduleResponse> deleteScheduleAndAlarm(UUID userId, @Valid EventScheduleUpdateRequest req) {
+        if (req == null || req.getScheduleId() == null) {
+            log.warn("⚠️ 잘못된 요청: userId={}, scheduleId=null", userId);
+            return ApiMessage.fail(HttpStatus.BAD_REQUEST.value(), "scheduleId는 필수입니다.");
+        }
+
+        UUID scheduleId = req.getScheduleId();
+        var scheduleOpt = eventScheduleRepository.findById(scheduleId);
+
+        if (scheduleOpt.isEmpty()) {
+            log.debug("ℹ️ 삭제 대상 일정 없음(이미 삭제됨): userId={}, scheduleId={}", userId, scheduleId);
+            // eventId/eventDate를 알 수 없으므로 최소 정보만 내려주거나, 빈 값으로 고정
+            return ApiMessage.success(
+                    HttpStatus.OK.value(),
+                    "일정/알림 삭제 완료(이미 없음)",
+                    EventScheduleResponse.builder()
+                            .eventId(null)     // 알 수 없음
+                            .eventDate(null)   // 알 수 없음
+                            .schedule(false)
+                            .alarm(false)
+                            .alarmTime(null)
+                            .build()
+            );
+        }
+
+        EventSchedule schedule = scheduleOpt.get();
+
+        // 소유권 체크
+        if (!schedule.getUser().getId().equals(userId)) {
+            log.warn("🚫 타 사용자 일정 삭제 시도: requester={}, owner={}, scheduleId={}",
+                    userId, schedule.getUser().getId(), scheduleId);
+            return ApiMessage.fail(HttpStatus.FORBIDDEN.value(), "본인 일정만 삭제할 수 있습니다.");
+        }
+
+        Calendar calendar = schedule.getCalendar();
+
+        // 알림 → 일정 순으로 삭제
+        int deletedAlarms = eventAlarmRepository.deleteByEventSchedule_Id(schedule.getId());
+        log.debug("🔕 연결 알림 삭제: scheduleId={}, deletedAlarms={}", schedule.getId(), deletedAlarms);
+
+        eventScheduleRepository.delete(schedule);
+        log.info("🗑️ 일정 삭제 완료: scheduleId={}, userId={}, calendarId={}, eventDate={}",
+                schedule.getId(), userId, calendar.getId(), schedule.getEventDate());
+
+        // 최종 상태 응답 (캘린더는 유지)
+        var body = EventScheduleResponse.builder()
+                .eventId(calendar.getId())
+                .eventDate(schedule.getEventDate())
+                .schedule(false)
+                .alarm(false)
+                .alarmTime(null)
+                .build();
+
+        return ApiMessage.success(HttpStatus.OK.value(), "일정 및 알림 삭제 완료", body);
     }
 
     /**
