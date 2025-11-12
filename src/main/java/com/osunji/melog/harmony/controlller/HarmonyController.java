@@ -460,6 +460,21 @@ public class HarmonyController {
 			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "조회에 실패했습니다"));
 		}
 	}
+
+
+
+
+
+
+	/**
+	 *
+	 *
+	 *
+	 * 하모니룸 전용 post관련 api
+	 *
+	 *
+	 *
+	 * /
 	/**
 	 * 19. 하모니룸 게시글 생성 - POST /api/harmony/{harmonyId}/posts
 	 */
@@ -483,6 +498,148 @@ public class HarmonyController {
 			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "게시글 생성에 실패했습니다"));
 		}
 	}
+
+
+
+	// ========== 하모니룸 게시글 단건 상세 ==========
+	@GetMapping("/harmony/posts/{harmonyPostId}")
+	public ResponseEntity<ApiMessage<HarmonyRoomResponse.PostDetail>> getHarmonyPostDetail(
+		@PathVariable String harmonyPostId,
+		@RequestHeader(value = "Authorization", required = false) String authHeader) {
+		ApiMessage<HarmonyRoomResponse.PostDetail> response = harmonyService.getHarmonyPostDetail(harmonyPostId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 하모니룸 게시글 전체 댓글 조회 ==========
+	@GetMapping("/harmony/posts/{harmonyPostId}/comments")
+	public ResponseEntity<ApiMessage<HarmonyRoomResponse.HarmonyRoomPostComments>> getHarmonyPostComments(
+		@PathVariable String harmonyPostId,
+		@RequestHeader(value = "Authorization", required = false) String authHeader) {
+		ApiMessage<HarmonyRoomResponse.HarmonyRoomPostComments> response = harmonyService.getHarmonyPostComments(harmonyPostId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 하모니룸 게시글 베스트 댓글 조회 ==========
+	@GetMapping("/harmony/posts/{harmonyPostId}/bestComment")
+	public ResponseEntity<ApiMessage<HarmonyRoomResponse.HarmonyRoomBestComment>> getBestHarmonyPostComment(
+		@PathVariable String harmonyPostId) {
+		ApiMessage<HarmonyRoomResponse.HarmonyRoomBestComment> response = harmonyService.getBestHarmonyPostComment(harmonyPostId);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 하모니룸 게시글 좋아요/취소 ==========
+	@PostMapping("/harmony/posts/{harmonyPostId}/like")
+	public ResponseEntity<ApiMessage<Void>> likeHarmonyPost(
+		@PathVariable String harmonyPostId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Void> response = harmonyService.likeOrUnlikeHarmonyPost(harmonyPostId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 하모니룸 게시글 좋아요 여부 ==========
+	@GetMapping("/harmony/posts/{harmonyPostId}/islike")
+	public ResponseEntity<ApiMessage<Boolean>> isHarmonyPostLiked(
+		@PathVariable String harmonyPostId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Boolean> response = harmonyService.isHarmonyPostLiked(harmonyPostId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 하모니룸 게시글 북마크 추가 ==========
+	@PostMapping("/harmony/posts/{harmonyPostId}/bookmark")
+	public ResponseEntity<ApiMessage<Void>> bookmarkHarmonyPost(
+		@PathVariable String harmonyPostId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Void> response = harmonyService.addHarmonyPostBookmark(harmonyPostId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 하모니룸 게시글 북마크 제거 ==========
+	@DeleteMapping("/harmony/posts/{harmonyPostId}/bookmark")
+	public ResponseEntity<ApiMessage<Void>> unbookmarkHarmonyPost(
+		@PathVariable String harmonyPostId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Void> response = harmonyService.removeHarmonyPostBookmark(harmonyPostId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 하모니룸 게시글 삭제 ==========
+	@DeleteMapping("/harmony/posts/{harmonyPostId}")
+	public ResponseEntity<ApiMessage<Void>> deleteHarmonyPost(
+		@PathVariable String harmonyPostId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Void> response = harmonyService.deleteHarmonyPost(harmonyPostId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 하모니룸 게시글 수정 ==========
+	@PatchMapping("/harmony/posts/{harmonyPostId}")
+	public ResponseEntity<ApiMessage<Void>> updateHarmonyPost(
+		@PathVariable String harmonyPostId,
+		@RequestBody HarmonyRoomRequest.UpdateHarmonyPost request,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Void> response = harmonyService.updateHarmonyPost(harmonyPostId, request, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 하모니룸 게시글 댓글 생성 ==========
+	@PostMapping("/harmony/posts/{harmonyPostId}/comment")
+	public ResponseEntity<ApiMessage<Void>> createHarmonyPostComment(
+		@PathVariable String harmonyPostId,
+		@RequestBody HarmonyRoomRequest.CreateComment request,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Void> response = harmonyService.createHarmonyPostComment(harmonyPostId, request, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 하모니룸 게시글 별도 특정 댓글 삭제 ==========
+	@DeleteMapping("/harmony/posts/{harmonyPostId}/comments/{commentId}")
+	public ResponseEntity<ApiMessage<Void>> deleteHarmonyPostComment(
+		@PathVariable String harmonyPostId,
+		@PathVariable String commentId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Void> response = harmonyService.deleteHarmonyPostComment(harmonyPostId, commentId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 하모니룸 게시글 특정 댓글 좋아요/취소 ==========
+	@PatchMapping("/harmony/posts/{harmonyPostId}/comments/{commentId}")
+	public ResponseEntity<ApiMessage<Void>> toggleHarmonyCommentLike(
+		@PathVariable String harmonyPostId,
+		@PathVariable String commentId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Void> response = harmonyService.likeOrUnlikeHarmonyComment(harmonyPostId, commentId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 유저별 하모니룸 게시글 목록 ==========
+	@GetMapping("/harmony/users/{userId}/posts")
+	public ResponseEntity<ApiMessage<HarmonyRoomResponse.UserHarmonyPosts>> getUserHarmonyPosts(
+		@PathVariable String userId,
+		@RequestHeader(value = "Authorization", required = false) String authHeader) {
+		ApiMessage<HarmonyRoomResponse.UserHarmonyPosts> response = harmonyService.getUserHarmonyPosts(userId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	// ========== 유저별 북마크 하모니룸 게시글 목록 ==========
+	@GetMapping("/harmony/posts/{userId}/bookmarks")
+	public ResponseEntity<ApiMessage<HarmonyRoomResponse.UserHarmonyBookmarks>> getHarmonyUserBookmarks(
+		@PathVariable String userId,
+		@RequestHeader(value = "Authorization", required = false) String authHeader) {
+		ApiMessage<HarmonyRoomResponse.UserHarmonyBookmarks> response = harmonyService.getHarmonyUserBookmarks(userId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+
+
+
+
+
+
+
+
+
+
 
 	@GetMapping("/harmony/roomSearch")
 	public ResponseEntity<ApiMessage<List<HarmonyRoomResponse.Simple>>> searchHarmonyRoom(
