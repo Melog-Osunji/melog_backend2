@@ -25,8 +25,13 @@ public interface HarmonyRoomPostsRepository extends JpaRepository<HarmonyRoomPos
 	 */
 	List<HarmonyRoomPosts> findByHarmonyRoomAndMediaTypeIsNotNullOrderByCreatedAtDesc(HarmonyRoom harmonyRoom);
 	// 연관관계 모두 fetch join
-	@EntityGraph(attributePaths = {"user", "likes", "comments", "bookmarks"})
-	Optional<HarmonyRoomPosts> findByIdWithAssociations(UUID id);
+	@Query("SELECT p FROM HarmonyRoomPosts p " +
+		"LEFT JOIN FETCH p.user " +
+		"LEFT JOIN FETCH p.likes " +
+		"LEFT JOIN FETCH p.comments " +
+		"LEFT JOIN FETCH p.bookmarks " +
+		"WHERE p.id = :id")
+	Optional<HarmonyRoomPosts> findByIdWithAssociations(@Param("id") UUID id);
 
 	// 좋아요 관계만 fetch join
 	@EntityGraph(attributePaths = {"likes"})
