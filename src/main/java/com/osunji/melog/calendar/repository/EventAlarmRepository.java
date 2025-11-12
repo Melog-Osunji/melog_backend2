@@ -13,6 +13,6 @@ public interface EventAlarmRepository extends JpaRepository<EventAlarm, UUID> {
 
     boolean existsByEventSchedule_Id(UUID eventScheduleId);
 
-    void deleteByEventSchedule_Id(UUID eventScheduleId);
+    int deleteByEventSchedule_Id(UUID eventScheduleId);
 }
 
