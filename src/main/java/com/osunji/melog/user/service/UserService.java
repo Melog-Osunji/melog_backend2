@@ -402,6 +402,7 @@ public class UserService {
         return ApiMessage.success(HttpStatus.OK.value(), "팔로우 정보 조회 성공", body);
     }
 
+    @Transactional(readOnly = true)
     public ApiMessage<UserResponse.MyPageResponse> getMyPage(UUID userId) {
         // 1) 유저 조회
         User user = userRepository.findById(userId).orElse(null);
@@ -413,7 +414,7 @@ public class UserService {
         long followers = followRepository.countByFollowing_IdAndStatus(userId, FollowStatus.ACCEPTED);
         long followings = followRepository.countByFollower_IdAndStatus(userId, FollowStatus.ACCEPTED);
 
-        // 3) 하모니룸: 내가 소유한 방(=매니저) 기준 + 북마크 여부
+        // 3) 하모니룸(내가 소유)
         List<HarmonyRoom> ownedRooms = harmonyRoomRepository.findByOwner_Id(userId);
         List<UserResponse.HarmonyRoomItem> roomItems = ownedRooms.stream()
                 .map(r -> UserResponse.HarmonyRoomItem.builder()
@@ -425,7 +426,7 @@ public class UserService {
                         .build())
                 .toList();
 
-        // 프로필 음악
+        // 4) 프로필 음악
         UserResponse.ProfileMusic profileMusic = userProfileMusicService.getActive(userId)
                 .map(m -> UserResponse.ProfileMusic.builder()
                         .youtube(m.getUrl())
@@ -433,10 +434,10 @@ public class UserService {
                         .build())
                 .orElse(null);
 
-        // 5) 사용자 게시글 (전체)
-        List<FilterPostResponse.UserPostData> posts = Collections.emptyList();
+        // 5) 사용자 게시글
+        List<FilterPostResponse.FeedPostData> posts = Collections.emptyList();
         try {
-            var postsMsg = postService.getUserPosts(userId.toString());
+            var postsMsg = postService.getUserFeed(userId.toString(), userId.toString());
             if (postsMsg == null) {
                 log.warn("getUserPosts: ApiMessage가 null");
             } else if (postsMsg.isSuccess() && postsMsg.getData() != null) {
@@ -448,25 +449,28 @@ public class UserService {
             if (log.isWarnEnabled()) log.warn("getUserPosts 예외: {}", e, e);
         }
 
-        // 5-1) 사용자 '미디어 포함' 게시글 (분리)
-        List<FilterPostResponse.UserPostData> mediaPosts = Collections.emptyList();
+        // 5-1) 사용자 '미디어 포함' 게시글 → FeedList로 수신 (댓글/베댓 포함)
+        List<FilterPostResponse.FeedPostData> mediaFeed = Collections.emptyList();
         try {
-            var mediaMsg = postService.getUserMediaPosts(userId.toString(), userId.toString());
+            // 본인 마이페이지라면 currentUserId = userId 로 넘겨 숨김 필터 등 동일 적용
+            var mediaMsg = postService.getUserMediaFeed(userId.toString(), userId.toString());
             if (mediaMsg == null) {
-                log.warn("getUserMediaPosts: ApiMessage가 null");
+                log.warn("getUserMediaFeed: ApiMessage가 null");
             } else if (mediaMsg.isSuccess() && mediaMsg.getData() != null) {
-                mediaPosts = Optional.ofNullable(mediaMsg.getData().getResults()).orElse(List.of());
+                mediaFeed = Optional.ofNullable(mediaMsg.getData().getResults()).orElse(List.of());
             } else {
-                log.warn("getUserMediaPosts 실패: code={}, message={}", mediaMsg.getCode(), mediaMsg.getMessage());
+                log.warn("getUserMediaFeed 실패: code={}, message={}", mediaMsg.getCode(), mediaMsg.getMessage());
             }
         } catch (Exception e) {
-            if (log.isWarnEnabled()) log.warn("getUserMediaPosts 예외: {}", e, e);
+            if (log.isWarnEnabled()) log.warn("getUserMediaFeed 예외: {}", e, e);
         }
 
-        // 5-2) 사용자 북마크 목록
+//        List<FilterPostResponse.UserPostData> mediaPosts = Collections.emptyList();
+
+        // 5-2) 사용자 북마크
         List<BookmarkResponse.BookmarkData> bookmarks = Collections.emptyList();
         try {
-            var bmMsg = bookmarkService.getBookmarksByUser(userId.toString()); // ← API 23번 서비스 호출
+            var bmMsg = bookmarkService.getBookmarksByUser(userId.toString());
             if (bmMsg == null) {
                 log.warn("getBookmarksByUser: ApiMessage가 null");
             } else if (bmMsg.isSuccess() && bmMsg.getData() != null) {
@@ -488,10 +492,11 @@ public class UserService {
                 .followings(followings)
                 .harmonyRooms(roomItems)
                 .posts(posts)
-                .mediaPosts(mediaPosts)
+                .mediaPosts(mediaFeed)
                 .bookmarks(bookmarks)
                 .build();
 
         return ApiMessage.success(200, "response successful", body);
     }
+
 }
