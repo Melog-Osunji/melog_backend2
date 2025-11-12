@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,7 +34,7 @@ public class ELKSearchRepository {
 			SearchLog searchLog = SearchLog.builder()
 				.query(query)
 				.category(category)
-				.searchTime(LocalDateTime.now())
+				.searchTime(Instant.now())
 				.userId(userId)
 				.build();
 
