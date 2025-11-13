@@ -203,6 +203,8 @@ public class HarmonyRoomResponse {
 		private String intro;
 		private List<String> category;
 		private String profileImgLink;
+		private Integer memberNum;                 // 멤버 수
+		private List<String> userProfileImgsUrl;
 	}
 	/**
 	 * 멤버 여부 확인 응답 DTO

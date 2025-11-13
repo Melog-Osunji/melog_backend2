@@ -1089,15 +1089,30 @@ public class HarmonyService {
 
 		List<HarmonyRoom> rooms = harmonyRoomRepository.searchByKeyword(keyword.trim());
 
-		// 원하는 형태로 DTO 변환
+		// 각 하모니룸의 멤버수와 멤버 프로필 이미지 2개 조회
 		return rooms.stream()
-			.map(room -> HarmonyRoomResponse.Simple.builder()
-				.id(room.getId().toString())
-				.name(room.getName())
-				.intro(room.getIntro())
-				.category(room.getCategory())
-				.profileImgLink(room.getProfileImageUrl())
-				.build())
+			.map(room -> {
+				// 멤버 목록 조회
+				List<HarmonyRoomMembers> members = harmonyRoomMembersRepository.findByHarmonyRoom(room);
+				int memberNum = members.size();
+
+				// 멤버 프로필 이미지 (최대 2개)
+				List<String> userProfileImgsUrl = members.stream()
+					.map(m -> m.getUser().getProfileImageUrl())
+					.filter(img -> img != null && !img.isBlank())
+					.limit(2)
+					.collect(Collectors.toList());
+
+				return HarmonyRoomResponse.Simple.builder()
+					.id(room.getId().toString())
+					.name(room.getName())
+					.intro(room.getIntro())
+					.category(room.getCategory())
+					.profileImgLink(room.getProfileImageUrl())
+					.memberNum(memberNum)
+					.userProfileImgsUrl(userProfileImgsUrl)
+					.build();
+			})
 			.collect(Collectors.toList());
 	}
 
