@@ -81,7 +81,7 @@ public class CalendarService {
         List<List<CalendarResponse.Day>> weeks = buildWeeksGrid(fromDate, toDate, eventsByDate);
         log.debug("🧱 달력 주차 수 = {}", weeks.size());
 
-        List<CalendarResponse.Item> CNV060Items = cultureOpenApiService.fetchItems(ALL);
+//        List<CalendarResponse.Item> CNV060Items = cultureOpenApiService.fetchItems(ALL);
         log.debug("✅ fetchItems() 완료: count={}", items.size());
 
         CalendarResponse body = CalendarResponse.builder()
@@ -96,7 +96,7 @@ public class CalendarService {
                         .weeks(weeks)
                         .build())
                 .schedule(items)
-                .items(CNV060Items)
+//                .items(CNV060Items)
                 .build();
 
         log.debug("✅ CalendarResponse 생성 완료 (items={}, weeks={})", items.size(), weeks.size());
