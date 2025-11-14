@@ -68,4 +68,10 @@ public interface BookmarkRepository extends JpaRepository<PostBookmark, PostBook
 	/** 특정 사용자의 북마크 개수 조회 */
 	@Query("SELECT COUNT(pb) FROM PostBookmark pb WHERE pb.user.id = :userId")
 	Long countByUserId(@Param("userId") UUID userId);
+
+
+
+
+
+
 }

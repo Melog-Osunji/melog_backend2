@@ -7,6 +7,7 @@ import com.osunji.melog.harmony.entity.HarmonyRoomPosts;
 import com.osunji.melog.harmony.repository.HarmonyRoomPostsRepository;
 import com.osunji.melog.review.entity.Post;
 import com.osunji.melog.review.entity.PostComment;
+import com.osunji.melog.review.repository.BookmarkRepository;
 import com.osunji.melog.user.domain.User;
 import com.osunji.melog.review.repository.PostRepository;
 import com.osunji.melog.review.repository.CommentRepository;
@@ -21,6 +22,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -36,6 +39,7 @@ public class PostService {
 	private final FollowRepository followRepository;
 	private final PostRepository postRepository;
 	private final CommentRepository commentRepository;
+	private final BookmarkRepository bookmarkRepository;
 	private final UserRepository userRepository;
 	private final AuthHelper authHelper;
 	private final PostMapper postMapper;
@@ -101,8 +105,6 @@ public class PostService {
 		}
 	}
 
-
-
 	/** 게시글 GET (API 15번) */
 	@Transactional(readOnly = true)
 	public ApiMessage<PostResponse.Single> getPost(String postIdStr, String authHeader) {
@@ -131,9 +133,15 @@ public class PostService {
 			Optional<PostComment> bestCommentOpt = commentRepository.findBestComment(postId);
 			PostComment bestComment = bestCommentOpt.orElse(null);
 			int commentCount = commentRepository.countCommentByPostId(postId);
-
-			// 6. DTO 변환
-			PostResponse.Single responseData = postMapper.toSingle(post, bestComment, commentCount);
+			// 6. 좋아요/북마크 여부 체크
+			boolean isLike = false;
+			boolean isBookmark = false;
+			if (userId != null) {
+				isLike = post.isLikedBy(userRepository.findById(userId).orElse(null));
+				isBookmark = bookmarkRepository.existsByUserIdAndPostId(userId, postId);
+			}
+			// 7. DTO 변환
+			PostResponse.Single responseData = postMapper.toSingle(post, bestComment, commentCount,isLike, isBookmark);
 
 			return ApiMessage.success(200, "게시글 조회 성공", responseData);
 
@@ -283,7 +291,7 @@ public class PostService {
 		}
 	}
 
-
+	/** 내가 이 게시글 좋아요 했는지 안 했는지*/
 	@Transactional(readOnly = true)
 	public boolean isPostLikedByUser(String postId, String authHeader) {
 		UUID userId = authHelper.authHelperAsUUID(authHeader);
@@ -307,8 +315,6 @@ public class PostService {
 
 
 	//---------------피드 조회-----------------//
-
-	/** 인기 피드 GET (API 19번) */
 
 	/** 인기 피드 GET (API 19번) - 좋아요 순 */
 	@Transactional(readOnly = true)
@@ -369,7 +375,14 @@ public class PostService {
 					}
 
 					PostComment bestComment = bestCommentOpt.orElse(null);
-					FilterPostResponse.FeedPostData feedData = postMapper.toFeedPostData(post, bestComment, commentCount);
+					boolean isLike = false;
+					boolean isBookmark = false;
+					if(userId != null) {
+						isLike = postRepository.existsLikeByUserIdAndPostId(userId, post.getId());
+						isBookmark = bookmarkRepository.existsByUserIdAndPostId(userId, post.getId());
+					}
+					FilterPostResponse.FeedPostData feedData = postMapper.toFeedPostData(post, bestComment, commentCount, isLike, isBookmark);
+
 					feedPostList.add(feedData);
 
 					System.out.println("    ✅ 변환 완료");
@@ -397,9 +410,6 @@ public class PostService {
 		}
 	}
 
-
-
-
 	/** 팔로우 피드 GET (API 20번)  */
 	@Transactional(readOnly = true)
 	public ApiMessage<FilterPostResponse.FeedList> getFollowPosts(String authHeader) {
@@ -422,8 +432,6 @@ public class PostService {
 						.results(Collections.emptyList())
 						.build());
 			}
-
-			// 3. ✅ 완전히 안전한 방법: findAll()로 전체 조회 후 필터링
 			System.out.println("📋 게시글 조회 시작 (전체 조회 후 필터링 방법)...");
 
 			List<Post> allPosts = postRepository.findAll();
@@ -451,7 +459,7 @@ public class PostService {
 				})
 				.sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt())) // 최신순
 				.limit(50)
-				.collect(Collectors.toList());
+				.toList();
 
 			System.out.println("  - 팔로잉 사용자 게시글 수: " + followingPosts.size());
 
@@ -473,6 +481,12 @@ public class PostService {
 			List<FilterPostResponse.FeedPostData> feedPostList = new ArrayList<>();
 
 			for (Post post : followingPosts) {
+				boolean isLike = false;
+				boolean isBookmark = false;
+				if (userId != null) {
+					isLike = postRepository.existsLikeByUserIdAndPostId(userId, post.getId());
+					isBookmark = bookmarkRepository.existsByUserIdAndPostId(userId, post.getId());
+				}
 				try {
 					System.out.println("  변환 중: " + post.getId() + " - " + post.getTitle());
 
@@ -488,7 +502,7 @@ public class PostService {
 					}
 
 					PostComment bestComment = bestCommentOpt.orElse(null);
-					FilterPostResponse.FeedPostData feedData = postMapper.toFeedPostData(post, bestComment, commentCount);
+					FilterPostResponse.FeedPostData feedData = postMapper.toFeedPostData(post, bestComment, commentCount, isLike, isBookmark);
 					feedPostList.add(feedData);
 
 					System.out.println("    ✅ 변환 완료");
@@ -515,8 +529,6 @@ public class PostService {
 			return ApiMessage.fail(500, "팔로우 피드 조회 실패: " + e.getMessage());
 		}
 	}
-
-
 
 	/** 추천 피드 GET (API 18번) - TODO 구현 */
 	@Transactional(readOnly = true)
@@ -663,6 +675,20 @@ public class PostService {
 
 
 
+	private String formatCreatedAgo(LocalDateTime createdAt) {
+		if (createdAt == null) return "";
 
+		long hours = ChronoUnit.HOURS.between(createdAt, LocalDateTime.now());
+		if (hours < 1) return "방금 전";
+		else if (hours < 24) return hours + "시간 전";
+
+		long days = ChronoUnit.DAYS.between(createdAt.toLocalDate(), LocalDateTime.now().toLocalDate());
+		if (days == 1) return "하루 전";
+		if (days <= 30) return days + "일 전";
+
+		long months = ChronoUnit.MONTHS.between(createdAt.toLocalDate(), LocalDateTime.now().toLocalDate());
+		if (months == 1) return "한 달 전";
+		return months + "달 전";
+	}
 
 }

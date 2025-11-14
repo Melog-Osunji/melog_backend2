@@ -42,11 +42,13 @@ public class FilterPostResponse {
 		private String mediaType;               // 미디어타입
 		private String mediaUrl;                // 미디어url
 		private List<String> tags;              // ["베토벤", "감상", "피아노"]
-		private Integer createdAgo;             // ✅ Integer 타입으로 통일
+		private String createdAgo;              // ✅ Integer 타입으로 통일
 		private Integer likeCount;              // ✅ Integer 타입으로 통일
-		private List<String> hiddenUser;       // ["숨김처리","유저","목록"]
+		private List<String> hiddenUser;        // ["숨김처리","유저","목록"]
 		private Integer commentCount;           // ✅ Integer 타입으로 통일
 		private BestCommentData bestComment;    // 베댓정보
+		private Boolean isLike;
+		private Boolean isBookmark;
 	}
 
 	@Getter

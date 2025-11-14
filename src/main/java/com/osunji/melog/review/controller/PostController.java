@@ -134,14 +134,15 @@ public class PostController {
 
 	/** 29. 댓글 좋아요/취소 PATCH /api/posts/{postID}/comments/{commentID} */
 	@PatchMapping("/posts/{postId}/comments/{commentId}")
-	public ResponseEntity<ApiMessage<Void>> toggleCommentLike(
+	public ResponseEntity<ApiMessage<CommentResponse.CommentLikeResponse>> toggleCommentLike(
 		@PathVariable String postId,
 		@PathVariable String commentId,
 		@RequestHeader("Authorization") String authHeader) {
 
-		ApiMessage<Void> response = commentService.likeOrUnlikeComment(postId, commentId, authHeader);
+		ApiMessage<CommentResponse.CommentLikeResponse> response = commentService.likeOrUnlikeComment(postId, commentId, authHeader);
 		return ResponseEntity.status(response.getCode()).body(response);
 	}
+
 
 	//---------------북마크 관련-----------------//
 

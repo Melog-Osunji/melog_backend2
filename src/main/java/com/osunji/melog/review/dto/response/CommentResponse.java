@@ -49,4 +49,14 @@ public class CommentResponse {
 		private Integer likes;                  // ✅ Integer 타입으로 통일
 		private List<RecommentData> recomments; // 대대댓글 (재귀 구조)
 	}
+
+	@Getter
+	@Setter
+	@Builder
+	public static class CommentLikeResponse {
+		private String action;    // "추가" 또는 "삭제"
+		private boolean liked;    // 현재 좋아요 상태
+		private int likeCount;    // 좋아요 개수
+	}
+
 }
