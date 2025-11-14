@@ -1,6 +1,7 @@
 package com.osunji.melog.review.repository;
 
 import com.osunji.melog.review.entity.Post;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
