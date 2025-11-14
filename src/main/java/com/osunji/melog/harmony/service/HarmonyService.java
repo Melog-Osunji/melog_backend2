@@ -1477,7 +1477,7 @@ public class HarmonyService {
 		}
 	}
 
-	// ========== 댓글 좋아요/취소 ==========
+	// ========== 댓글 좋아요/취소 ==========cf
 	public ApiMessage<Void> likeOrUnlikeHarmonyComment(String harmonyPostIdStr, String commentIdStr, String authHeader) {
 		try {
 			UUID userId = authHelper.authHelperAsUUID(authHeader);

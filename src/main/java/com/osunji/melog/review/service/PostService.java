@@ -563,115 +563,37 @@ public class PostService {
 		}
 	}
 
-    /** 특정 유저의 '미디어가 포함된' 모든 게시글(피드형) GET  */
-    @Transactional(readOnly = true)
-    public ApiMessage<FilterPostResponse.FeedList> getUserMediaFeed(String userIdStr,
-                                                                    @Nullable String currentUserIdStr) {
-        try {
-            // 1) 파라미터 파싱
-            UUID userId = UUID.fromString(userIdStr);
-            UUID currentUserId = null;
-            if (currentUserIdStr != null && !currentUserIdStr.isBlank()) {
-                currentUserId = UUID.fromString(currentUserIdStr);
-            }
+	/** 특정 유저의 '미디어가 포함된' 모든 게시글 GETdddddddd */
+	@Transactional(readOnly = true)
+	public ApiMessage<FilterPostResponse.UserPostList> getUserMediaPosts(String userIdStr, @Nullable String currentUserIdStr) {
+		try {
+			UUID userId = UUID.fromString(userIdStr);
+			UUID currentUserId = null;
 
-            // 2) 미디어 포함 게시글 조회
-            List<Post> posts = postRepository.findUserMediaPostsWithAuthor(userId, currentUserId);
+			if (currentUserIdStr != null && !currentUserIdStr.isBlank()) {
+				currentUserId = UUID.fromString(currentUserIdStr);
+			}
 
-            // 3) DTO 변환 (댓글 수/베스트 댓글 포함)
-            List<FilterPostResponse.FeedPostData> feedPostList = new ArrayList<>();
+			List<Post> posts = postRepository.findMediaPostsByUserIdOrderByCreatedAtDesc(userId, currentUserId);
 
-            for (Post post : posts) {
-                try {
-                    Optional<PostComment> bestCommentOpt = Optional.empty();
-                    int commentCount = 0;
+			List<FilterPostResponse.UserPostData> userPostList = posts.stream()
+					.map(postMapper::toUserPostData)
+					.toList();
 
-                    try {
-                        bestCommentOpt = commentRepository.findBestComment(post.getId());
-                        commentCount = commentRepository.countCommentByPostId(post.getId());
-                    } catch (Exception e) {
-                        // 댓글 조회 실패해도 나머지 렌더링은 진행
-                    }
+			FilterPostResponse.UserPostList response = FilterPostResponse.UserPostList.builder()
+					.results(userPostList)
+					.build();
 
-                    PostComment bestComment = bestCommentOpt.orElse(null);
+			return ApiMessage.success(200, "사용자 미디어 게시글 조회 성공", response);
 
-                    // 기존에 쓰던 매퍼 그대로 사용 (likeCount/createdAgo/hiddenUser 등 내부 규칙 일관 유지)
-                    FilterPostResponse.FeedPostData feedData =
-                            postMapper.toFeedPostData(post, bestComment, commentCount);
+		} catch (IllegalArgumentException e) {
+			// UUID 파싱 실패 등
+			return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다.");
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "사용자 미디어 게시글 조회 실패: " + e.getMessage());
+		}
+	}
 
-                    feedPostList.add(feedData);
-
-                } catch (Exception e) {
-                    // 문제 생긴 게시물은 스킵하고 계속
-                }
-            }
-
-            FilterPostResponse.FeedList body = FilterPostResponse.FeedList.builder()
-                    .results(feedPostList)
-                    .build();
-
-            return ApiMessage.success(200, "사용자 미디어 게시글(댓글 포함) 조회 성공", body);
-
-        } catch (IllegalArgumentException e) {
-            // UUID 파싱 실패 등
-            return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다.");
-        } catch (Exception e) {
-            return ApiMessage.fail(500, "사용자 미디어 게시글 조회 실패: " + e.getMessage());
-        }
-    }
-
-    /** 특정 유저의 '전체' 게시글(피드형) GET */
-    @Transactional(readOnly = true)
-    public ApiMessage<FilterPostResponse.FeedList> getUserFeed(String userIdStr,
-                                                               @Nullable String currentUserIdStr) {
-        try {
-            // 1) 파라미터 파싱
-            UUID userId = UUID.fromString(userIdStr);
-            UUID currentUserId = null;
-            if (currentUserIdStr != null && !currentUserIdStr.isBlank()) {
-                currentUserId = UUID.fromString(currentUserIdStr);
-            }
-
-            // 2) 전체 게시글 조회 (미디어 조건 제거)
-            List<Post> posts = postRepository.findUserPostsWithAuthor(userId, currentUserId);
-
-            // 3) DTO 변환 (댓글 수/베스트 댓글 포함) — 기존 매퍼 재사용
-            List<FilterPostResponse.FeedPostData> feedPostList = new ArrayList<>();
-            for (Post post : posts) {
-                try {
-                    Optional<PostComment> bestCommentOpt = Optional.empty();
-                    int commentCount = 0;
-
-                    try {
-                        bestCommentOpt = commentRepository.findBestComment(post.getId());
-                        commentCount = commentRepository.countCommentByPostId(post.getId());
-                    } catch (Exception ignore) {
-                        // 댓글 조회 실패해도 개별 게시물 렌더링은 진행
-                    }
-
-                    PostComment bestComment = bestCommentOpt.orElse(null);
-                    FilterPostResponse.FeedPostData feedData =
-                            postMapper.toFeedPostData(post, bestComment, commentCount);
-
-                    feedPostList.add(feedData);
-                } catch (Exception ignore) {
-                    // 문제 발생한 게시물은 스킵
-                }
-            }
-
-            FilterPostResponse.FeedList body = FilterPostResponse.FeedList.builder()
-                    .results(feedPostList)
-                    .build();
-
-            return ApiMessage.success(200, "사용자 전체 게시글(댓글 포함) 조회 성공", body);
-
-        } catch (IllegalArgumentException e) {
-            // UUID 파싱 실패 등
-            return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다.");
-        } catch (Exception e) {
-            return ApiMessage.fail(500, "사용자 전체 게시글 조회 실패: " + e.getMessage());
-        }
-    }
 
 
 

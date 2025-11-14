@@ -47,7 +47,7 @@ public interface HarmonyRoomPostsRepository extends JpaRepository<HarmonyRoomPos
 	 */
 	Optional<HarmonyRoomPosts> findByHarmonyRoom(HarmonyRoom harmonyRoom);
 	/**
-	 * 특정 하모니룸의 게시글 조회 (최신순)
+	 * 특정 하모니룸의 게시글 조회 (최신순)d
 	 */
 	List<HarmonyRoomPosts> findByHarmonyRoomOrderByCreatedAtDesc(HarmonyRoom harmonyRoom);
 
