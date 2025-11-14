@@ -1,6 +1,7 @@
 package com.osunji.melog.harmony.entity;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -50,7 +51,7 @@ public class HarmonyPostComment {
 	 * 댓글 작성 일시
 	 */
 	@Column(nullable = false)
-	private LocalDate createdAt;
+	private LocalDateTime createdAt;
 
 	/**
 	 * 부모 댓글 (대댓글인 경우)
@@ -85,7 +86,7 @@ public class HarmonyPostComment {
 		this.user = user;
 		this.harmonyPost = harmonyPost;
 		this.content = content;
-		this.createdAt = LocalDate.now();
+		this.createdAt = LocalDateTime.now();
 		this.parentComment = null;
 		this.likedUsers = new ArrayList<>();
 		this.childComments = new ArrayList<>();
@@ -98,7 +99,7 @@ public class HarmonyPostComment {
 		this.user = user;
 		this.harmonyPost = harmonyPost;
 		this.content = content;
-		this.createdAt = LocalDate.now();
+		this.createdAt = LocalDateTime.now();
 		this.parentComment = parentComment;
 		this.likedUsers = new ArrayList<>();
 		this.childComments = new ArrayList<>();

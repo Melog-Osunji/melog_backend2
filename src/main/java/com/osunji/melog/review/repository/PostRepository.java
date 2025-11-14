@@ -92,7 +92,12 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 		"ORDER BY p.createdAt DESC")
 	List<Post> findAllPostsByUserIdIncludingHarmony(@Param("userId") UUID userId,
 		@Param("currentUserId") UUID currentUserId);
-
+	// 사용자(userId)가 게시글(postId)에 좋아요 눌렀는지 여부 조회
+	@Query("SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END " +
+		"FROM Post p JOIN p.likes u " +
+		"WHERE p.id = :postId AND u.id = :userId")
+	boolean existsLikeByUserIdAndPostId(@Param("userId") UUID userId,
+		@Param("postId") UUID postId);
 	/** 특정 유저의 '미디어가 있는' 게시글만 조회 + hiddenUsers 제외 */
 	@Query("""
         SELECT p FROM Post p

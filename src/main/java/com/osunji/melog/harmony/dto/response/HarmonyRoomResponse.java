@@ -55,7 +55,7 @@ public class HarmonyRoomResponse {
 			private String postID;
 			private String mediaUrl;
 			private String mediaType;
-			private String createdAgo;          // "오늘" 또는 "n일전"
+			private String createdAgo;
 		}
 	}
 
@@ -115,7 +115,7 @@ public class HarmonyRoomResponse {
 				private String mediaType;
 				private String mediaUrl;
 				private List<String> tags;
-				private Integer createdAgo;
+				private String createdAgo;
 				private Integer likeCount;
 				private List<String> hiddenUser;
 				private Integer commentCount;
@@ -170,7 +170,7 @@ public class HarmonyRoomResponse {
 		private String intro;
 		private Boolean isRunning;              // 내가 생성자인지 여부
 		private Boolean isPrivate;
-		private LocalDateTime createdAt;
+		private String createdAt;
 		private List<String> members;           // 멤버 ID 리스트
 		private String owner;                   // 소유자 ID
 		private Boolean isDirectAssign;
@@ -315,7 +315,7 @@ public class HarmonyRoomResponse {
 		private String mediaType;
 		private String mediaUrl;
 		private List<String> tags;
-		private Integer createdAgo;       // "몇일 전" 같은 카운트, 날짜 문자열 아님
+		private String createdAgo;
 		private Integer likeCount;
 		private List<String> hiddenUser;  // 숨긴 유저 ID 리스트
 		private Integer commentCount;

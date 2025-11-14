@@ -153,7 +153,9 @@ public class CommentService {
 	}
 
 	/** 댓글 좋아요/취소 (API 29번) */
-	public ApiMessage<Void> likeOrUnlikeComment(String postIdStr, String commentIdStr, String authHeader) {
+	public ApiMessage<CommentResponse.CommentLikeResponse> likeOrUnlikeComment(
+		String postIdStr, String commentIdStr, String authHeader) {
+
 		try {
 			// 1. 토큰에서 userId 추출
 			UUID userId = authHelper.authHelperAsUUID(authHeader);
@@ -167,15 +169,30 @@ public class CommentService {
 				.orElseThrow(() -> new IllegalArgumentException("댓글을 찾을 수 없습니다."));
 
 			// 3. 좋아요 토글
+			boolean liked;
+			String action;
 			if (comment.isLikedBy(user)) {
 				comment.removeLike(user);
+				liked = false;
+				action = "삭제";
 			} else {
 				comment.addLike(user);
+				liked = true;
+				action = "추가";
 			}
 
 			commentRepository.save(comment);
 
-			return ApiMessage.success(200, "댓글 좋아요/취소 완료", null);
+			// 4. 응답 DTO 생성
+			CommentResponse.CommentLikeResponse responseData = CommentResponse.CommentLikeResponse.builder()
+				.action(action)
+				.liked(liked)
+				.likeCount(comment.getLikeCount())
+				.build();
+
+			return ApiMessage.success(200,
+				String.format("좋아요가 %s되었습니다. (현재 %d개)", action, comment.getLikeCount()),
+				responseData);
 
 		} catch (IllegalArgumentException e) {
 			return ApiMessage.fail(400, e.getMessage());
