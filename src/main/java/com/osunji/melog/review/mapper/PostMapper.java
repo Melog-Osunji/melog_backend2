@@ -16,15 +16,15 @@ import java.util.stream.Collectors;
 public class PostMapper {
 
 	/** 단일 게시글 조회 응답 변환 (API 15번) */
-	public PostResponse.Single toSingle(Post post, PostComment bestComment, int commentCount) {
+	public PostResponse.Single toSingle(Post post, PostComment bestComment, int commentCount,boolean isLike, boolean isBookmark) {
 		return PostResponse.Single.builder()
-			.post(toPostData(post, bestComment, commentCount))
+			.post(toPostData(post, bestComment, commentCount, isLike, isBookmark))
 			.user(toUserData(post.getUser()))
 			.build();
 	}
 
 	/** 피드용 게시글 데이터 변환 (API 18,19,20번) */
-	public FilterPostResponse.FeedPostData toFeedPostData(Post post, PostComment bestComment, int commentCount) {
+	public FilterPostResponse.FeedPostData toFeedPostData(Post post, PostComment bestComment, int commentCount, boolean isLike, boolean isBookmark) {
 		try {
 			System.out.println("🔍 PostMapper.toFeedPostData 시작");
 			System.out.println("  - Post ID: " + post.getId());
@@ -43,11 +43,13 @@ public class PostMapper {
 				.mediaType(post.getMediaType())
 				.mediaUrl(post.getMediaUrl())
 				.tags(post.getTags())
-				.createdAgo(calcHoursAgo(post.getCreatedAt())) // ✅ calcDaysAgo → calcHoursAgo
+				.createdAgo(formatCreatedAgo(post.getCreatedAt())) // ✅ calcDaysAgo → calcHoursAgo
 				.likeCount(post.getLikeCount())
 				.hiddenUser(getHiddenUserNicknames(post))
 				.commentCount(commentCount)
 				.bestComment(toBestCommentForFeed(bestComment))
+				.isLike(isLike)
+				.isBookmark(isBookmark)
 				.build();
 
 			System.out.println("✅ PostData 생성 완료");
@@ -87,7 +89,7 @@ public class PostMapper {
 	// ========== 공통 변환 메서드 ==========
 
 	/** PostResponse용 PostData 변환 */
-	private PostResponse.PostData toPostData(Post post, PostComment bestComment, int commentCount) {
+	private PostResponse.PostData toPostData(Post post, PostComment bestComment, int commentCount,boolean isLike, boolean isBookmark) {
 		return PostResponse.PostData.builder()
 			.id(post.getId().toString())
 			.title(post.getTitle())
@@ -95,11 +97,13 @@ public class PostMapper {
 			.mediaType(post.getMediaType())
 			.mediaUrl(post.getMediaUrl())
 			.tags(post.getTags())
-			.createdAgo(calcHoursAgo(post.getCreatedAt())) // ✅ 수정
+			.createdAgo(formatCreatedAgo(post.getCreatedAt())) // ✅ 수정
 			.likeCount(post.getLikeCount())
 			.hiddenUser(getHiddenUserNicknames(post))
 			.commentCount(commentCount)
 			.bestComment(toBestCommentForPost(bestComment))
+			.isLike(isLike)
+			.isBookmark(isBookmark)
 			.build();
 	}
 
@@ -179,7 +183,21 @@ public class PostMapper {
 		if (createdAt == null) return 0;
 		return (int) ChronoUnit.HOURS.between(createdAt, LocalDateTime.now());
 	}
+	private String formatCreatedAgo(LocalDateTime createdAt) {
+		if (createdAt == null) return "";
 
+		long hours = ChronoUnit.HOURS.between(createdAt, LocalDateTime.now());
+		if (hours < 1) return "방금 전";
+		else if (hours < 24) return hours + "시간 전";
+
+		long days = ChronoUnit.DAYS.between(createdAt.toLocalDate(), LocalDateTime.now().toLocalDate());
+		if (days == 1) return "하루 전";
+		if (days <= 30) return days + "일 전";
+
+		long months = ChronoUnit.MONTHS.between(createdAt.toLocalDate(), LocalDateTime.now().toLocalDate());
+		if (months == 1) return "한 달 전";
+		return months + "달 전";
+	}
 	/** LocalDateTime 기준 며칠 전인지 계산 (선택적 사용) ✅ */
 	private Integer calcDaysAgo(LocalDateTime createdAt) {
 		if (createdAt == null) return 0;

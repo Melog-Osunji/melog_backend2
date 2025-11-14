@@ -28,11 +28,13 @@ public class PostResponse {
 		private String mediaType;               // 미디어타입
 		private String mediaUrl;                // 미디어url
 		private List<String> tags;              // ["베토벤", "감상", "피아노"]
-		private int createdAgo;                 // 몇시간전작성인지 Integer
+		private String createdAgo;              // 언제작성인지 n시간 전/n일 전/n달 전
 		private int likeCount;                  // 좋아요개수
 		private List<String> hiddenUser;        // ["숨김처리","유저","리스트"]
 		private int commentCount;               // 댓글개수
 		private BestCommentData bestComment;    // 베댓정보
+		private Boolean isLike;
+		private Boolean isBookmark;
 	}
 
 	@Getter

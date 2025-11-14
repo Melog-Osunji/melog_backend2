@@ -1,14 +1,10 @@
 package com.osunji.melog.harmony.service;
-import com.osunji.melog.review.service.PostService;
 import com.osunji.melog.global.common.AuthHelper;
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.harmony.dto.request.HarmonyRoomRequest;
 import com.osunji.melog.harmony.dto.response.HarmonyRoomResponse;
 import com.osunji.melog.harmony.entity.*;
 import com.osunji.melog.harmony.repository.*;
-import com.osunji.melog.review.dto.request.PostRequest;
-import com.osunji.melog.review.entity.Post;
-import com.osunji.melog.review.entity.PostComment;
 import com.osunji.melog.review.repository.PostRepository;
 import com.osunji.melog.user.domain.User;
 import com.osunji.melog.user.repository.UserRepository;
@@ -31,13 +27,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class HarmonyService {
-	private final CommentRepository commentRepository;
 	private final HarmonyRoomRepository harmonyRoomRepository;
 	private final HarmonyRoomPostsRepository harmonyRoomPostsRepository;
 	private final HarmonyRoomAssignWaitRepository harmonyRoomAssignWaitRepository;
 	private final HarmonyRoomMembersRepository harmonyRoomMembersRepository;
 	private final UserRepository userRepository;
-	private final PostRepository postRepository;
 	private final HarmonyReportLogService harmonyReportLogService;
 	private final HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository;
 	private final HarmonyRoomReportRepository harmonyRoomReportRepository;
@@ -204,17 +198,15 @@ public class HarmonyService {
 				.build();
 		}
 
-		// 하모니룸 게시글에서 미디어가 있는 것만 조회
 		List<HarmonyRoomPosts> mediaPostsList = harmonyRoomPostsRepository
 			.findByHarmonyRoomInAndMediaTypeIsNotNullOrderByCreatedAtDesc(myHarmonyRooms);
 
-		List<HarmonyRoomResponse.RecentMedia.RecentMediaInfo> recentMediaList = new ArrayList<>();
-
-		for (HarmonyRoomPosts post : mediaPostsList) {
-			if (post.getMediaType() != null && post.getMediaUrl() != null) {
+		List<HarmonyRoomResponse.RecentMedia.RecentMediaInfo> recentMediaList = mediaPostsList.stream()
+			.filter(post -> post.getMediaType() != null && post.getMediaUrl() != null)
+			.map(post -> {
 				String createdAgo = calculateCreatedAgo(post.getCreatedAt());
 
-				recentMediaList.add(HarmonyRoomResponse.RecentMedia.RecentMediaInfo.builder()
+				return HarmonyRoomResponse.RecentMedia.RecentMediaInfo.builder()
 					.harmonyRoomId(post.getHarmonyRoom().getId().toString())
 					.userNickname(post.getUser().getNickname())
 					.userProfileImgLink(post.getUser().getProfileImageUrl())
@@ -223,14 +215,15 @@ public class HarmonyService {
 					.mediaUrl(post.getMediaUrl())
 					.mediaType(post.getMediaType())
 					.createdAgo(createdAgo)
-					.build());
-			}
-		}
+					.build();
+			})
+			.limit(10)
+			.toList();
 
 		log.info("📺 최근 미디어 조회 완료: {}개", recentMediaList.size());
 
 		return HarmonyRoomResponse.RecentMedia.builder()
-			.recentMedia(recentMediaList.stream().limit(10).collect(Collectors.toList()))
+			.recentMedia(recentMediaList)
 			.build();
 	}
 
@@ -378,7 +371,7 @@ public class HarmonyService {
 		}
 
 		// 생성 시간 (초 단위)
-		Integer createdAgo = calculateCreatedAgoInSeconds(post.getCreatedAt());
+		String createdAgo = calculateCreatedAgo(post.getCreatedAt());
 
 		HarmonyRoomResponse.HarmonyRoomPosts.PostResult.PostDetail.BestComment bestCommentDto = null;
 		if (bestComment != null) {
@@ -444,15 +437,6 @@ public class HarmonyService {
 			));
 	}
 
-	/**
-	 * 생성 시간을 초 단위로 계산
-	 */
-	private Integer calculateCreatedAgoInSeconds(LocalDateTime createdAt) {
-		if (createdAt == null) return 0;
-
-		LocalDateTime now = LocalDateTime.now();
-		return (int) java.time.Duration.between(createdAt, now).getSeconds();
-	}
 
 	/**
 	 * 6. 하모니룸 범용 정보 조회
@@ -478,6 +462,7 @@ public class HarmonyService {
 		boolean isRunning = harmonyRoom.isOwner(user);
 
 		log.info("ℹ️ 하모니룸 정보 조회 완료: {} (멤버 {}명)", harmonyRoom.getName(), members.size());
+		String createdAgo = calculateCreatedAgo(harmonyRoom.getCreatedAt());
 
 		return HarmonyRoomResponse.Information.builder()
 			.id(harmonyRoom.getId().toString())         // ✅ 하모니룸 ID 추가
@@ -488,7 +473,7 @@ public class HarmonyService {
 			.intro(harmonyRoom.getIntro())
 			.isRunning(isRunning)
 			.isPrivate(harmonyRoom.getIsPrivate())
-			.createdAt(harmonyRoom.getCreatedAt())
+			.createdAt(createdAgo)
 			.members(memberIds)
 			.owner(harmonyRoom.getOwner().getId().toString())
 			.isDirectAssign(harmonyRoom.getIsDirectAssign())
@@ -1078,7 +1063,6 @@ public class HarmonyService {
 	 */
 	@Transactional(readOnly = true)
 	public HarmonyRoomResponse.HarmonyRoomPosts getRecommendPosts(String harmonyId, String authHeader) {
-		// getHarmonyRoomPosts와 동일한 로직
 		return getHarmonyRoomPosts(harmonyId,authHeader);
 	}
 
@@ -1117,23 +1101,6 @@ public class HarmonyService {
 	}
 
 
-	// ========== 헬퍼 메서드 ==========
-
-	/**
-	 * 시간 계산 ("오늘" 또는 "n일전") - LocalDateTime 버전
-	 */
-	private String calculateCreatedAgo(LocalDateTime createdAt) {
-		if (createdAt == null) return "알 수 없음";
-
-		LocalDateTime now = LocalDateTime.now();
-		long daysBetween = ChronoUnit.DAYS.between(createdAt.toLocalDate(), now.toLocalDate());
-
-		if (daysBetween == 0) {
-			return "오늘";
-		} else {
-			return daysBetween + "일전";
-		}
-	}
 
 
 
@@ -1168,8 +1135,7 @@ public class HarmonyService {
 			int likeCount = post.getLikes() != null ? post.getLikes().size() : 0;
 			int commentCount = post.getComments() != null ? post.getComments().size() : 0;
 
-			Integer createdAgo = (post.getCreatedAt() == null) ? 0 :
-				(int) ChronoUnit.HOURS.between(post.getCreatedAt(), LocalDateTime.now());
+			String createdAgo = calculateCreatedAgo(post.getCreatedAt());
 
 			HarmonyRoomResponse.PostDetail postDetail = HarmonyRoomResponse.PostDetail.builder()
 				.id(post.getId().toString())
@@ -1232,7 +1198,7 @@ public class HarmonyService {
 			.userNickname(comment.getUser().getNickname())
 			.userProfileImgLink(comment.getUser().getProfileImageUrl())
 			.likeCount(comment.getLikeCount())
-			.createdAgo(calculateCreatedAgo(comment.getCreatedAt().atStartOfDay()))
+			.createdAgo(calculateCreatedAgo(comment.getCreatedAt()))
 			.replies(childCommentDtos)
 			.build();
 	}
@@ -1615,4 +1581,24 @@ public class HarmonyService {
 		} catch (Exception e) {
 			return ApiMessage.fail(500, "사용자 하모니룸 북마크 게시글 조회 실패: " + e.getMessage());
 		}}
+
+	private String calculateCreatedAgo(LocalDateTime createdAt) {
+		if (createdAt == null) return "";
+		long hours = ChronoUnit.HOURS.between(createdAt, LocalDateTime.now());
+		if (hours < 1) return "방금 전";
+		else if (hours < 24) return hours + "시간 전";
+
+		long days = ChronoUnit.DAYS.between(createdAt.toLocalDate(), LocalDateTime.now().toLocalDate());
+		if (days == 1) return "하루 전";
+		if (days <= 30) return days + "일 전";
+
+		long months = ChronoUnit.MONTHS.between(createdAt.toLocalDate(), LocalDateTime.now().toLocalDate());
+		if (months == 1) return "한 달 전";
+		return months + "달 전";
+	}
+
+
+
+
+
 }
