@@ -83,7 +83,13 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 	/** YouTube 미디어만 모두 조회 */
 	@Query("SELECT p FROM Post p WHERE p.mediaType = 'youtube'")
 	List<Post> findAllYoutubeMedia();
+	// 유저 미디어 게시글과 작성자 정보를 함께 조회
+	@Query("SELECT p FROM Post p JOIN FETCH p.user WHERE p.user.id = :userId")
+	List<Post> findUserMediaPostsWithAuthor(@Param("userId") UUID userId, @Param("currentUserId") UUID currentUserId);
 
+	// 유저 게시글과 작성자 정보를 함께 조회
+	@Query("SELECT p FROM Post p JOIN FETCH p.user WHERE p.user.id = :userId")
+	List<Post> findUserPostsWithAuthor(@Param("userId") UUID userId, @Param("currentUserId") UUID currentUserId);
 	/**
 	 * 사용자의 모든 게시글 조회 (일반 + 하모니룸 게시글 포함)
 	 */
