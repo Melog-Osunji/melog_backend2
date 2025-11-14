@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 public class Calendar {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+//    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", columnDefinition = "uuid")
     private UUID id;
 
@@ -58,23 +58,24 @@ public class Calendar {
     @Column(name = "created_at", nullable = false)
     private LocalDate createdAt;
 
-    // ✅ region 파라미터 추가하고 필드에 대입
-    public Calendar(String source,
+    public Calendar(UUID id,
+                    String source,
                     String externalId,
                     String detailUrl,
                     String title,
                     String classification,
-                    String region,            // ← 추가
+                    String region,
                     LocalDate startDate,
                     LocalDate endDate,
                     String description,
                     String imageUrl) {
+        this.id = id;
         this.source = source;
         this.externalId = externalId;
         this.detailUrl = detailUrl;
         this.title = title;
         this.classification = classification;
-        this.region = region;          // ← 이제 정상 대입
+        this.region = region;
         this.startDate = startDate;
         this.endDate = endDate;
         this.description = description;
@@ -82,8 +83,8 @@ public class Calendar {
         this.createdAt = LocalDate.now();
     }
 
-    // ✅ 순서 맞춰서 region 전달
-    public static Calendar fromKcisa(String externalId,
+    public static Calendar fromKcisa(UUID id,
+                                     String externalId,
                                      String detailUrl,
                                      String title,
                                      String region,
@@ -92,11 +93,12 @@ public class Calendar {
                                      String description,
                                      String imageUrl) {
         return new Calendar(
+                id,
                 "KCISA_CNV_060",
                 externalId,
                 detailUrl,
                 title,
-                /* classification= */ null, // 원한다면 분류값 채워도 됨
+                null,
                 region,
                 startDate,
                 endDate,
