@@ -20,7 +20,7 @@ public interface HarmonyRoomRepository extends JpaRepository<HarmonyRoom, UUID> 
 	List<HarmonyRoom> findByOwnerOrderByNameAsc(User owner);
 
 	/**
-	 * 하모니룸 이름으로 검색
+	 * 하모니룸 이름으로 검색d
 	 */
 	@Query("SELECT h FROM HarmonyRoom h WHERE " +
 		"LOWER(h.name) LIKE LOWER(CONCAT('%', :keyword, '%')) " +

@@ -87,7 +87,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 	@Query("SELECT p FROM Post p JOIN FETCH p.user WHERE p.user.id = :userId")
 	List<Post> findUserMediaPostsWithAuthor(@Param("userId") UUID userId, @Param("currentUserId") UUID currentUserId);
 
-	// 유저 게시글과 작성자 정보를 함께 조회
+	// 유저 게시글과 작성자 정보를 함께 조회fff
 	@Query("SELECT p FROM Post p JOIN FETCH p.user WHERE p.user.id = :userId")
 	List<Post> findUserPostsWithAuthor(@Param("userId") UUID userId, @Param("currentUserId") UUID currentUserId);
 	/**

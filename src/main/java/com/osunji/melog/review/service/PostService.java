@@ -563,7 +563,7 @@ public class PostService {
 		}
 	}
 
-	/** 특정 유저의 '미디어가 포함된' 모든 게시글 GET */
+	/** 특정 유저의 '미디어가 포함된' 모든 게시글 GETdddd */
 	@Transactional(readOnly = true)
 	public ApiMessage<FilterPostResponse.UserPostList> getUserMediaPosts(String userIdStr, @Nullable String currentUserIdStr) {
 		try {

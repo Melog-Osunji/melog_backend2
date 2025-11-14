@@ -94,7 +94,7 @@ public class PostController {
 	}
 
 
-	//---------------댓글 관련-----------------//
+	//---------------댓글 관련------cc-----------//
 
 	/** 16. 특정 게시글 모든 댓글 조회 GET /api/posts/{postID}/comments */
 	@GetMapping("/posts/{postId}/comments")

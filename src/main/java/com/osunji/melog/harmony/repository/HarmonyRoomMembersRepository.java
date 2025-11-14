@@ -20,7 +20,7 @@ public interface HarmonyRoomMembersRepository extends JpaRepository<HarmonyRoomM
 	List<HarmonyRoomMembers> findByHarmonyRoom(HarmonyRoom harmonyRoom);
 
 	/**
-	 * 사용자가 속한 하모니룸 조회
+	 * 사용자가 속한 하모니룸 조회d
 	 */
 	List<HarmonyRoomMembers> findByUser(User user);
 

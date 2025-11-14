@@ -19,7 +19,7 @@ public class FilterPostResponse {
 	@Getter
 	@Setter
 	@Builder
-	//---------------특정 유저의 모든 게시글 (API 22번)-----------------//
+	//---------------특정 유저의 모든 게시글 (API 22번)--------------cc---//
 	public static class UserPostList {
 		private List<UserPostData> results;
 	}
