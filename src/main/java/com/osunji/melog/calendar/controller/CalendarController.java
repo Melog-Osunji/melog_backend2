@@ -3,7 +3,7 @@ package com.osunji.melog.calendar.controller;
 import com.osunji.melog.calendar.CultureCategory;
 import com.osunji.melog.calendar.dto.CalendarResponse;
 import com.osunji.melog.calendar.service.CalendarService;
-import com.osunji.melog.calendar.service.CultureOpenApiService;
+import com.osunji.melog.calendar.service.CultureOpenApiClient;
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.global.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ import java.util.UUID;
 public class CalendarController {
 
     private final CalendarService calendarService;
-    private final CultureOpenApiService cultureOpenApiService;
+    private final CultureOpenApiClient cultureOpenApiClient;
 
     // 캘린더 메인 화면
     @GetMapping("/main")
@@ -60,8 +60,8 @@ public class CalendarController {
                     .body("잘못된 category 값입니다.");
         }
 
-        log.debug("🔍 CultureOpenApiService.fetchItems() 호출 시작: category={}", cat);
-        List<CalendarResponse.Item> items = cultureOpenApiService.fetchItems(cat);
+        log.debug("🔍 CultureOpenWebClient.fetchItems() 호출 시작: category={}", cat);
+        List<CalendarResponse.Item> items = cultureOpenApiClient.fetchItems(cat);
         log.debug("✅ fetchItems() 완료: count={}", items.size());
 
         // 응답 아이템의 category 필수 검사

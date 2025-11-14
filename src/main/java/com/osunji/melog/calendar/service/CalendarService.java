@@ -13,8 +13,6 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 
-import static com.osunji.melog.calendar.CultureCategory.ALL;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -24,7 +22,7 @@ public class CalendarService {
 
     private static final DayOfWeek WEEK_START = DayOfWeek.SATURDAY;
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    private final CultureOpenApiService cultureOpenApiService;
+    private final CultureOpenApiClient cultureOpenApiClient;
 
     public ApiMessage<CalendarResponse> calendarMain(UUID userId, Integer year, Integer month) {
         log.debug("📅 [calendarMain] called with userId={}, year={}, month={}", userId, year, month);
