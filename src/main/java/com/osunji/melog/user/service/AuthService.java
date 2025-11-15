@@ -3,6 +3,7 @@ package com.osunji.melog.user.service;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.proc.BadJOSEException;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.osunji.melog.global.util.GoogleOidcUtil;
 import com.osunji.melog.global.util.JWTUtil;
 import com.osunji.melog.global.util.KakaoOidcUtil;
 import com.osunji.melog.user.dto.request.OauthLoginRequestDTO;
@@ -37,13 +38,14 @@ public class AuthService {
     private final long refreshTtlMs;
     private final long refreshRoateBelow;
     private final KakaoOidcUtil kakaoOidcUtil;
+    private final GoogleOidcUtil googleOidcUtil;
 
     public AuthService(
             @Value("${jwt.access-expiration}") long accessTtlMs,
             @Value("${jwt.refresh-expiration}") long refreshTtlMs,
             @Value("${jwt.refresh-below}") long refreshRotateBelow,
             OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo,
-            UserRepository userRepository, KakaoOidcUtil kakaoOidcUtil) {
+            UserRepository userRepository, KakaoOidcUtil kakaoOidcUtil, GoogleOidcUtil googleOidcUtil) {
 
         this.accessTtlMs = accessTtlMs;
         this.refreshTtlMs = refreshTtlMs;
@@ -56,6 +58,7 @@ public class AuthService {
 
         log.info("✅ AuthService initialized (accessTtlMs={}ms, refreshTtlMs={}ms, rotateBelow={}s)",
                 accessTtlMs, refreshTtlMs, refreshRotateBelow);
+        this.googleOidcUtil = googleOidcUtil;
     }
 
     public LoginResponseDTO upsertUserFromKakaoIdToken(OauthLoginRequestDTO request)
@@ -66,6 +69,53 @@ public class AuthService {
 
         // 1. ID 토큰 검증
         JWTClaimsSet claims = kakaoOidcUtil.verifyKakaoIdToken(request.getIdToken());
+        log.debug("✅ ID Token verified. Claims: sub={}, email={}, nickname={}",
+                claims.getSubject(), claims.getStringClaim("email"), claims.getStringClaim("nickname"));
+
+        // 2. 페이로드에서 값 추출
+        String sub = claims.getSubject();
+        if (sub == null) {
+            log.error("❌ Missing sub claim");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_sub");
+        }
+
+        String email = requireClaim(claims, "email");
+        String nickname = requireClaim(claims, "nickname");
+        String picture = requireClaim(claims, "picture");
+        Platform platform = request.getPlatform();
+
+        log.debug("📦 Extracted user info: sub={}, email={}, nickname={}, platform={}", sub, email, nickname, platform);
+
+        // 3. DB 조회 → 있으면 기존 유저, 없으면 새 유저 생성
+        return userRepository.findByOidcAndPlatform(sub, platform)
+                .map(user -> {
+                    log.info("👤 Existing user found (oidc={}, platform={})", sub, platform);
+                    return LoginResponseDTO.builder()
+                            .isNewUser(false)
+                            .user(convertToUserDTO(user))
+                            .build();
+                })
+                .orElseGet(() -> {
+                    log.info("🆕 No existing user found. Creating new user (email={}, platform={})", email, platform);
+                    User newUser = new User(email, platform, nickname, picture, null);
+                    newUser.setOidc(sub);
+                    User saved = userRepository.save(newUser);
+                    log.info("✅ New user created with ID={}", saved.getId());
+                    return LoginResponseDTO.builder()
+                            .isNewUser(true)
+                            .user(convertToUserDTO(saved))
+                            .build();
+                });
+    }
+
+    public LoginResponseDTO upsertUserFromGoogleIdToken(OauthLoginRequestDTO request)
+            throws BadJOSEException, ParseException, JOSEException {
+
+        log.debug("🟡 [AuthService] upsertUserFromGoogleIdToken() called for platform={}, idToken length={}",
+                request.getPlatform(), request.getIdToken() != null ? request.getIdToken().length() : 0);
+
+        // 1. ID 토큰 검증
+        JWTClaimsSet claims = googleOidcUtil.verifyGoogleIdToken(request.getIdToken());
         log.debug("✅ ID Token verified. Claims: sub={}, email={}, nickname={}",
                 claims.getSubject(), claims.getStringClaim("email"), claims.getStringClaim("nickname"));
 
