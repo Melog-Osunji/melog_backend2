@@ -3,7 +3,7 @@ package com.osunji.melog;
 import com.osunji.melog.calendar.controller.CalendarController;
 import com.osunji.melog.calendar.dto.CalendarResponse;
 import com.osunji.melog.calendar.service.CalendarService;
-import com.osunji.melog.calendar.service.CultureOpenApiService;
+import com.osunji.melog.calendar.service.CultureOpenApiClient;
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.global.security.JwtAuthFilter;
 import org.junit.jupiter.api.DisplayName;
@@ -50,7 +50,7 @@ class CalendarControllerTest {
     CalendarService calendarService;
 
     @MockBean
-    CultureOpenApiService cultureOpenApiService;
+    CultureOpenApiClient cultureOpenApiClient;
 
     // ---- /api/calendar/main ----
 
@@ -124,7 +124,7 @@ class CalendarControllerTest {
                 .category("MUSIC") // 응답에서 enum name 사용
                 .build();
 
-        Mockito.when(cultureOpenApiService.fetchItems(any()))
+        Mockito.when(cultureOpenApiClient.fetchItems(any()))
                 .thenReturn(List.of(item));
 
         mockMvc.perform(get("/api/calendar/items")
@@ -147,7 +147,7 @@ class CalendarControllerTest {
                 .category("") // 빈 문자열 → invalid
                 .build();
 
-        Mockito.when(cultureOpenApiService.fetchItems(any()))
+        Mockito.when(cultureOpenApiClient.fetchItems(any()))
                 .thenReturn(List.of(bad));
 
         mockMvc.perform(get("/api/calendar/items")
