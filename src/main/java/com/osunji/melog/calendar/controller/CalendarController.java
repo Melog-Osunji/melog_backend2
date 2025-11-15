@@ -2,6 +2,7 @@ package com.osunji.melog.calendar.controller;
 
 import com.osunji.melog.calendar.CultureCategory;
 import com.osunji.melog.calendar.dto.CalendarResponse;
+import com.osunji.melog.calendar.service.CalendarItemProvider;
 import com.osunji.melog.calendar.service.CalendarService;
 import com.osunji.melog.calendar.service.CultureOpenApiClient;
 import com.osunji.melog.global.dto.ApiMessage;
@@ -23,6 +24,7 @@ public class CalendarController {
 
     private final CalendarService calendarService;
     private final CultureOpenApiClient cultureOpenApiClient;
+    private final CalendarItemProvider calendarItemProvider;
 
     // 캘린더 메인 화면
     @GetMapping("/main")
@@ -61,7 +63,7 @@ public class CalendarController {
         }
 
         log.debug("🔍 CultureOpenWebClient.fetchItems() 호출 시작: category={}", cat);
-        List<CalendarResponse.Item> items = cultureOpenApiClient.fetchItems(cat);
+        List<CalendarResponse.Item> items = calendarItemProvider.getItems(cat);
         log.debug("✅ fetchItems() 완료: count={}", items.size());
 
         // 응답 아이템의 category 필수 검사
