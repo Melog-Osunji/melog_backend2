@@ -58,7 +58,7 @@ public interface CommentRepository extends JpaRepository<PostComment, UUID> {  /
 	@Query("SELECT COUNT(c) FROM PostComment c WHERE c.user.id = :userId")
 	int countCommentByuserId(@Param("userId") UUID userId);  // ✅ String → UUID
 
-	//---------------부모-자식 댓글 관련-----------------//
+	//---------------부모-자식 댓글 관련------fff-----------//
 	/** 특정 댓글의 대댓글들 조회 */
 	@Query("SELECT c FROM PostComment c JOIN FETCH c.user " +
 		"WHERE c.parentComment.id = :parentCommentId " +

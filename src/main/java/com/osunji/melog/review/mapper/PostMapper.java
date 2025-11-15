@@ -107,7 +107,7 @@ public class PostMapper {
 			.build();
 	}
 
-	/** UserData 변환 */
+	/** UserData 변환cccc */
 	private PostResponse.UserData toUserData(User user) {
 		return PostResponse.UserData.builder()
 			.id(user.getId().toString())

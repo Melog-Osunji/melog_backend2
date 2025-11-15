@@ -10,7 +10,7 @@ public class PostResponse {
 	@Getter
 	@Setter
 	@Builder
-	//---------------단일 게시글 조회 (GET /api/posts/{postId})-----------------//
+	//---------------단일 게시글 조회 (GET /api/posts/{postId})----------cc-------//
 	public static class Single {
 		private PostData post;
 		private UserData user;

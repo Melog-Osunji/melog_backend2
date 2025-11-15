@@ -621,7 +621,7 @@ public class HarmonyController {
 		return ResponseEntity.status(response.getCode()).body(response);
 	}
 
-	// ========== 유저별 북마크 하모니룸 게시글 목록 ==========
+	// ========== 유저별 북마크 하모니룸 게시글 목록 ========ff==
 	@GetMapping("/harmony/posts/{userId}/bookmarks")
 	public ResponseEntity<ApiMessage<HarmonyRoomResponse.UserHarmonyBookmarks>> getHarmonyUserBookmarks(
 		@PathVariable String userId,

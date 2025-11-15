@@ -317,7 +317,7 @@ public class HarmonyRoomResponse {
 		private List<String> tags;
 		private String createdAgo;
 		private Integer likeCount;
-		private List<String> hiddenUser;  // 숨긴 유저 ID 리스트
+		private List<String> hiddenUser;  // 숨긴 유저 ID 리스ff트
 		private Integer commentCount;
 		private BestComment bestComment;
 		private Boolean isLiked;      // 추가 필요

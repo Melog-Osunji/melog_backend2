@@ -97,7 +97,7 @@ public class CommentService {
 			Post post = postRepository.findById(postId)
 				.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
 
-			// 3. 부모 댓글 확인 (대댓글인 경우)
+			// 3. 부모 댓글 확인 (대댓글인 경우)ffff
 			PostComment parentComment = null;
 			if (request.getResponseTo() != null) {
 				UUID parentId = UUID.fromString(request.getResponseTo());

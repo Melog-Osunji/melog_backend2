@@ -28,7 +28,7 @@ public interface BookmarkRepository extends JpaRepository<PostBookmark, PostBook
 	Optional<PostBookmark> isBookmarkByuserIdAndpostId(@Param("userId") UUID userId,  // ✅ String → UUID
 		@Param("postId") UUID postId);  // ✅ String → UUID
 
-	/** 북마크 삭제 - 사용자ID와 게시글ID로 */
+	/** 북마크 삭제 - 사용자ID와 게시글IDffff로 */
 	@Modifying(clearAutomatically = true)
 	@Query("DELETE FROM PostBookmark pb " +
 		"WHERE pb.user.id = :userId AND pb.post.id = :postId")
