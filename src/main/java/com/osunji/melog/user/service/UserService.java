@@ -468,9 +468,9 @@ public class UserService {
                 .orElse(null);
 
         // 5) 사용자 게시글
-        List<FilterPostResponse.FeedPostData> posts = Collections.emptyList();
+        List<FilterPostResponse.UserPostData> posts = Collections.emptyList();
         try {
-            var postsMsg = postService.getUserFeed(userId.toString(), userId.toString());
+            var postsMsg = postService.getUserPosts(userId.toString());
             if (postsMsg == null) {
                 log.warn("getUserPosts: ApiMessage가 null");
             } else if (postsMsg.isSuccess() && postsMsg.getData() != null) {
@@ -483,10 +483,10 @@ public class UserService {
         }
 
         // 5-1) 사용자 '미디어 포함' 게시글 → FeedList로 수신 (댓글/베댓 포함)
-        List<FilterPostResponse.FeedPostData> mediaFeed = Collections.emptyList();
+        List<FilterPostResponse.UserPostData> mediaFeed = Collections.emptyList();
         try {
             // 본인 마이페이지라면 currentUserId = userId 로 넘겨 숨김 필터 등 동일 적용
-            var mediaMsg = postService.getUserMediaFeed(userId.toString(), userId.toString());
+            var mediaMsg = postService.getUserMediaPosts(userId.toString(), userId.toString());
             if (mediaMsg == null) {
                 log.warn("getUserMediaFeed: ApiMessage가 null");
             } else if (mediaMsg.isSuccess() && mediaMsg.getData() != null) {
