@@ -8,28 +8,24 @@ import com.osunji.melog.calendar.dto.CalendarResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.time.Duration;
 
 import static io.micrometer.common.util.StringUtils.truncate;
 
 @Slf4j
-@Service
+@Component
 @RequiredArgsConstructor
-public class CultureOpenApiService {
+public class CultureOpenApiClient {
 
-    private final WebClient cultureWebClient; // baseUrl은 https://api.kcisa.kr
+    private final WebClient cultureWebClient; // baseUrl: https://api.kcisa.kr
     @Value("${openapi.kcisa.service-key}")
     private String serviceKey;
 
@@ -37,27 +33,24 @@ public class CultureOpenApiService {
     private static final ZoneId   KST   = ZoneId.of("Asia/Seoul");
     private static final String TITLE_ALL = " ";
 
-
-    /** KCISA CNV_060에서 최대 20개 요청 → Item 매핑 → 최근 10일 시작일 필터 */
+    /**
+     * KCISA CNV_060 호출 → Item 매핑 (과거 종료 일정 제외, 최대 20)
+     * 저장/캐시는 하지 않는다. 오직 호출/가공만 담당.
+     */
     public List<CalendarResponse.Item> fetchItems(CultureCategory category) {
         LocalDate today = LocalDate.now(KST);
-        LocalDate from  = today.minusDays(10);
 
         List<JsonNode> buckets = new ArrayList<>();
 
         if (category == CultureCategory.ALL) {
-            // ALL이면 enum 순회 (ALL 제외) + title=공백 1자
             for (CultureCategory c : CultureCategory.values()) {
                 if (c == CultureCategory.ALL) continue;
                 String dtype = c.dtype().orElse(null);
                 if (dtype == null || dtype.isBlank()) continue;
 
-                // 1차: 공백 1자로 호출 → 실패(403/timeout 등) 시 폴백 키워드
                 JsonNode root = callCnV060WithFallback(dtype, TITLE_ALL,
                         (c == CultureCategory.EXHIBITION) ? "전시" : "공연");
                 if (root != null) buckets.add(root);
-                log.info("응답: {}", root);
-
             }
         } else {
             String dtype = category.dtype().orElse(null);
@@ -65,7 +58,6 @@ public class CultureOpenApiService {
 
             JsonNode root = callCnV060WithFallback(dtype, TITLE_ALL,
                     (category == CultureCategory.EXHIBITION) ? "전시" : "공연");
-            log.info("응답: {}", root);
             if (root != null) buckets.add(root);
         }
 
@@ -76,42 +68,37 @@ public class CultureOpenApiService {
         for (JsonNode n : allItems) {
             CalendarResponse.Item it = mapNodeToItem(n, category);
 
-            // 끝난(= 종료일이 오늘보다 이전) 것만 제외
             var start = it.getStartDateTime();
             var end   = (it.getEndDateTime() != null) ? it.getEndDateTime() : start;
-            if (end == null) continue; // 날짜 정보가 전혀 없으면 스킵
+            if (end == null) continue;
 
             if (end.toLocalDate().isBefore(today)) {
-                continue; // 과거에 완전히 끝난 일정 → 제외
+                continue; // 과거 종료 일정 제외
             }
 
-            uniq.putIfAbsent(it.getId(), it); // 중복 제거
+            uniq.putIfAbsent(it.getId(), it);
             if (uniq.size() >= 20) break;
         }
         return new ArrayList<>(uniq.values());
     }
 
-    /** CNV_060 실제 호출: dtype/ title(2자+) 필수, 타임아웃/에러처리 + 로깅 */
+    // ====== 내부 구현 (호출 + 매핑 유틸) ======
+
     private JsonNode callCnV060(String dtype, String titleKeyword) {
-        // title은 2자 이상 필요 → 한 글자면 즉시 폴백이 일어나게끔 로그로 표시
         if (titleKeyword == null || titleKeyword.trim().length() < 2) {
-            log.warn("⚠️ titleKeyword가 2자 미만입니다. KCISA가 204/빈응답을 줄 수 있음: '{}'", titleKeyword);
+            log.warn("titleKeyword가 2자 미만: '{}'", titleKeyword);
         }
 
         try {
-            // 원시 응답 바디(String)로 먼저 수신 후, ObjectMapper로 JsonNode 파싱
             String body = cultureWebClient.get()
-                    .uri(b -> {
-                        var uri = b.path(CNV060)
-                                .queryParam("serviceKey", serviceKey)
-                                .queryParam("numOfRows", 20)
-                                .queryParam("pageNo", 1)
-                                .queryParam("dtype", dtype)           // ★ 필수
-                                .queryParam("title", titleKeyword)    // ★ 필수(2자 이상)
-                                .build();
-                        log.debug("🌐 KCISA 요청 URI -> {}", uri);
-                        return uri;
-                    })
+                    .uri(b -> b.path(CNV060)
+                            .queryParam("serviceKey", serviceKey)
+                            .queryParam("numOfRows", 20)
+                            .queryParam("pageNo", 1)
+                            .queryParam("dtype", dtype)           // 필수
+                            .queryParam("title", titleKeyword)    // 필수(2자 이상)
+                            .build()
+                    )
                     .header("Accept", "application/json")
                     .retrieve()
                     .onStatus(
@@ -119,49 +106,49 @@ public class CultureOpenApiService {
                             resp -> resp.bodyToMono(String.class)
                                     .defaultIfEmpty("")
                                     .map(errBody -> {
-                                        log.error("❌ KCISA HTTP {} 에러, body={}", resp.statusCode(), truncate(errBody, 2000));
+                                        log.error("KCISA HTTP {} 에러, body={}", resp.statusCode(), truncate(errBody, 2000));
                                         return new IllegalStateException("KCISA HTTP " + resp.statusCode());
                                     })
                     )
                     .bodyToMono(String.class)
                     .timeout(Duration.ofSeconds(12))
-                    .doOnSubscribe(s -> log.debug("➡️ KCISA 호출 시작: dtype='{}', title='{}'", dtype, titleKeyword))
-                    .doOnError(ex -> log.warn("⚠️ KCISA 호출 오류: dtype={}, title={}, err={}", dtype, titleKeyword, ex.toString()))
+                    .doOnSubscribe(s -> log.debug("KCISA 호출 시작: dtype='{}', title='{}'", dtype, titleKeyword))
+                    .doOnError(ex -> log.warn("KCISA 호출 오류: dtype={}, title={}, err={}", dtype, titleKeyword, ex.toString()))
                     .onErrorResume(ex -> Mono.empty())
                     .block();
 
             if (body == null) {
-                log.warn("⚠️ KCISA 응답 바디가 null입니다. (dtype='{}', title='{}')", dtype, titleKeyword);
+                log.warn("KCISA 응답 바디 null (dtype='{}', title='{}')", dtype, titleKeyword);
                 return null;
             }
 
             ObjectMapper mapper = new ObjectMapper();
             JsonNode root = mapper.readTree(body);
 
-            // 응답 최상위 구조 요약 로그
-
-            // items.item 위치 실제 확인
             ArrayNode items = findArray(root, "response", "body", "items", "item");
             if (items == null || items.isEmpty()) {
-                log.warn("⚠️ items.item 배열을 찾지 못했거나 비어 있습니다. (dtype='{}', title='{}')", dtype, titleKeyword);
+                log.warn("items.item 없음/빈 배열 (dtype='{}', title='{}')", dtype, titleKeyword);
             } else {
-                log.info("✅ items.item 크기: {}", items.size());
+                log.info("items.item 크기: {}", items.size());
             }
             return root;
 
         } catch (Exception e) {
-            log.warn("KCISA CNV_060 call unexpected error: {}, dtype={}, title={}", e.toString(), dtype, titleKeyword);
+            log.warn("KCISA CNV_060 unexpected error: {}, dtype={}, title={}", e.toString(), dtype, titleKeyword);
             return null;
         }
     }
 
+    private JsonNode callCnV060WithFallback(String dtype, String preferredTitle, String fallbackTitle) {
+        JsonNode r = callCnV060(dtype, preferredTitle);
+        if (r != null) return r;
+        return callCnV060(dtype, fallbackTitle);
+    }
 
-    /** 여러 응답에서 data 배열만 합치기 */
     private static ArrayNode mergeAllDataArrays(List<JsonNode> roots) {
         ObjectMapper mapper = new ObjectMapper();
         ArrayNode merged = mapper.createArrayNode();
         for (JsonNode root : roots) {
-            // 실제 응답 구조: response -> body -> items -> item
             ArrayNode items = findArray(root, "response","body","items","item");
             if (items != null) {
                 for (JsonNode n : items) merged.add(n);
@@ -170,27 +157,24 @@ public class CultureOpenApiService {
         return merged;
     }
 
-
-    /** CNV_060 응답 → Item 매핑 */
+    /** KCISA 응답 → Item 매핑 */
     private CalendarResponse.Item mapNodeToItem(JsonNode n, CultureCategory reqCat) {
         String title    = text(n, "title");
-        String type     = text(n, "type");         // 분야(연극/뮤지컬/…)
-        String period   = text(n, "period", "eventPeriod"); // “yyyy.MM.dd ~ yyyy.MM.dd”
-        String eventSite= text(n, "eventSite");    // 장소
-        String image    = text(n, "imageObject");  // 썸네일 URL
-        String url      = text(n, "url");          // 상세 URL(있으면 UUID 생성 근거로 사용)
+        String type     = text(n, "type");                   // 분야
+        String period   = text(n, "period", "eventPeriod");  // yyyy.MM.dd ~ yyyy.MM.dd
+        String eventSite= text(n, "eventSite");              // 장소
+        String image    = text(n, "imageObject");            // 썸네일
+        String url      = text(n, "url");                    // 상세 URL
 
-        // period → 시작/종료일
         LocalDate[] range = parsePeriod(period);
         LocalDate s = range[0];
         LocalDate e = (range[1] != null ? range[1] : range[0]);
 
-        // 카테고리: 요청값 우선(ALL이면 응답 type 사용, 없으면 '기타')
         String categoryLabel = (reqCat != CultureCategory.ALL)
                 ? reqCat.getLabel()
                 : (isBlank(type) ? "기타" : type);
 
-        UUID id = makeStableUUID(url, title, s, eventSite); // URL 우선 안정 UUID
+        UUID id = makeStableUUID(url, title, s, eventSite);
         int dDay = (s == null) ? 0 : (int) ChronoUnit.DAYS.between(LocalDate.now(KST), s);
 
         return CalendarResponse.Item.builder()
@@ -199,10 +183,11 @@ public class CultureOpenApiService {
                 .category(categoryLabel)
                 .thumbnailUrl(blankToNull(image))
                 .venue(blankToNull(eventSite))
+//                .detailUrl(blankToNull(url))                  // ← 누락되기 쉬워 추가
                 .startDateTime(toOffset(s))
                 .endDateTime(toOffset(e))
                 .dDay(dDay)
-                .bookmarked(false) // 북마크는 별도 주입
+                .bookmarked(false)
                 .build();
     }
 
@@ -237,7 +222,6 @@ public class CultureOpenApiService {
         return (d == null) ? null : d.atStartOfDay().atOffset(ZoneOffset.ofHours(9));
     }
 
-    /** “yyyy.MM.dd ~ yyyy.MM.dd” / “yyyy-MM-dd ~ yyyy-MM-dd” / “yyyyMMdd~yyyyMMdd” 등 파싱 */
     private static LocalDate[] parsePeriod(String raw) {
         if (raw == null) return new LocalDate[]{null, null};
         String norm = raw.replace(" ", "")
@@ -252,9 +236,9 @@ public class CultureOpenApiService {
     private static LocalDate parseDateFlexible(String r) {
         if (r == null) return null;
         List<DateTimeFormatter> fmts = List.of(
-                DateTimeFormatter.ISO_LOCAL_DATE,          // yyyy-MM-dd
-                DateTimeFormatter.BASIC_ISO_DATE,          // yyyyMMdd
-                DateTimeFormatter.ofPattern("yyyy-MM")     // yyyy-MM (1일로 파싱)
+                DateTimeFormatter.ISO_LOCAL_DATE,
+                DateTimeFormatter.BASIC_ISO_DATE,
+                DateTimeFormatter.ofPattern("yyyy-MM")
         );
         for (DateTimeFormatter f : fmts) {
             try { return LocalDate.parse(r, f); } catch (Exception ignore) {}
@@ -270,12 +254,5 @@ public class CultureOpenApiService {
         String basis = !isBlank(url) ? "kcisa:"+url
                 : (defaultIfBlank(title,"") + "|" + (s!=null?s:"") + "|" + defaultIfBlank(place,""));
         return UUID.nameUUIDFromBytes(basis.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private JsonNode callCnV060WithFallback(String dtype, String preferredTitle, String fallbackTitle) {
-        JsonNode r = callCnV060(dtype, preferredTitle);
-        if (r != null) return r;
-        // 첫 호출 실패(403, 5xx, timeout 등) 시 폴백
-        return callCnV060(dtype, fallbackTitle);
     }
 }

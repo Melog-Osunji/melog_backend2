@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -19,7 +20,7 @@ public class CalendarResponse {
     private Meta meta;
     private Calendar calendar;
     private List<Item> schedule;
-    private List<Item> items;
+//    private List<Item> items;
 
 
     @Getter
@@ -59,7 +60,10 @@ public class CalendarResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
-    public static class Item {
+    public static class Item implements Serializable {
+
+        private static final long serialVersionUID = 1L;
+
         private UUID id;
         private String title;
         private String category;
