@@ -22,36 +22,36 @@ import java.time.Instant;
 import java.util.Objects;
 
 @Component
-public class GoogleOidcUtil {
+public class NaverOidcUtil {
 
-    private static final Logger log = LoggerFactory.getLogger(GoogleOidcUtil.class);
+    private static final Logger log = LoggerFactory.getLogger(NaverOidcUtil.class);
 
-    private final String googleIssuer;
-    private final String googleClientId;
-    private final JWKSource<SecurityContext> googleJwkSource;
-    private final ConfigurableJWTProcessor<SecurityContext> googleJwtProcessor;
+    private final String naverIssuer;
+    private final String naverClientId;
+    private final JWKSource<SecurityContext> naverJwkSource;
+    private final ConfigurableJWTProcessor<SecurityContext> naverJwtProcessor;
 
-    public GoogleOidcUtil(
-            @Qualifier("googleJwkSource") JWKSource<SecurityContext> googleJwkSource,
-            @Value("${oidc.providers.google.issuer}") String googleIssuer,
-            @Value("${oidc.providers.google.client-id}") String googleClientId
+    public NaverOidcUtil(
+            @Qualifier("naverJwkSource") JWKSource<SecurityContext> naverJwkSource,
+            @Value("${oidc.providers.naver.issuer}") String naverIssuer,
+            @Value("${oidc.providers.naver.client-id}") String naverClientId
     ) {
-        this.googleIssuer = googleIssuer;
-        this.googleClientId = googleClientId;
-        this.googleJwkSource = googleJwkSource;
+        this.naverIssuer = naverIssuer;
+        this.naverClientId = naverClientId;
+        this.naverJwkSource = naverJwkSource;
 
-        log.info("🔧 Initializing googleOidcUtil with issuer={}, clientId={}", googleIssuer, googleClientId);
+        log.info("🔧 Initializing naverOidcUtil with issuer={}, clientId={}", naverIssuer, naverClientId);
 
         // Nimbus Processor 1회 구성 후 재사용
         var proc = new DefaultJWTProcessor<SecurityContext>();
-        proc.setJWSKeySelector(new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, googleJwkSource));
-        this.googleJwtProcessor = proc;
+        proc.setJWSKeySelector(new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, naverJwkSource));
+        this.naverJwtProcessor = proc;
     }
 
-    public JWTClaimsSet verifyGoogleIdToken(String idToken)
+    public JWTClaimsSet verifyNaverIdToken(String idToken)
             throws ParseException, JOSEException, BadJOSEException {
 
-        log.debug("🟡 Start verifying google ID Token...");
+        log.debug("🟡 Start verifying naver ID Token...");
 
         var header = SignedJWT.parse(idToken).getHeader();
         log.debug("🧩 Parsed JWT header: alg={}, kid={}", header.getAlgorithm(), header.getKeyID());
@@ -67,16 +67,16 @@ public class GoogleOidcUtil {
 
         log.debug("✅ Header validation passed. Processing JWT with Nimbus...");
 
-        JWTClaimsSet claims = googleJwtProcessor.process(idToken, null);
+        JWTClaimsSet claims = naverJwtProcessor.process(idToken, null);
         log.info("✅ Successfully processed JWT. Subject={}", claims.getSubject());
 
         // 표준 OIDC 수동 검증
-        if (!Objects.equals(googleIssuer, claims.getIssuer())) {
+        if (!Objects.equals(naverIssuer, claims.getIssuer())) {
             log.error("❌ Invalid issuer: {}", claims.getIssuer());
             throw new BadJWTException("Invalid iss");
         }
         var aud = claims.getAudience();
-        if (aud == null || aud.stream().noneMatch(googleClientId::equals)) {
+        if (aud == null || aud.stream().noneMatch(naverClientId::equals)) {
             log.error("❌ Invalid audience: {}", aud);
             throw new BadJWTException("Invalid aud");
         }
@@ -89,7 +89,7 @@ public class GoogleOidcUtil {
         }
 
         var azp = (String) claims.getClaim("azp");
-        if (azp != null && !googleClientId.equals(azp)) {
+        if (azp != null && !naverClientId.equals(azp)) {
             log.error("❌ Invalid azp: {}", azp);
             throw new BadJWTException("Invalid azp");
         }

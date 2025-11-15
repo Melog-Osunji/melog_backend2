@@ -32,11 +32,67 @@ public class AuthController {
     }
 
     @PostMapping("/login/kakao")
-    public ResponseEntity<?> callback(@RequestBody OauthLoginRequestDTO request)
+    public ResponseEntity<?> callbackKakao(@RequestBody OauthLoginRequestDTO request)
             throws BadJOSEException, ParseException, JOSEException {
 
         // 1) OIDC 처리
         LoginResponseDTO loginResponse = authService.upsertUserFromKakaoIdToken(request);
+
+        // 2) JWT 발급
+        RefreshResult refreshResult = authService.issueJwtForUser(loginResponse.getUser().getId());
+
+        // 3) RefreshToken 쿠키 생성
+        ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", refreshResult.refreshToken())
+                .httpOnly(true)   // JS 접근 불가 (보안 필수)
+                .secure(true)     // HTTPS에서만 전송
+                .path("/")        // 모든 경로에서 유효
+                .maxAge(refreshResult.refreshTtlSeconds()) // TTL 설정
+                .sameSite("Strict") // CSRF 방지
+                .build();
+
+        // 4) 헤더 + 쿠키 설정 후 응답
+        return ResponseEntity.ok()
+                .header("Authorization", "Bearer " + refreshResult.accessToken())   // accessToken 헤더
+                .header("X-Refresh-Token", refreshResult.refreshToken())            // refreshToken 헤더
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())           // refreshToken 쿠키
+                .header("X-Refresh-TTL", String.valueOf(refreshResult.refreshTtlSeconds())) // 선택: TTL
+                .body(loginResponse);
+    }
+
+    @PostMapping("/login/google")
+    public ResponseEntity<?> callbackGoogle(@RequestBody OauthLoginRequestDTO request)
+            throws BadJOSEException, ParseException, JOSEException {
+
+        // 1) OIDC 처리
+        LoginResponseDTO loginResponse = authService.upsertUserFromGoogleIdToken(request);
+
+        // 2) JWT 발급
+        RefreshResult refreshResult = authService.issueJwtForUser(loginResponse.getUser().getId());
+
+        // 3) RefreshToken 쿠키 생성
+        ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", refreshResult.refreshToken())
+                .httpOnly(true)   // JS 접근 불가 (보안 필수)
+                .secure(true)     // HTTPS에서만 전송
+                .path("/")        // 모든 경로에서 유효
+                .maxAge(refreshResult.refreshTtlSeconds()) // TTL 설정
+                .sameSite("Strict") // CSRF 방지
+                .build();
+
+        // 4) 헤더 + 쿠키 설정 후 응답
+        return ResponseEntity.ok()
+                .header("Authorization", "Bearer " + refreshResult.accessToken())   // accessToken 헤더
+                .header("X-Refresh-Token", refreshResult.refreshToken())            // refreshToken 헤더
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())           // refreshToken 쿠키
+                .header("X-Refresh-TTL", String.valueOf(refreshResult.refreshTtlSeconds())) // 선택: TTL
+                .body(loginResponse);
+    }
+
+    @PostMapping("/login/naver")
+    public ResponseEntity<?> callbackNaver(@RequestBody OauthLoginRequestDTO request)
+            throws BadJOSEException, ParseException, JOSEException {
+
+        // 1) OIDC 처리
+        LoginResponseDTO loginResponse = authService.upsertUserFromNaverIdToken(request);
 
         // 2) JWT 발급
         RefreshResult refreshResult = authService.issueJwtForUser(loginResponse.getUser().getId());
