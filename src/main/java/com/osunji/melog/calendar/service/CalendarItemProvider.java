@@ -1,6 +1,5 @@
 package com.osunji.melog.calendar.service;
 
-
 import com.osunji.melog.calendar.CultureCategory;
 import com.osunji.melog.calendar.domain.Calendar;
 import com.osunji.melog.calendar.dto.CalendarResponse;
@@ -15,7 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.time.*;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -34,20 +36,23 @@ public class CalendarItemProvider {
 
     /**
      * 메인 진입점
-     * 1) 캐시 → 2) DB → 3) OpenAPI + DB insert → 다시 DB → 캐시 채움
+     * 1) 캐시(RedisItem) → 2) DB → 3) OpenAPI + DB insert → 다시 DB → 캐시 채움
      */
     @Transactional
     public List<CalendarResponse.Item> getItems(CultureCategory category) {
         String cacheKey = category.name();
 
-        // 1) 캐시 조회
+        // 1) 캐시 조회 (RedisItem 기준)
         Cache cache = cacheManager.getCache(CACHE_NAME);
         if (cache != null) {
             @SuppressWarnings("unchecked")
-            List<CalendarResponse.Item> cached = cache.get(cacheKey, List.class);
+            List<CalendarResponse.RedisItem> cached = cache.get(cacheKey, List.class);
             if (cached != null && !cached.isEmpty()) {
-                log.debug("[CalendarItemProvider] cache hit: category={}", category);
-                return cached;
+                log.debug("[CalendarItemProvider] cache hit: category={}, size={}", category, cached.size());
+                // RedisItem → 응답용 Item 변환
+                return cached.stream()
+                        .map(this::fromRedisItem)
+                        .toList();
             }
         }
 
@@ -63,11 +68,19 @@ public class CalendarItemProvider {
 
         if (!fromDb.isEmpty()) {
             log.debug("[CalendarItemProvider] db hit: category={}, size={}", category, fromDb.size());
-            List<CalendarResponse.Item> dto = fromDb.stream()
-                    .map(this::toDto)
-                    .collect(Collectors.toList());
-            putCacheAfterCommit(cache, cacheKey, dto);
-            return dto;
+
+            // Calendar → Item
+            List<CalendarResponse.Item> items = fromDb.stream()
+                    .map(this::toItemDto)
+                    .toList();
+
+            // Item → RedisItem 변환 후 캐시 저장
+            List<CalendarResponse.RedisItem> redisItems = items.stream()
+                    .map(this::toRedisItem)
+                    .toList();
+
+            putCacheAfterCommit(cache, cacheKey, redisItems);
+            return items;
         }
 
         // 3) DB에도 없으면 → OpenAPI 호출
@@ -87,12 +100,17 @@ public class CalendarItemProvider {
                 today,
                 PageRequest.of(0, 20)
         );
-        List<CalendarResponse.Item> dto = afterUpsert.stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
 
-        putCacheAfterCommit(cache, cacheKey, dto);
-        return dto;
+        List<CalendarResponse.Item> items = afterUpsert.stream()
+                .map(this::toItemDto)
+                .toList();
+
+        List<CalendarResponse.RedisItem> redisItems = items.stream()
+                .map(this::toRedisItem)
+                .toList();
+
+        putCacheAfterCommit(cache, cacheKey, redisItems);
+        return items;
     }
 
     /**
@@ -151,9 +169,9 @@ public class CalendarItemProvider {
     }
 
     /**
-     * Calendar 엔티티 → CalendarResponse.Item 변환
+     * Calendar 엔티티 → 응답용 Item 변환
      */
-    private CalendarResponse.Item toDto(Calendar c) {
+    private CalendarResponse.Item toItemDto(Calendar c) {
         LocalDate start = c.getStartDate();
         LocalDate end   = (c.getEndDate() != null ? c.getEndDate() : c.getStartDate());
 
@@ -186,27 +204,64 @@ public class CalendarItemProvider {
                 .endDateTime(endOd)
                 .dDay(dDay)
                 .bookmarked(false)
+                .eventId(null)
                 .build();
     }
 
     /**
-     * 트랜잭션 커밋 이후에만 캐시에 값 넣기
+     * RedisItem → 응답용 Item 변환
+     * (eventId는 Redis에 없으니 여기서는 null)
      */
-    private void putCacheAfterCommit(Cache cache, String cacheKey, List<CalendarResponse.Item> dto) {
+    private CalendarResponse.Item fromRedisItem(CalendarResponse.RedisItem r) {
+        return CalendarResponse.Item.builder()
+                .id(r.getId())
+                .title(r.getTitle())
+                .category(r.getCategory())
+                .thumbnailUrl(r.getThumbnailUrl())
+                .venue(r.getVenue())
+                .startDateTime(r.getStartDateTime())
+                .endDateTime(r.getEndDateTime())
+                .dDay(r.getDDay())
+                .bookmarked(r.isBookmarked())
+                .eventId(null)
+                .build();
+    }
+
+    /**
+     * 응답용 Item → 캐시용 RedisItem 변환
+     */
+    private CalendarResponse.RedisItem toRedisItem(CalendarResponse.Item i) {
+        return CalendarResponse.RedisItem.builder()
+                .id(i.getId())
+                .title(i.getTitle())
+                .category(i.getCategory())
+                .thumbnailUrl(i.getThumbnailUrl())
+                .venue(i.getVenue())
+                .startDateTime(i.getStartDateTime())
+                .endDateTime(i.getEndDateTime())
+                .dDay(i.getDDay())
+                .bookmarked(i.isBookmarked())
+                .build();
+    }
+
+    /**
+     * 트랜잭션 커밋 이후에만 캐시에 값 넣기 (RedisItem 리스트)
+     */
+    private void putCacheAfterCommit(Cache cache, String cacheKey, List<CalendarResponse.RedisItem> redisItems) {
         if (cache == null) return;
-        if (dto == null || dto.isEmpty()) return;
+        if (redisItems == null || redisItems.isEmpty()) return;
 
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    cache.put(cacheKey, dto);
-                    log.debug("[CalendarItemProvider] cache put after commit: key={}, size={}", cacheKey, dto.size());
+                    cache.put(cacheKey, redisItems);
+                    log.debug("[CalendarItemProvider] cache put after commit: key={}, size={}", cacheKey, redisItems.size());
                 }
             });
         } else {
-            cache.put(cacheKey, dto);
-            log.debug("[CalendarItemProvider] cache put (no tx): key={}, size={}", cacheKey, dto.size());
+            cache.put(cacheKey, redisItems);
+            log.debug("[CalendarItemProvider] cache put (no tx): key={}, size={}", cacheKey, redisItems.size());
         }
     }
 }
