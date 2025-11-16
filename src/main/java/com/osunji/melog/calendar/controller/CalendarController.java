@@ -51,7 +51,10 @@ public class CalendarController {
 
     // 외부 공연 아이템 조회
     @GetMapping("/items")
-    public ResponseEntity<?> getItems(@RequestParam String category) {
+    public ResponseEntity<?> getItems(@RequestParam String category,
+                @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+
+                                      ) {
         log.debug("🎭 [GET /api/calendar/items] called with category='{}'", category);
 
         CultureCategory cat = parseCategory(category);
@@ -63,7 +66,7 @@ public class CalendarController {
         }
 
         log.debug("🔍 CultureOpenWebClient.fetchItems() 호출 시작: category={}", cat);
-        List<CalendarResponse.Item> items = calendarItemProvider.getItems(cat);
+        List<CalendarResponse.Item> items = calendarItemProvider.getItems(cat, userId);
         log.debug("✅ fetchItems() 완료: count={}", items.size());
 
         // 응답 아이템의 category 필수 검사
