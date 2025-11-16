@@ -2,7 +2,9 @@ package com.osunji.melog.calendar.repository;
 
 
 import com.osunji.melog.calendar.domain.EventSchedule;
+import io.lettuce.core.dynamic.annotation.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,6 +25,18 @@ public interface EventScheduleRepository extends JpaRepository<EventSchedule, UU
 
     // 필요 시 캘린더별 기간 조회
     List<EventSchedule> findByUser_IdAndCalendar_IdAndEventDateBetween(UUID userId, UUID calendarId, LocalDate from, LocalDate to);
+
+    @Query("""
+        SELECT es
+        FROM EventSchedule es
+        JOIN FETCH es.calendar c
+        WHERE es.user.id = :userId
+          AND c.id IN :calendarIds
+        """)
+    List<EventSchedule> findByUser_IdAndCalendar_IdIn(
+            @Param("userId") UUID userId,
+            @Param("calendarIds") List<UUID> calendarIds
+    );
 }
 
 

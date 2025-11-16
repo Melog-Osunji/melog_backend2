@@ -2,13 +2,16 @@ package com.osunji.melog.calendar.service;
 
 import com.osunji.melog.calendar.CultureCategory;
 import com.osunji.melog.calendar.domain.Calendar;
+import com.osunji.melog.calendar.domain.EventSchedule;
 import com.osunji.melog.calendar.dto.CalendarResponse;
 import com.osunji.melog.calendar.repository.CalendarRepository;
+import com.osunji.melog.calendar.repository.EventScheduleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -29,6 +32,7 @@ public class CalendarItemProvider {
 
     private final CultureOpenApiClient openApiClient;   // KCISA OpenAPI 호출 전담
     private final CalendarRepository calendarRepository;
+    private final EventScheduleRepository eventScheduleRepository;
     private final CacheManager cacheManager;
 
     private static final String CACHE_NAME = "kcisa:items";
@@ -36,23 +40,31 @@ public class CalendarItemProvider {
 
     /**
      * 메인 진입점
-     * 1) 캐시(RedisItem) → 2) DB → 3) OpenAPI + DB insert → 다시 DB → 캐시 채움
+     * 1) 캐시(RedisItem - 전역 공용) → 2) DB → 3) OpenAPI + DB insert → 다시 DB → 캐시 채움
+     * userId가 주어지면, 해당 유저가 저장한 일정 기준으로
+     *  - bookmarked = true
+     *  - eventId = EventSchedule.id
+     * 를 채워서 반환한다.
      */
     @Transactional
-    public List<CalendarResponse.Item> getItems(CultureCategory category) {
+    public List<CalendarResponse.Item> getItems(CultureCategory category, @Nullable UUID userId) {
         String cacheKey = category.name();
 
-        // 1) 캐시 조회 (RedisItem 기준)
+        // 1) 캐시 조회 (RedisItem 기준, 유저와 무관한 전역 캐시)
         Cache cache = cacheManager.getCache(CACHE_NAME);
         if (cache != null) {
             @SuppressWarnings("unchecked")
             List<CalendarResponse.RedisItem> cached = cache.get(cacheKey, List.class);
             if (cached != null && !cached.isEmpty()) {
                 log.debug("[CalendarItemProvider] cache hit: category={}, size={}", category, cached.size());
-                // RedisItem → 응답용 Item 변환
-                return cached.stream()
+
+                // RedisItem → 기본 Item 리스트 (bookmarked=false, eventId=null)
+                List<CalendarResponse.Item> baseItems = cached.stream()
                         .map(this::fromRedisItem)
                         .toList();
+
+                // 유저가 있으면 bookmark/eventId 반영
+                return applyBookmarkAndEventId(baseItems, userId);
             }
         }
 
@@ -69,18 +81,19 @@ public class CalendarItemProvider {
         if (!fromDb.isEmpty()) {
             log.debug("[CalendarItemProvider] db hit: category={}, size={}", category, fromDb.size());
 
-            // Calendar → Item
-            List<CalendarResponse.Item> items = fromDb.stream()
+            // Calendar → 기본 Item 리스트
+            List<CalendarResponse.Item> baseItems = fromDb.stream()
                     .map(this::toItemDto)
                     .toList();
 
-            // Item → RedisItem 변환 후 캐시 저장
-            List<CalendarResponse.RedisItem> redisItems = items.stream()
+            // 전역 캐시에는 유저 정보 없는 RedisItem으로 저장
+            List<CalendarResponse.RedisItem> redisItems = baseItems.stream()
                     .map(this::toRedisItem)
                     .toList();
-
             putCacheAfterCommit(cache, cacheKey, redisItems);
-            return items;
+
+            // 응답에는 유저별 bookmark/eventId 반영
+            return applyBookmarkAndEventId(baseItems, userId);
         }
 
         // 3) DB에도 없으면 → OpenAPI 호출
@@ -101,16 +114,16 @@ public class CalendarItemProvider {
                 PageRequest.of(0, 20)
         );
 
-        List<CalendarResponse.Item> items = afterUpsert.stream()
+        List<CalendarResponse.Item> baseItems = afterUpsert.stream()
                 .map(this::toItemDto)
                 .toList();
 
-        List<CalendarResponse.RedisItem> redisItems = items.stream()
+        List<CalendarResponse.RedisItem> redisItems = baseItems.stream()
                 .map(this::toRedisItem)
                 .toList();
-
         putCacheAfterCommit(cache, cacheKey, redisItems);
-        return items;
+
+        return applyBookmarkAndEventId(baseItems, userId);
     }
 
     /**
@@ -169,7 +182,7 @@ public class CalendarItemProvider {
     }
 
     /**
-     * Calendar 엔티티 → 응답용 Item 변환
+     * Calendar 엔티티 → 응답용 Item 변환 (bookmarked=false, eventId=null 기준)
      */
     private CalendarResponse.Item toItemDto(Calendar c) {
         LocalDate start = c.getStartDate();
@@ -203,14 +216,13 @@ public class CalendarItemProvider {
                 .startDateTime(startOd)
                 .endDateTime(endOd)
                 .dDay(dDay)
-                .bookmarked(false)
-                .eventId(null)
+                .bookmarked(false)  // 기본값: 저장 안 한 상태
+                .eventId(null)      // 기본값: 연관 EventSchedule 없음
                 .build();
     }
 
     /**
-     * RedisItem → 응답용 Item 변환
-     * (eventId는 Redis에 없으니 여기서는 null)
+     * RedisItem → 기본 Item 변환 (bookmarked=false, eventId=null 기준)
      */
     private CalendarResponse.Item fromRedisItem(CalendarResponse.RedisItem r) {
         return CalendarResponse.Item.builder()
@@ -222,13 +234,13 @@ public class CalendarItemProvider {
                 .startDateTime(r.getStartDateTime())
                 .endDateTime(r.getEndDateTime())
                 .dDay(r.getDDay())
-                .bookmarked(r.isBookmarked())
-                .eventId(null)
+                .bookmarked(false)   // 캐시는 유저 정보가 없으니 항상 false로 두고,
+                .eventId(null)       // 아래 applyBookmarkAndEventId에서 유저 기준으로 다시 세팅
                 .build();
     }
 
     /**
-     * 응답용 Item → 캐시용 RedisItem 변환
+     * 응답용 Item → 캐시용 RedisItem 변환 (유저 정보 없는 전역 데이터)
      */
     private CalendarResponse.RedisItem toRedisItem(CalendarResponse.Item i) {
         return CalendarResponse.RedisItem.builder()
@@ -240,8 +252,67 @@ public class CalendarItemProvider {
                 .startDateTime(i.getStartDateTime())
                 .endDateTime(i.getEndDateTime())
                 .dDay(i.getDDay())
-                .bookmarked(i.isBookmarked())
+                .bookmarked(false) // 전역 캐시는 bookmark를 쓰지 않음 (항상 false)
                 .build();
+    }
+
+    /**
+     * 유저가 저장한 일정(EventSchedule) 기준으로
+     *  - bookmarked = true/false
+     *  - eventId    = EventSchedule.id
+     * 를 반영한 새 Item 리스트를 만들어 반환한다.
+     *
+     * userId == null 이면 그대로 반환.
+     */
+    private List<CalendarResponse.Item> applyBookmarkAndEventId(List<CalendarResponse.Item> baseItems,
+                                                                @Nullable UUID userId) {
+        if (userId == null || baseItems.isEmpty()) {
+            return baseItems;
+        }
+
+        // 현재 응답에 포함된 calendar id들
+        List<UUID> calendarIds = baseItems.stream()
+                .map(CalendarResponse.Item::getId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (calendarIds.isEmpty()) {
+            return baseItems;
+        }
+
+        // 해당 유저가 저장한 EventSchedule 목록 조회
+        List<EventSchedule> schedules = eventScheduleRepository
+                .findByUser_IdAndCalendar_IdIn(userId, calendarIds);
+
+        // calendar.id → EventSchedule 매핑 (여러 개일 경우 첫 번째만 사용)
+        Map<UUID, EventSchedule> scheduleByCalendarId = schedules.stream()
+                .collect(Collectors.toMap(
+                        es -> es.getCalendar().getId(),
+                        es -> es,
+                        (a, b) -> a  // 중복 시 첫 번째 유지
+                ));
+
+        // 기존 Item을 복사해서 bookmarked / eventId만 채워서 반환
+        return baseItems.stream()
+                .map(item -> {
+                    EventSchedule es = scheduleByCalendarId.get(item.getId());
+                    boolean bookmarked = (es != null);
+                    UUID eventId = (es != null ? es.getId() : null);
+
+                    return CalendarResponse.Item.builder()
+                            .id(item.getId())
+                            .title(item.getTitle())
+                            .category(item.getCategory())
+                            .thumbnailUrl(item.getThumbnailUrl())
+                            .venue(item.getVenue())
+                            .startDateTime(item.getStartDateTime())
+                            .endDateTime(item.getEndDateTime())
+                            .dDay(item.getDDay())
+                            .bookmarked(bookmarked)
+                            .eventId(eventId)
+                            .build();
+                })
+                .toList();
     }
 
     /**
