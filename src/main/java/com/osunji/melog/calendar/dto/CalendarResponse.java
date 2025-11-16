@@ -60,7 +60,28 @@ public class CalendarResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
-    public static class Item implements Serializable {
+    public static class Item {
+
+        private static final long serialVersionUID = 1L;
+
+        private UUID id;
+        private String title;
+        private String category;
+        private String thumbnailUrl;
+        private String venue; // 장소
+        private OffsetDateTime startDateTime;
+        private OffsetDateTime endDateTime;
+        private int dDay;
+        private boolean bookmarked;
+        private UUID eventId;
+    }
+
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class RedisItem implements Serializable {
 
         private static final long serialVersionUID = 1L;
 
