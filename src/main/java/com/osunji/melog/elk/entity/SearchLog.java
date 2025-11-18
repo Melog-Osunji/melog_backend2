@@ -10,6 +10,7 @@ import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Document(indexName = "search_logs")
@@ -30,7 +31,7 @@ public class SearchLog {
 	private String category;
 
 	@Field(type = FieldType.Date)
-	private LocalDateTime searchTime;
+	private Instant searchTime;
 
 	@Field(type = FieldType.Keyword)
 	private String userId;
