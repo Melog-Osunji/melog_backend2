@@ -256,8 +256,7 @@ public class HarmonyController {
 		@PathVariable String harmonyId,
 		@RequestHeader("Authorization") String authHeader) {
 		try {
-			System.out.println("🔍 하모니룸 대기 상태 확인: " + harmonyId);
-
+			log.info("🔍 하모니룸 대기 상태 확인: " , harmonyId);
 			HarmonyRoomResponse.IsWaiting response = harmonyService.isWaitingUser(harmonyId, authHeader);
 
 			return ResponseEntity.ok(ApiMessage.success(200, "대기 상태 조회 완료", response));
