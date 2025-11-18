@@ -1,68 +1,74 @@
 package com.osunji.melog.feed.service;
 
 import co.elastic.clients.elasticsearch._types.Time;
+import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.query_dsl.*;
-import com.osunji.melog.elk.entity.PostIndex;
 import com.osunji.melog.feed.view.FeedItem;
-import lombok.AllArgsConstructor;
+import com.osunji.melog.review.entity.Post;
+import com.osunji.melog.review.repository.PostRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
+import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.document.Document;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
-// ==== Elasticsearch Java API v8 (co.elastic.clients) – 쿼리/빌더는 전부 이 패키지로! ====
-import co.elastic.clients.elasticsearch._types.FieldValue;
-
+@Slf4j
 @Service
 public class FeedService {
+
     private static final String POSTS_INDEX = "posts";
 
     private final ElasticsearchOperations esOps;
     private final UserSignalService signalService;
+    private final PostRepository postRepository;
 
-    // 가중치/스케일 설정
-    private final Double tag;         // function weight
-    private final Double followee;    // function weight
-    private final String scale;       // ← 데케이 스케일은 "7d" 같은 문자열!
+    private final Double tag;       // function weight
+    private final Double followee;  // function weight
+    private final String scale;     // "7d" 같은 문자열
 
     public FeedService(
             ElasticsearchOperations esOps,
             UserSignalService signalService,
+            PostRepository postRepository,
             @Value("${recommend.boost.tag}") Double tag,
-            @Value("${recommend.boost.followee}") Double followee,  // ← 키 수정!
-            @Value("${recommend.fresh.scale}") String scale         // ← 타입: String ("7d" 등)
+            @Value("${recommend.boost.followee}") Double followee,
+            @Value("${recommend.fresh.scale}") String scale
     ) {
         this.esOps = esOps;
         this.signalService = signalService;
+        this.postRepository = postRepository;
         this.tag = tag;
         this.followee = followee;
         this.scale = scale;
     }
 
     public List<FeedItem> recommend(UUID userId, int size, List<String> seenIds) {
+
+        // 0) 유저 시그널 (태그/팔로잉) 수집
         var sig       = signalService.build(userId);
         var tags      = sig.getTopTags();
         var followees = sig.getFolloweeIds();
 
-        // 1) 베이스 쿼리
-        Query baseQuery =
-                (tags != null && !tags.isEmpty())
-                        ? MultiMatchQuery.of(m -> m
-                        .query(String.join(" ", tags))
-                        .fields("title^3", "content")
-                )._toQuery()
-                        : MatchAllQuery.of(m -> m)._toQuery();
+        log.debug("[FeedService] recommend start: userId={}, size={}, seenIdsSize={}",
+                userId, size, seenIds != null ? seenIds.size() : 0);
+        log.debug("[FeedService] user signals: tags={}, followees={}", tags, followees);
 
-        // 2) function_score functions
+        // 1) 베이스 쿼리: 추천이므로 일단 전체 문서 대상
+        Query baseQuery = MatchAllQuery.of(m -> m)._toQuery();
+
+        // 2) function_score functions 구성
         var functions = new ArrayList<FunctionScore>();
 
-        // 태그 부스팅
+        // 2-1) 태그 부스팅 (필요시 "tags.keyword" 로 변경)
         if (tags != null && !tags.isEmpty()) {
             Query tagsFilter = TermsQuery.of(t -> t
                     .field("tags")
@@ -75,7 +81,7 @@ public class FeedService {
             ));
         }
 
-        // 팔로잉 부스팅
+        // 2-2) 팔로잉 부스팅
         if (followees != null && !followees.isEmpty()) {
             Query followeesFilter = TermsQuery.of(t -> t
                     .field("userId")
@@ -88,20 +94,19 @@ public class FeedService {
             ));
         }
 
-// 신선도(작성시각) 가우시안 데케이
+        // 2-3) 신선도(작성 시각) 가우시안 데케이
         functions.add(FunctionScore.of(fs -> fs.gauss(g -> g
-                .date(d -> d                               // ← DecayFunction.Builder → date(...)
-                        .field("createdAt")                    // ← DateDecayFunction.Builder.field(...)
-                        .placement(p -> p                      // ← DateDecayFunction.Builder.placement(...)
-                                .origin("now")                     // origin: String
-                                .scale(Time.of(t -> t.time(scale)))// scale: Time (예: scale="7d")
-                                // .offset(Time.of(t -> t.time("0d")))
+                .date(d -> d
+                        .field("createdAt")
+                        .placement(p -> p
+                                .origin("now")
+                                .scale(Time.of(t -> t.time(scale))) // 예: "7d"
                                 .decay(0.5)
                         )
                 )
         )));
 
-        // 인기(좋아요 수) 가산
+        // 2-4) 인기(좋아요 수) 가중치
         functions.add(FunctionScore.of(fs -> fs
                 .fieldValueFactor(fvf -> fvf
                         .field("likeCount")
@@ -119,91 +124,155 @@ public class FeedService {
                 .boostMode(FunctionBoostMode.Sum)
         )._toQuery();
 
-        // 4) 실행
+        // 4) ES 검색 실행
+        int maxResults = Math.max(size * 5, 100);
         NativeQuery nq = new NativeQueryBuilder()
                 .withQuery(functionScore)
-                .withMaxResults(Math.max(size * 5, 100))  // 1차 후보 넉넉히
+                .withMaxResults(maxResults)
                 .build();
 
-        var hits = esOps.search(nq, PostIndex.class, IndexCoordinates.of(POSTS_INDEX))
-                .getSearchHits();
+        log.debug("[FeedService] executing ES search: index={}, maxResults={}", POSTS_INDEX, maxResults);
 
-        // 5) 서버단 정제: seenIds 제거 + 다양화
-        var dedup = new HashMap<String, Pair>();
-        for (SearchHit<PostIndex> h : hits) {
-            var p = h.getContent();
-            if (p == null) continue;
-            if (seenIds != null && seenIds.contains(p.getId())) continue;
-            dedup.putIfAbsent(p.getId(), new Pair(p, h.getScore()));
+        SearchHits<Document> hits = esOps.search(nq, Document.class, IndexCoordinates.of(POSTS_INDEX));
+
+        log.debug("[FeedService] ES search done. totalHits={}", hits.getTotalHits());
+        for (SearchHit<Document> hit : hits) {
+            log.debug("[FeedService] ES hit: id={}, score={}", hit.getId(), hit.getScore());
         }
 
-        var ranked = dedup.values().stream()
-                .sorted(Comparator.comparingDouble((Pair p) -> p.score).reversed())
-                .limit((long) size * 3)
+        // 5) id + score만 뽑기 (seenIds 제외, 중복 제거)
+        Set<String> seen = seenIds != null ? new HashSet<>(seenIds) : Set.of();
+        LinkedHashMap<String, Float> idToScore = new LinkedHashMap<>();
+
+        for (SearchHit<Document> hit : hits) {
+            String id = hit.getId();
+            if (id == null) continue;
+            if (seen.contains(id)) {
+                log.debug("[FeedService] skip hit(id={}): already seen", id);
+                continue;
+            }
+            if (idToScore.containsKey(id)) continue;
+            idToScore.put(id, hit.getScore());
+        }
+
+        log.debug("[FeedService] candidates after seen-filter: size={}", idToScore.size());
+
+        if (idToScore.isEmpty()) {
+            log.debug("[FeedService] no candidates, return empty list.");
+            return List.of();
+        }
+
+        // 6) DB에서 Post 조회
+        int candidateSize = Math.max(size * 3, 30);
+        List<String> candidateIds = idToScore.keySet().stream()
+                .limit(candidateSize)
                 .toList();
 
-        var diversified = diversify(ranked, size,
-                pair -> pair.post.getUserId(),            // 동일 작성자 제한
-                pair -> firstOrNull(pair.post.getTags())  // 대표 태그 제한
+        List<UUID> uuidList = candidateIds.stream()
+                .map(UUID::fromString)
+                .toList();
+
+        List<Post> posts = postRepository.findAllById(uuidList);
+        log.debug("[FeedService] loaded posts from DB: requestedIds={}, loadedSize={}",
+                candidateIds.size(), posts.size());
+
+        Map<UUID, Post> postMap = posts.stream()
+                .collect(Collectors.toMap(Post::getId, p -> p));
+
+        List<Post> ranked = candidateIds.stream()
+                .map(id -> postMap.get(UUID.fromString(id)))
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparingDouble(
+                        (Post p) -> Optional.ofNullable(idToScore.get(p.getId().toString())).orElse(0f)
+                ).reversed())
+                .toList();
+
+        log.debug("[FeedService] ranked posts size={}", ranked.size());
+
+        // 7) 다양화 적용
+        List<Post> diversified = diversify(
+                ranked,
+                size,
+                p -> p.getUser().getId().toString(),
+                this::firstTagOrNull
         );
 
-        return diversified.stream().map(p -> FeedItem.builder()
-                .id(p.post.getId())
-                .title(p.post.getTitle())
-                .excerpt(snippet(p.post.getContent()))
-                .tags(p.post.getTags())
-                .authorId(p.post.getUserId())
-                .likeCount(p.post.getLikeCount())
-                .createdAt(p.post.getCreatedAt())
-                .score(p.score)
-                .build()
-        ).collect(Collectors.toList());
+        log.debug("[FeedService] diversified result size={}", diversified.size());
+
+        // 8) 최종 매핑
+        List<FeedItem> result = diversified.stream()
+                .map(p -> {
+                    Float score = idToScore.getOrDefault(p.getId().toString(), 0f);
+                    return FeedItem.builder()
+                            .id(p.getId().toString())
+                            .title(p.getTitle())
+                            .excerpt(snippet(p.getContent()))
+                            .tags(extractTagNames(p))
+                            .authorId(p.getUser().getId().toString())
+                            .likeCount(p.getLikeCount())
+                            .createdAt(p.getCreatedAt())
+                            .score(score.doubleValue())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        log.debug("[FeedService] recommend end: final size={}", result.size());
+        return result;
     }
 
     // ===== helpers =====
+
     private static String snippet(String s) {
         if (s == null) return "";
         return s.length() <= 140 ? s : s.substring(0, 140) + "…";
     }
 
-    private static String firstOrNull(List<String> xs) {
-        return (xs == null || xs.isEmpty()) ? null : xs.get(0);
+    private String firstTagOrNull(Post post) {
+        List<String> tags = extractTagNames(post);
+        if (tags == null || tags.isEmpty()) return null;
+        return tags.get(0);
+    }
+
+    private List<String> extractTagNames(Post post) {
+        return post.getTags(); // Post.getTags() 가 List<String> 이라고 가정
     }
 
     @SafeVarargs
-    private static List<Pair> diversify(List<Pair> sorted, int size,
-                                        java.util.function.Function<Pair, String>... keys) {
+    private static <T> List<T> diversify(List<T> sorted, int size,
+                                         Function<T, String>... keys) {
+
         var counts = new ArrayList<HashMap<String, Integer>>();
         for (int i = 0; i < keys.length; i++) counts.add(new HashMap<>());
 
-        var out = new ArrayList<Pair>();
-        for (var s : sorted) {
+        var out = new ArrayList<T>();
+
+        for (T item : sorted) {
             boolean ok = true;
+
             for (int i = 0; i < keys.length; i++) {
-                var key = keys[i].apply(s);
+                String key = keys[i].apply(item);
                 if (key == null) continue;
-                if (counts.get(i).getOrDefault(key, 0) >= 2) { ok = false; break; } // 키별 최대 2개
+                if (counts.get(i).getOrDefault(key, 0) >= 2) {
+                    ok = false;
+                    break;
+                }
             }
+
             if (ok) {
-                out.add(s);
+                out.add(item);
                 for (int i = 0; i < keys.length; i++) {
-                    var key = keys[i].apply(s);
+                    String key = keys[i].apply(item);
                     if (key != null) counts.get(i).merge(key, 1, Integer::sum);
                 }
             }
             if (out.size() >= size) break;
         }
+
         int idx = 0;
         while (out.size() < size && idx < sorted.size()) {
-            var s2 = sorted.get(idx++);
+            T s2 = sorted.get(idx++);
             if (!out.contains(s2)) out.add(s2);
         }
         return out;
-    }
-
-    @AllArgsConstructor
-    private static class Pair {
-        PostIndex post;
-        double score;
     }
 }

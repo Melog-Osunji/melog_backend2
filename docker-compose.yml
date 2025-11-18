@@ -98,6 +98,9 @@ services:
     depends_on:
       setup:
         condition: service_healthy
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: docker.elastic.co/elasticsearch/elasticsearch:8.18.4
     labels:
       co.elastic.logs/module: elasticsearch

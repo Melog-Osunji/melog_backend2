@@ -8,6 +8,9 @@ import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 import java.io.InputStream;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Component
 public class SearchPresetLoader {
 	private final ObjectMapper om = new ObjectMapper();
@@ -21,31 +24,31 @@ public class SearchPresetLoader {
 
 	@PostConstruct
 	public void load() {
-		System.out.println("📂 검색 사전 데이터 로딩 시작...");
+		log.info("📂 검색 사전 데이터 로딩 시작...");
 
 		try {
 			composer = read("search/composer.json");
-			System.out.println("✅ composer.json 로드 완료");
+			log.info("✅ composer.json 로드 완료");
 
 			player = read("search/player.json");
-			System.out.println("✅ player.json 로드 완료");
+			log.info("✅ player.json 로드 완료");
 
 			genre = read("search/genre.json");
-			System.out.println("✅ genre.json 로드 완료");
+			log.info("✅ genre.json 로드 완료");
 
 			period = read("search/period.json");
-			System.out.println("✅ period.json 로드 완료");
+			log.info("✅ period.json 로드 완료");
 
 			instrument = read("search/instrument.json");
-			System.out.println("✅ instrument.json 로드 완료");
+			log.info("✅ instrument.json 로드 완료");
 
 			recommendSeed = readOptional("search/recommend_keywords.json");
-			System.out.println("✅ recommend_keywords.json 로드 완료");
+			log.info("✅ recommend_keywords.json 로드 완료");
 
-			System.out.println("🎉 모든 검색 사전 데이터 로딩 완료!");
+			log.info("🎉 모든 검색 사전 데이터 로딩 완료!");
 
 		} catch (Exception e) {
-			System.out.println("❌ 사전 데이터 로딩 실패: " + e.getMessage());
+			log.error("❌ 사전 데이터 로딩 실패: {}", e.getMessage(), e);
 			throw e;
 		}
 	}
@@ -53,10 +56,10 @@ public class SearchPresetLoader {
 	private JsonNode read(String path) {
 		try (InputStream is = new ClassPathResource(path).getInputStream()) {
 			JsonNode node = om.readTree(is);
-			System.out.println("  - " + path + " 파일 크기: " + node.size());
+			log.info("  - {} 파일 크기: {}", path, node.size());
 			return node;
 		} catch (Exception e) {
-			System.out.println("❌ 파일 읽기 실패: " + path);
+			log.error("❌ 파일 읽기 실패: {}", path, e);
 			throw new IllegalStateException("Preset load failed: " + path, e);
 		}
 	}
@@ -64,10 +67,10 @@ public class SearchPresetLoader {
 	private JsonNode readOptional(String path) {
 		try (InputStream is = new ClassPathResource(path).getInputStream()) {
 			JsonNode node = om.readTree(is);
-			System.out.println("  - " + path + " (선택사항) 로드 성공");
+			log.info("  - {} (선택사항) 로드 성공", path);
 			return node;
 		} catch (Exception e) {
-			System.out.println("  - " + path + " (선택사항) 파일 없음 - 빈 객체 반환");
+			log.warn("  - {} (선택사항) 파일 없음 - 빈 객체 반환", path);
 			return om.createObjectNode();
 		}
 	}
@@ -78,25 +81,24 @@ public class SearchPresetLoader {
 	public JsonNode genre() { return genre; }
 	public JsonNode period() { return period; }
 	public JsonNode instrument() { return instrument; }
-
 	public List<String> recommendSeed() {
 		if (recommendSeed.has("recommendKeyword")) {
 			List<String> seeds = new ObjectMapper().convertValue(recommendSeed.get("recommendKeyword"), List.class);
-			System.out.println("📝 추천 키워드 시드 수: " + seeds.size());
+			log.info("📝 추천 키워드 시드 수: {}", seeds.size());
 			return seeds;
 		}
-		System.out.println("📝 추천 키워드 시드 없음 - 빈 리스트 반환");
+		log.info("📝 추천 키워드 시드 없음 - 빈 리스트 반환");
 		return List.of();
 	}
 
-	// ✅ 디버깅용 메서드 추가
+	// 디버깅용 출력 메서드
 	public void printLoadedData() {
-		System.out.println("=== 로드된 검색 사전 데이터 ===");
-		System.out.println("작곡가: " + (composer != null ? composer.size() + "개" : "없음"));
-		System.out.println("연주가: " + (player != null ? player.size() + "개" : "없음"));
-		System.out.println("장르: " + (genre != null ? genre.size() + "개" : "없음"));
-		System.out.println("시대: " + (period != null ? period.size() + "개" : "없음"));
-		System.out.println("악기: " + (instrument != null ? instrument.size() + "개" : "없음"));
-		System.out.println("추천 시드: " + recommendSeed().size() + "개");
+		log.info("=== 로드된 검색 사전 데이터 ===");
+		log.info("작곡가: {}", composer != null ? composer.size() + "개" : "없음");
+		log.info("연주가: {}", player != null ? player.size() + "개" : "없음");
+		log.info("장르: {}", genre != null ? genre.size() + "개" : "없음");
+		log.info("시대: {}", period != null ? period.size() + "개" : "없음");
+		log.info("악기: {}", instrument != null ? instrument.size() + "개" : "없음");
+		log.info("추천 시드: {}개", recommendSeed().size());
 	}
 }

@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +46,7 @@ public class SearchLogService {
 				.id(UUID.randomUUID().toString())
 				.query(processQuery(query))
 				.category(processCategory(category))
-				.searchTime(LocalDateTime.now())
+				.searchTime(Instant.now())
 				.userId(processUserId(userId))
 				.build();
 

@@ -8,7 +8,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import org.springframework.web.bind.annotation.RequestParam;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -23,7 +25,7 @@ public class SearchController {
 	 */
 	@GetMapping("/search/all")
 	public ResponseEntity<ApiMessage<SearchResponse.AllSearch>> getAllSearch() {
-		System.out.println("🔍 통합 검색 API 호출됨");
+		log.info("🔍 통합 검색 API 호출됨");
 		SearchResponse.AllSearch response = searchService.getAllSearch();
 		ApiMessage<SearchResponse.AllSearch> apiResponse = ApiMessage.success(200, "통합 검색 데이터 조회 성공", response);
 		return ResponseEntity.ok(apiResponse);
@@ -40,7 +42,7 @@ public class SearchController {
 	 */
 	@GetMapping("/search/composer")
 	public ResponseEntity<ApiMessage<SearchResponse.Composer>> getPopularComposers() {
-		System.out.println("🎼 인기 작곡가 API 호출됨");
+		log.info("🎼 인기 작곡가 API 호출됨");
 		SearchResponse.Composer response = (SearchResponse.Composer)searchService.getPopularComposers();  // ✅ 캐스팅 필요없음
 		ApiMessage<SearchResponse.Composer> apiResponse = ApiMessage.success(200, "인기 작곡가 조회 성공", response);
 		return ResponseEntity.ok(apiResponse);
@@ -53,7 +55,7 @@ public class SearchController {
 	 */
 	@GetMapping("/search/player")
 	public ResponseEntity<ApiMessage<List<SearchResponse.Player>>> getPopularPlayers() {
-		System.out.println("🎹 인기 연주가 API 호출됨");
+		log.info("🎹 인기 연주가 API 호출됨");
 		List<SearchResponse.Player> response = searchService.getPopularPlayers();
 		ApiMessage<List<SearchResponse.Player>> apiResponse = ApiMessage.success(200, "인기 연주가 조회 성공", response);
 		return ResponseEntity.ok(apiResponse);
@@ -65,7 +67,7 @@ public class SearchController {
 	 */
 	@GetMapping("/search/genre")
 	public ResponseEntity<ApiMessage<List<SearchResponse.Genre>>> getGenres() {
-		System.out.println("🎵 장르 API 호출됨");
+		log.info("🎵 장르 API 호출됨");
 		List<SearchResponse.Genre> response = searchService.getGenres();
 		ApiMessage<List<SearchResponse.Genre>> apiResponse = ApiMessage.success(200, "장르 목록 조회 성공", response);
 		return ResponseEntity.ok(apiResponse);
@@ -77,7 +79,7 @@ public class SearchController {
 	 */
 	@GetMapping("/search/period")
 	public ResponseEntity<ApiMessage<SearchResponse.Period>> getPeriods() {
-		System.out.println("⏰ 인기 시대 API 호출됨");
+		log.info("⏰ 인기 시대 API 호출됨");
 		SearchResponse.Period response = searchService.getPeriods();
 		ApiMessage<SearchResponse.Period> apiResponse = ApiMessage.success(200, "인기 시대 조회 성공", response);
 		return ResponseEntity.ok(apiResponse);
@@ -89,7 +91,7 @@ public class SearchController {
 	 */
 	@GetMapping("/search/instrument")
 	public ResponseEntity<ApiMessage<SearchResponse.Instrument>> getInstruments() {
-		System.out.println("🎺 인기 악기 API 호출됨");
+		log.info("🎺 인기 악기 API 호출됨");
 		SearchResponse.Instrument response = searchService.getInstruments();
 		ApiMessage<SearchResponse.Instrument> apiResponse = ApiMessage.success(200, "인기 악기 조회 성공", response);
 		return ResponseEntity.ok(apiResponse);
@@ -103,7 +105,7 @@ public class SearchController {
 	@GetMapping("/search")
 	public ResponseEntity<ApiMessage<SearchResponse.SearchResultAll>> searchAll(
 		@RequestParam String q) {
-		System.out.println("🔍 통합 검색 실행: '" + q + "'");
+		log.info("🔍 통합 검색 실행: {}" ,q );
 		SearchResponse.SearchResultAll response = searchService.searchAll(q);
 		ApiMessage<SearchResponse.SearchResultAll> apiResponse = ApiMessage.success(200, "검색 완료", response);
 		return ResponseEntity.ok(apiResponse);
@@ -119,7 +121,7 @@ public class SearchController {
 		@RequestParam String q,
 		@RequestHeader("Authorization") String authHeader) {
 
-		System.out.println("👤 프로필 검색 실행: '" + q + "'");
+		log.info("👤 프로필 검색 실행: {}",q);
 		SearchResponse.SearchProfile response = searchService.searchProfile(q, authHeader);
 		ApiMessage<SearchResponse.SearchProfile> apiResponse = ApiMessage.success(200, "프로필 검색 완료", response);
 		return ResponseEntity.ok(apiResponse);
@@ -133,7 +135,7 @@ public class SearchController {
 	@GetMapping("/search/feed")
 	public ResponseEntity<ApiMessage<SearchResponse.SearchFeed>> searchFeed(
 		@RequestParam String q) {
-		System.out.println("📰 피드 검색 실행: '" + q + "'");
+		log.info("📰 피드 검색 실행: {}" ,q);
 		SearchResponse.SearchFeed response = searchService.searchFeed(q);
 		ApiMessage<SearchResponse.SearchFeed> apiResponse = ApiMessage.success(200, "피드 검색 완료", response);
 		return ResponseEntity.ok(apiResponse);
@@ -152,7 +154,7 @@ public class SearchController {
 				SearchResponse.Autocomplete.builder().suggestions(List.of()).build()));
 		}
 
-		System.out.println("🔍 자동완성 검색: '" + q + "'");
+		log.info("🔍 자동완성 검색: {}" ,q);
 		SearchResponse.Autocomplete response = searchService.getAutocomplete(q);
 		return ResponseEntity.ok(ApiMessage.success(200, "자동완성 조회 완료", response));
 	}

@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,7 +34,7 @@ public class ELKSearchRepository {
 			SearchLog searchLog = SearchLog.builder()
 				.query(query)
 				.category(category)
-				.searchTime(LocalDateTime.now())
+				.searchTime(Instant.now())
 				.userId(userId)
 				.build();
 
@@ -53,16 +54,14 @@ public class ELKSearchRepository {
 	 */
 	public boolean testConnection() {
 		try {
-			System.out.println("🔍 ELK 연결 테스트 시작");
+			log.info("🔍 ELK 연결 테스트 시작");
 
 			var response = elasticsearchClient.info();
-			System.out.println("✅ ELK 연결 성공: " + response.clusterName());
-			System.out.println("  - 클러스터: " + response.clusterName());
-			System.out.println("  - 버전: " + response.version().number());
-
+			log.info("✅ ELK 연결 성공: {}", response.clusterName());
+			log.info("  - 버전: {}", response.version().number());
 			return true;
 		} catch (Exception e) {
-			System.out.println("❌ ELK 연결 실패: " + e.getMessage());
+			log.error("❌ ELK 연결 실패: {}", e.getMessage(), e);
 			e.printStackTrace();
 			return false;
 		}
@@ -73,7 +72,7 @@ public class ELKSearchRepository {
 	 */
 	public List<String> getPopularSearchTerms() {
 		try {
-			System.out.println("📊 ELK 인기 검색어 집계 시작 (20개 빈도순)");
+			log.info("📊 ELK 인기 검색어 집계 시작 (20개 빈도순)");
 			ensureIndexExists("search_logs");
 
 			SearchRequest searchRequest = SearchRequest.of(s -> s
@@ -105,12 +104,13 @@ public class ELKSearchRepository {
 				.map(bucket -> {
 					String term = bucket.key().stringValue();
 					long count = bucket.docCount();
-					System.out.println("    🔥 " + count + "회: '" + term + "'");
+					log.info("    🔥 {}회: '{}'", count, term);
 					return term;
 				})
 				.collect(Collectors.toList());  // ✅ 필터링 제거, 모든 검색어 포함
 
-			System.out.println("✅ ELK 인기 검색어 " + results.size() + "개 (빈도순)");
+			log.info("✅ ELK 인기 검색어 {}개 (빈도순)", results.size());
+
 
 			// ✅ 20개 미만이면 그냥 반환, 20개 이상이면 20개만
 			return results;
