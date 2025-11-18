@@ -2,8 +2,8 @@ package com.osunji.melog.calendar.controller;
 
 import com.osunji.melog.calendar.CultureCategory;
 import com.osunji.melog.calendar.dto.CalendarResponse;
+import com.osunji.melog.calendar.service.CalendarItemProvider;
 import com.osunji.melog.calendar.service.CalendarService;
-import com.osunji.melog.calendar.service.CultureOpenApiService;
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.global.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/calendar")
@@ -22,7 +23,7 @@ import java.util.UUID;
 public class CalendarController {
 
     private final CalendarService calendarService;
-    private final CultureOpenApiService cultureOpenApiService;
+    private final CalendarItemProvider calendarItemProvider;
 
     // 캘린더 메인 화면
     @GetMapping("/main")
@@ -43,13 +44,16 @@ public class CalendarController {
 
         log.debug("🔍 CalendarService.calendarMain() 호출 시작");
         ApiMessage<CalendarResponse> result = calendarService.calendarMain(userId, year, month);
-        log.debug("📅 [GET /api/calendar/main] called with userId={}, year={}, month={}", userId, year, month);
+        log.debug("✅ CalendarService.calendarMain() 완료");
         return ResponseEntity.ok(result);
     }
 
     // 외부 공연 아이템 조회
     @GetMapping("/items")
-    public ResponseEntity<?> getItems(@RequestParam String category) {
+    public ResponseEntity<?> getItems(
+            @RequestParam String category,
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+    ) {
         log.debug("🎭 [GET /api/calendar/items] called with category='{}'", category);
 
         CultureCategory cat = parseCategory(category);
@@ -60,9 +64,9 @@ public class CalendarController {
                     .body("잘못된 category 값입니다.");
         }
 
-        log.debug("🔍 CultureOpenApiService.fetchItems() 호출 시작: category={}", cat);
-        List<CalendarResponse.Item> items = cultureOpenApiService.fetchItems(cat);
-        log.debug("✅ fetchItems() 완료: count={}", items.size());
+        log.debug("🔍 CalendarItemProvider.getItems() 호출 시작: category={}, userId={}", cat, userId);
+        List<CalendarResponse.Item> items = calendarItemProvider.getItems(cat, userId);
+        log.debug("✅ CalendarItemProvider.getItems() 완료: count={}", items.size());
 
         // 응답 아이템의 category 필수 검사
         boolean hasMissingCategory = items.stream()
@@ -113,5 +117,3 @@ public class CalendarController {
         return null;
     }
 }
-
-

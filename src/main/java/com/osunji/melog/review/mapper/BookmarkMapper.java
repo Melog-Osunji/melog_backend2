@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class BookmarkMapper {
 
-	/** 북마크 엔티티 → BookmarkData DTO 변환 (API 23번) */
+	/** 북마크 엔티티 → BookmarkDataccc DTO 변환 (API 23번) */
 	public BookmarkResponse.BookmarkData toBookmarkData(PostBookmark postBookmark) {
 		return BookmarkResponse.BookmarkData.builder()
 			.postId(postBookmark.getPost().getId().toString())    // ✅ UUID → String

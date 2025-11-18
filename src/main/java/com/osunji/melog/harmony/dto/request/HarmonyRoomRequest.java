@@ -2,48 +2,54 @@ package com.osunji.melog.harmony.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Setter;
 
 import java.util.List;
 
 public class HarmonyRoomRequest {
 
-	/**
-	 * 하모니룸 생성 요청 DTO
-	 */
-	@Data
+
+	@Getter
+	@Setter
 	@NoArgsConstructor
 	@AllArgsConstructor
 	@Builder
 	public static class Create {
-		private String name;                // 하모니룸 이름
-		private String intro;               // 소개글
-		private List<String> category;      // 카테고리 리스트
-		private String profileImg;          // 프로필 이미지 (선택)
+		@NotBlank(message = "하모니룸 이름은 필수입니다.")
+		private String name;
+
+		private String intro;
+
+		private List<String> category;
+
+		private String profileImg;
 	}
 
-	/**
-	 * 하모니룸 수정 요청 DTO - 값이 없으면 기존값 유지
-	 */
-	@Data
+	@Getter
+	@Setter
 	@NoArgsConstructor
 	@AllArgsConstructor
 	@Builder
 	public static class Update {
-		private String name;                // 하모니룸 이름 (선택)
-		private String intro;               // 소개글 (선택)
-		private List<String> category;      // 카테고리 리스트 (선택)
-		private String profileImg;          // 프로필 이미지 (선택)
-		private Boolean isDirectAssign;     // 바로 승인 여부 (선택)
+		private String name;
+
+		private String intro;
+
+		private List<String> category;
+
+		private String profileImg;
+
+		private Boolean isDirectAssign;
+
 		private Boolean isPrivate;
 	}
 
-	/**
-	 * 하모니룸 삭제 요청 DTO
-	 */
-	@Data
+	@Getter
+	@Setter
 	@NoArgsConstructor
 	@AllArgsConstructor
 	@Builder
@@ -51,52 +57,87 @@ public class HarmonyRoomRequest {
 		private String reason;
 	}
 
-	/**
-	 * 하모니룸 게시글 생성 요청 DTO
-	 */
-	@Data
-	@Builder
+	@Getter
+	@Setter
 	@NoArgsConstructor
 	@AllArgsConstructor
+	@Builder
 	public static class CreateHarmonyPost {
-		@NotBlank(message = "게시글 내용은 필수입니다")
+		@NotBlank(message = "게시글 내용은 필수입니다.")
 		private String content;
+
 		private String mediaType;
+
 		private String mediaUrl;
+
 		private List<String> tags;
 	}
 
-
-
-	/**
-	 * 하모니룸 공유 요청 DTO - 딥링크용
-	 */
-	@Data
+	@Getter
+	@Setter
 	@NoArgsConstructor
 	@AllArgsConstructor
 	@Builder
-	public static class Share {
-		private String message;             // 공유 메시지 (선택)
+	public static class UpdateHarmonyPost {
+		private String content;
+
+		private String mediaType;
+
+		private String mediaUrl;
+
+		private List<String> tags;
 	}
 
-	/**
-	 * 가입 승인/거절 요청 DTO
-	 */
-	@Data
+	@Getter
+	@Setter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	@Builder
+	public static class CreateComment {
+		@NotBlank(message = "댓글 내용은 필수입니다.")
+		private String content;
+
+		private String responseTo;  // 부모 댓글 ID. null이면 일반 댓글
+	}
+
+	@Getter
+	@Setter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	@Builder
+	public static class UpdateComment {
+		@NotBlank(message = "댓글 내용은 필수입니다.")
+		private String content;
+	}
+
+	@Getter
+	@Setter
 	@NoArgsConstructor
 	@AllArgsConstructor
 	@Builder
 	public static class ApproveOrDeny {
-		private String userID;              // 승인/거절할 사용자 ID
+		private String userID;
 	}
 
-	@Data
+	@Getter
+	@Setter
 	@NoArgsConstructor
 	@AllArgsConstructor
 	@Builder
 	public static class Report {
-		private String reason;          // 신고 사유 ("spam", "abuse", "inappropriate" 등)
-		private String category;        // 신고 카테고리
-		private String details;         // 상세 내용
+		private String reason;
+
+		private String category;
+
+		private String details;
+	}
+
+	@Getter
+	@Setter
+	@NoArgsConstructor
+	@AllArgsConstructor
+	@Builder
+	public static class Share {
+		private String message;
 	}
 }

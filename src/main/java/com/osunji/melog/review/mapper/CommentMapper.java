@@ -17,6 +17,7 @@ public class CommentMapper {
 		return CommentResponse.Best.builder()
 			.id(bestComment.getId().toString())
 			.userID(bestComment.getUser().getId().toString())     // ✅ API 명세: "userID"
+			.nickname(bestComment.getUser().getNickname())
 			.profileUrl(bestComment.getUser().getProfileImageUrl()) // ✅ API 명세: "profileUrl"
 			.content(bestComment.getContent())
 			.likes(bestComment.getLikeCount())                    // ✅ Entity 메서드 사용
@@ -28,6 +29,7 @@ public class CommentMapper {
 		return CommentResponse.CommentData.builder()
 			.id(comment.getId().toString())
 			.userID(comment.getUser().getId().toString())         // ✅ API 명세: "userID"
+			.nickname(comment.getUser().getNickname())
 			.profileUrl(comment.getUser().getProfileImageUrl())  // ✅ API 명세: "profileUrl"
 			.content(comment.getContent())
 			.likes(comment.getLikeCount())                        // ✅ Entity 메서드 사용
@@ -50,6 +52,7 @@ public class CommentMapper {
 		return CommentResponse.RecommentData.builder()
 			.id(comment.getId().toString())
 			.userID(comment.getUser().getId().toString())         // ✅ API 명세: "userID"
+			.nickname((comment.getUser().getNickname()))
 			.content(comment.getContent())
 			.likes(comment.getLikeCount())                        // ✅ Entity 메서드 사용
 			.recomments(toRecommentList(comment.getChildComments())) // ✅ 재귀 처리

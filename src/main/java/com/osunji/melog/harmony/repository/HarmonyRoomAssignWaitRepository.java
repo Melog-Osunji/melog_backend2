@@ -20,7 +20,7 @@ public interface HarmonyRoomAssignWaitRepository extends JpaRepository<HarmonyRo
 	Optional<HarmonyRoomAssignWait> findByHarmonyRoom(HarmonyRoom harmonyRoom);
 
 	/**
-	 * 하모니룸 ID로 대기 목록 조회
+	 * 하모니룸 ID로 대기 목록 조회xx
 	 */
 	@Query("SELECT h FROM HarmonyRoomAssignWait h WHERE h.harmonyRoom.id = :harmonyRoomId")
 	Optional<HarmonyRoomAssignWait> findByHarmonyRoomId(@Param("harmonyRoomId") UUID harmonyRoomId);

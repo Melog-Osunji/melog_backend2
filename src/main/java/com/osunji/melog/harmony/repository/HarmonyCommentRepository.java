@@ -122,11 +122,20 @@ public interface HarmonyCommentRepository extends JpaRepository<HarmonyPostComme
 	List<HarmonyPostComment> findBestCommentsForMultiplePosts(@Param("postIds") List<UUID> postIds);
 
 	/**
-	 * 더 간단한 버전 (JPQL LIMIT이 지원되지 않는 경우)
+	 * 더 간단한 버전 (JPQL LIMIT이 지원되지 않는 경우)xx
 	 */
 	@Query("SELECT c FROM HarmonyPostComment c " +
 		"JOIN FETCH c.user " +
 		"WHERE c.harmonyPost.id IN :postIds " +
 		"ORDER BY c.harmonyPost.id, SIZE(c.likedUsers) DESC, c.createdAt ASC")
 	List<HarmonyPostComment> findAllCommentsForPosts(@Param("postIds") List<UUID> postIds);
+
+
+	// 특정 게시글 최상위 댓글 조회(대댓글 제외)
+	@Query("SELECT c FROM HarmonyPostComment c JOIN FETCH c.user " +
+		"WHERE c.harmonyPost.id = :postId AND c.parentComment IS NULL " +
+		"ORDER BY c.createdAt ASC")
+	List<HarmonyPostComment> findRootCommentsByPostId(@Param("postId") UUID postId);
+
+
 }

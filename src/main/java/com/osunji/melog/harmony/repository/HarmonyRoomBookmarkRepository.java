@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import com.osunji.melog.harmony.entity.HarmonyPostBookmark;
 import com.osunji.melog.harmony.entity.HarmonyRoom;
 import com.osunji.melog.harmony.entity.HarmonyRoomBookmark;
 import com.osunji.melog.user.domain.User;
@@ -27,6 +28,8 @@ public interface HarmonyRoomBookmarkRepository extends JpaRepository<HarmonyRoom
 	 * 사용자와 하모니룸으로 북마크 조회
 	 */
 	Optional<HarmonyRoomBookmark> findByUserAndHarmonyRoom(User user, HarmonyRoom harmonyRoom);
+	@Query("SELECT b FROM HarmonyPostBookmark b WHERE b.user.id = :userId ORDER BY b.createdAt DESC")
+	List<HarmonyPostBookmark> findBookmarkAllByUserId(UUID userId);
 
 	/**
 	 * 특정 하모니룸의 북마크 수 조회

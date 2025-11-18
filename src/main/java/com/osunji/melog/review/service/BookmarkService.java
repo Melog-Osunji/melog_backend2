@@ -26,7 +26,7 @@ public class BookmarkService {
 	private final UserRepository userRepository;
 	private final AuthHelper authHelper;
 
-	/** 게시글 북마크 생성 (API 27번) */
+	/** 게시글 북마크 생성 (API 27번)fff */
 	public ApiMessage addBookmark(String postIdStr, String authHeader) {
 		try {
 			// 1. 토큰에서 userId 추출

@@ -12,7 +12,7 @@ public class BookmarkResponse {
 	@Getter
 	@Setter
 	@Builder
-	//---------------유저 북마크 목록-----------------//
+	//---------------유저 북마크 목록------cc-----------//
 	public static class ListAll {
 		private List<BookmarkData> results;
 	}

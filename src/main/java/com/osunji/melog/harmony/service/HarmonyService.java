@@ -1,14 +1,10 @@
 package com.osunji.melog.harmony.service;
-import com.osunji.melog.review.service.PostService;
 import com.osunji.melog.global.common.AuthHelper;
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.harmony.dto.request.HarmonyRoomRequest;
 import com.osunji.melog.harmony.dto.response.HarmonyRoomResponse;
 import com.osunji.melog.harmony.entity.*;
 import com.osunji.melog.harmony.repository.*;
-import com.osunji.melog.review.dto.request.PostRequest;
-import com.osunji.melog.review.entity.Post;
-import com.osunji.melog.review.entity.PostComment;
 import com.osunji.melog.review.repository.PostRepository;
 import com.osunji.melog.user.domain.User;
 import com.osunji.melog.user.repository.UserRepository;
@@ -31,13 +27,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class HarmonyService {
-	private final CommentRepository commentRepository;
 	private final HarmonyRoomRepository harmonyRoomRepository;
 	private final HarmonyRoomPostsRepository harmonyRoomPostsRepository;
 	private final HarmonyRoomAssignWaitRepository harmonyRoomAssignWaitRepository;
 	private final HarmonyRoomMembersRepository harmonyRoomMembersRepository;
 	private final UserRepository userRepository;
-	private final PostRepository postRepository;
 	private final HarmonyReportLogService harmonyReportLogService;
 	private final HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository;
 	private final HarmonyRoomReportRepository harmonyRoomReportRepository;
@@ -204,17 +198,15 @@ public class HarmonyService {
 				.build();
 		}
 
-		// 하모니룸 게시글에서 미디어가 있는 것만 조회
 		List<HarmonyRoomPosts> mediaPostsList = harmonyRoomPostsRepository
 			.findByHarmonyRoomInAndMediaTypeIsNotNullOrderByCreatedAtDesc(myHarmonyRooms);
 
-		List<HarmonyRoomResponse.RecentMedia.RecentMediaInfo> recentMediaList = new ArrayList<>();
-
-		for (HarmonyRoomPosts post : mediaPostsList) {
-			if (post.getMediaType() != null && post.getMediaUrl() != null) {
+		List<HarmonyRoomResponse.RecentMedia.RecentMediaInfo> recentMediaList = mediaPostsList.stream()
+			.filter(post -> post.getMediaType() != null && post.getMediaUrl() != null)
+			.map(post -> {
 				String createdAgo = calculateCreatedAgo(post.getCreatedAt());
 
-				recentMediaList.add(HarmonyRoomResponse.RecentMedia.RecentMediaInfo.builder()
+				return HarmonyRoomResponse.RecentMedia.RecentMediaInfo.builder()
 					.harmonyRoomId(post.getHarmonyRoom().getId().toString())
 					.userNickname(post.getUser().getNickname())
 					.userProfileImgLink(post.getUser().getProfileImageUrl())
@@ -223,14 +215,15 @@ public class HarmonyService {
 					.mediaUrl(post.getMediaUrl())
 					.mediaType(post.getMediaType())
 					.createdAgo(createdAgo)
-					.build());
-			}
-		}
+					.build();
+			})
+			.limit(10)
+			.toList();
 
 		log.info("📺 최근 미디어 조회 완료: {}개", recentMediaList.size());
 
 		return HarmonyRoomResponse.RecentMedia.builder()
-			.recentMedia(recentMediaList.stream().limit(10).collect(Collectors.toList()))
+			.recentMedia(recentMediaList)
 			.build();
 	}
 
@@ -378,7 +371,7 @@ public class HarmonyService {
 		}
 
 		// 생성 시간 (초 단위)
-		Integer createdAgo = calculateCreatedAgoInSeconds(post.getCreatedAt());
+		String createdAgo = calculateCreatedAgo(post.getCreatedAt());
 
 		HarmonyRoomResponse.HarmonyRoomPosts.PostResult.PostDetail.BestComment bestCommentDto = null;
 		if (bestComment != null) {
@@ -444,15 +437,6 @@ public class HarmonyService {
 			));
 	}
 
-	/**
-	 * 생성 시간을 초 단위로 계산
-	 */
-	private Integer calculateCreatedAgoInSeconds(LocalDateTime createdAt) {
-		if (createdAt == null) return 0;
-
-		LocalDateTime now = LocalDateTime.now();
-		return (int) java.time.Duration.between(createdAt, now).getSeconds();
-	}
 
 	/**
 	 * 6. 하모니룸 범용 정보 조회
@@ -478,6 +462,7 @@ public class HarmonyService {
 		boolean isRunning = harmonyRoom.isOwner(user);
 
 		log.info("ℹ️ 하모니룸 정보 조회 완료: {} (멤버 {}명)", harmonyRoom.getName(), members.size());
+		String createdAgo = calculateCreatedAgo(harmonyRoom.getCreatedAt());
 
 		return HarmonyRoomResponse.Information.builder()
 			.id(harmonyRoom.getId().toString())         // ✅ 하모니룸 ID 추가
@@ -488,7 +473,7 @@ public class HarmonyService {
 			.intro(harmonyRoom.getIntro())
 			.isRunning(isRunning)
 			.isPrivate(harmonyRoom.getIsPrivate())
-			.createdAt(harmonyRoom.getCreatedAt())
+			.createdAt(createdAgo)
 			.members(memberIds)
 			.owner(harmonyRoom.getOwner().getId().toString())
 			.isDirectAssign(harmonyRoom.getIsDirectAssign())
@@ -602,8 +587,8 @@ public class HarmonyService {
 			request.getCategory(),
 			request.getIntro(),
 			request.getProfileImg(),
-			request.getIsPrivate(),
-			request.getIsDirectAssign()
+			request.getIsDirectAssign(),
+			request.getIsPrivate()
 		);
 
 		harmonyRoomRepository.save(harmonyRoom);
@@ -1078,7 +1063,6 @@ public class HarmonyService {
 	 */
 	@Transactional(readOnly = true)
 	public HarmonyRoomResponse.HarmonyRoomPosts getRecommendPosts(String harmonyId, String authHeader) {
-		// getHarmonyRoomPosts와 동일한 로직
 		return getHarmonyRoomPosts(harmonyId,authHeader);
 	}
 
@@ -1089,36 +1073,531 @@ public class HarmonyService {
 
 		List<HarmonyRoom> rooms = harmonyRoomRepository.searchByKeyword(keyword.trim());
 
-		// 원하는 형태로 DTO 변환
+		// 각 하모니룸의 멤버수와 멤버 프로필 이미지 2개 조회
 		return rooms.stream()
-			.map(room -> HarmonyRoomResponse.Simple.builder()
-				.id(room.getId().toString())
-				.name(room.getName())
-				.intro(room.getIntro())
-				.category(room.getCategory())
-				.profileImgLink(room.getProfileImageUrl())
-				.build())
+			.map(room -> {
+				// 멤버 목록 조회
+				List<HarmonyRoomMembers> members = harmonyRoomMembersRepository.findByHarmonyRoom(room);
+				int memberNum = members.size();
+
+				// 멤버 프로필 이미지 (최대 2개)
+				List<String> userProfileImgsUrl = members.stream()
+					.map(m -> m.getUser().getProfileImageUrl())
+					.filter(img -> img != null && !img.isBlank())
+					.limit(2)
+					.collect(Collectors.toList());
+
+				return HarmonyRoomResponse.Simple.builder()
+					.id(room.getId().toString())
+					.name(room.getName())
+					.intro(room.getIntro())
+					.category(room.getCategory())
+					.profileImgLink(room.getProfileImageUrl())
+					.memberNum(memberNum)
+					.userProfileImgsUrl(userProfileImgsUrl)
+					.build();
+			})
 			.collect(Collectors.toList());
 	}
 
 
-	// ========== 헬퍼 메서드 ==========
 
-	/**
-	 * 시간 계산 ("오늘" 또는 "n일전") - LocalDateTime 버전
-	 */
-	private String calculateCreatedAgo(LocalDateTime createdAt) {
-		if (createdAt == null) return "알 수 없음";
 
-		LocalDateTime now = LocalDateTime.now();
-		long daysBetween = ChronoUnit.DAYS.between(createdAt.toLocalDate(), now.toLocalDate());
 
-		if (daysBetween == 0) {
-			return "오늘";
-		} else {
-			return daysBetween + "일전";
+	// ========== 게시글 단건 상세 조회 ==========
+	@Transactional(readOnly = true)
+	public ApiMessage<HarmonyRoomResponse.PostDetail> getHarmonyPostDetail(String harmonyPostIdStr, String authHeader) {
+		try {
+			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
+			UUID userId = null;
+			try {
+				if (authHeader != null) {
+					userId = authHelper.authHelperAsUUID(authHeader);
+				}
+			} catch (Exception ignored) {}
+
+			final UUID finalUserId = userId;  // 람다에서 사용할 final 변수로 복사
+
+			HarmonyRoomPosts post = harmonyRoomPostsRepository.findByIdWithAssociations(harmonyPostId)
+				.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
+
+			boolean isLiked = false;
+			boolean isBookmarked = false;
+			if (finalUserId != null) {
+				User user = userRepository.findById(finalUserId).orElse(null);
+				if (user != null) {
+					isLiked = post.getLikes().stream().anyMatch(like -> like.getUser().getId().equals(finalUserId));
+					isBookmarked = post.getBookmarks().stream().anyMatch(b -> b.getUser().getId().equals(finalUserId));
+				}
+			}
+
+
+			int likeCount = post.getLikes() != null ? post.getLikes().size() : 0;
+			int commentCount = post.getComments() != null ? post.getComments().size() : 0;
+
+			String createdAgo = calculateCreatedAgo(post.getCreatedAt());
+
+			HarmonyRoomResponse.PostDetail postDetail = HarmonyRoomResponse.PostDetail.builder()
+				.id(post.getId().toString())
+				.content(post.getContent())
+				.mediaType(post.getMediaType())
+				.mediaUrl(post.getMediaUrl())
+				.tags(post.getTags())
+				.createdAgo(createdAgo)
+				.likeCount(likeCount)
+				.commentCount(commentCount)
+				.isLiked(isLiked)
+				.isBookmarked(isBookmarked)
+				.build();
+
+			return ApiMessage.success(200, "게시글 상세 조회 성공", postDetail);
+
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "게시글 상세 조회 실패: " + e.getMessage());
 		}
 	}
+	// ========== 게시글 전체 댓글 조회 ==========
+	@Transactional(readOnly = true)
+	public ApiMessage<HarmonyRoomResponse.HarmonyRoomPostComments> getHarmonyPostComments(String harmonyPostIdStr, String authHeader) {
+		try {
+			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
+			// 최상위 댓글 조회 (자식 댓글은 재귀적으로 CommentData 내 replies 필드로 포함)
+			List<HarmonyPostComment> rootComments = harmonyCommentRepository.findRootCommentsByPostId(harmonyPostId);
+
+			List<HarmonyRoomResponse.HarmonyRoomPostComments.CommentData> commentDataList =
+				rootComments.stream()
+					.map(this::toCommentData)
+					.collect(Collectors.toList());
+
+			HarmonyRoomResponse.HarmonyRoomPostComments response =
+				HarmonyRoomResponse.HarmonyRoomPostComments.builder()
+					.comments(commentDataList)
+					.build();
+
+			return ApiMessage.success(200, "댓글 목록 조회 성공", response);
+
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "댓글 목록 조회 실패: " + e.getMessage());
+		}
+	}
+
+	// 댓글 DTO 변환 메서드 (재귀 처리)
+	private HarmonyRoomResponse.HarmonyRoomPostComments.CommentData toCommentData(HarmonyPostComment comment) {
+		List<HarmonyRoomResponse.HarmonyRoomPostComments.CommentData> childCommentDtos = comment.getChildComments().stream()
+			.map(this::toCommentData) // 재귀 호출
+			.collect(Collectors.toList());
+
+		return HarmonyRoomResponse.HarmonyRoomPostComments.CommentData.builder()
+			.id(comment.getId().toString())
+			.content(comment.getContent())
+			.userId(comment.getUser().getId().toString())
+			.userNickname(comment.getUser().getNickname())
+			.userProfileImgLink(comment.getUser().getProfileImageUrl())
+			.likeCount(comment.getLikeCount())
+			.createdAgo(calculateCreatedAgo(comment.getCreatedAt()))
+			.replies(childCommentDtos)
+			.build();
+	}
+
+
+
+
+	// ========== 게시글 베스트 댓글 조회 ==========
+	@Transactional(readOnly = true)
+	public ApiMessage<HarmonyRoomResponse.HarmonyRoomBestComment> getBestHarmonyPostComment(String harmonyPostIdStr) {
+		try {
+			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
+			Optional<HarmonyPostComment> bestCommentOpt = harmonyCommentRepository.findBestComment(harmonyPostId);
+
+			if (bestCommentOpt.isEmpty()) {
+				return ApiMessage.success(200, "베스트 댓글이 없습니다.", null);
+			}
+
+			HarmonyPostComment bestComment = bestCommentOpt.get();
+
+			HarmonyRoomResponse.HarmonyRoomBestComment bestDto = HarmonyRoomResponse.HarmonyRoomBestComment.builder()
+				.id(bestComment.getId().toString())
+				.content(bestComment.getContent())
+				.userId(bestComment.getUser().getId().toString())              // userID → userId 변경
+				.userNickname(bestComment.getUser().getNickname())            // profileUrl 대신 userNickname 사용
+				.likeCount(bestComment.getLikeCount())                        // likes → likeCount 변경
+				.build();
+
+			return ApiMessage.success(200, "베스트 댓글 조회 성공", bestDto);
+
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "베스트 댓글 조회 실패: " + e.getMessage());
+		}
+	}
+
+	// ========== 게시글 좋아요/취소 ==========
+	public ApiMessage<Void> likeOrUnlikeHarmonyPost(String harmonyPostIdStr, String authHeader) {
+		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
+			HarmonyRoomPosts post = harmonyRoomPostsRepository.findByIdWithLikes(harmonyPostId)
+				.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
+
+			boolean wasLiked = post.getLikes().stream().anyMatch(like -> like.getUser().getId().equals(userId));
+
+			if (wasLiked) {
+				// 좋아요 취소
+				post.getLikes().removeIf(like -> like.getUser().getId().equals(userId));
+			} else {
+				// 좋아요 추가
+				HarmonyPostLike like = HarmonyPostLike.builder()
+					.harmonyPost(post)
+					.user(user)
+					.build();
+				post.getLikes().add(like);
+			}
+
+			harmonyRoomPostsRepository.save(post);
+
+			int newLikeCount = post.getLikes().size();
+			String action = wasLiked ? "취소" : "추가";
+			String message = String.format("좋아요가 %s되었습니다. (현재 %d개)", action, newLikeCount);
+
+			return ApiMessage.success(200, message, null);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (IllegalStateException e) {
+			return ApiMessage.fail(401, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "좋아요 처리 실패: " + e.getMessage());
+		}
+	}
+
+	// ========== 게시글 좋아요 여부 조회 ==========
+	@Transactional(readOnly = true)
+	public ApiMessage<Boolean> isHarmonyPostLiked(String harmonyPostIdStr, String authHeader) {
+		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
+
+			HarmonyRoomPosts post = harmonyRoomPostsRepository.findById(harmonyPostId)
+				.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
+
+			boolean liked = post.getLikes().stream()
+				.anyMatch(like -> like.getUser().getId().equals(userId));
+
+			return ApiMessage.success(200, "좋아요 여부 조회 성공", liked);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "좋아요 여부 조회 실패: " + e.getMessage());
+		}
+	}
+
+	// ========== 게시글 북마크 추가 ==========
+	public ApiMessage<Void> addHarmonyPostBookmark(String harmonyPostIdStr, String authHeader) {
+		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
+			HarmonyRoomPosts post = harmonyRoomPostsRepository.findById(harmonyPostId)
+				.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
+
+			boolean alreadyBookmarked = post.getBookmarks().stream()
+				.anyMatch(bookmark -> bookmark.getUser().getId().equals(userId));
+			if (alreadyBookmarked) {
+				return ApiMessage.fail(409, "이미 북마크한 게시글입니다.");
+			}
+
+			HarmonyPostBookmark bookmark = HarmonyPostBookmark.builder()
+				.harmonyPost(post)
+				.user(user)
+				.build();
+			post.getBookmarks().add(bookmark);
+
+			harmonyRoomPostsRepository.save(post);
+
+			return ApiMessage.success(201, "북마크가 성공적으로 추가되었습니다.", null);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "북마크 추가 실패: " + e.getMessage());
+		}
+	}
+
+	// ========== 게시글 북마크 제거 ==========
+	public ApiMessage<Void> removeHarmonyPostBookmark(String harmonyPostIdStr, String authHeader) {
+		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+
+			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
+			HarmonyRoomPosts post = harmonyRoomPostsRepository.findById(harmonyPostId)
+				.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
+
+			Optional<HarmonyPostBookmark> bookmarkOpt = post.getBookmarks().stream()
+				.filter(bookmark -> bookmark.getUser().getId().equals(userId))
+				.findFirst();
+
+			if (bookmarkOpt.isEmpty()) {
+				return ApiMessage.fail(404, "북마크 정보가 존재하지 않습니다.");
+			}
+
+			post.getBookmarks().remove(bookmarkOpt.get());
+
+			harmonyRoomPostsRepository.save(post);
+
+			return ApiMessage.success(200, "북마크가 성공적으로 제거되었습니다.", null);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "북마크 제거 실패: " + e.getMessage());
+		}
+	}
+
+	// ========== 게시글 삭제 ==========
+	public ApiMessage<Void> deleteHarmonyPost(String harmonyPostIdStr, String authHeader) {
+		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
+
+			HarmonyRoomPosts post = harmonyRoomPostsRepository.findByIdWithAssociations(harmonyPostId)
+				.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
+
+			if (!post.getUser().getId().equals(userId)) {
+				return ApiMessage.fail(403, "삭제 권한이 없습니다.");
+			}
+
+			harmonyRoomPostsRepository.delete(post);
+
+			return ApiMessage.success(200, "게시글이 성공적으로 삭제되었습니다.", null);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (IllegalStateException e) {
+			return ApiMessage.fail(401, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "게시글 삭제 실패: " + e.getMessage());
+		}
+	}
+
+	// ========== 게시글 수정 ==========
+	public ApiMessage<Void> updateHarmonyPost(String harmonyPostIdStr, HarmonyRoomRequest.UpdateHarmonyPost request, String authHeader) {
+		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
+
+			HarmonyRoomPosts post = harmonyRoomPostsRepository.findByIdWithAssociations(harmonyPostId)
+				.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
+
+			if (!post.getUser().getId().equals(userId)) {
+				return ApiMessage.fail(403, "수정 권한이 없습니다.");
+			}
+
+			if (request.getContent() != null && !request.getContent().trim().isEmpty()) {
+				post.setContent(request.getContent());
+			}
+			if (request.getMediaType() != null) {
+				post.setMediaType(request.getMediaType());
+			}
+			if (request.getMediaUrl() != null) {
+				post.setMediaUrl(request.getMediaUrl());
+			}
+			if (request.getTags() != null) {
+				post.getTags().clear();
+				post.getTags().addAll(request.getTags());
+			}
+
+			harmonyRoomPostsRepository.save(post);
+
+			return ApiMessage.success(200, "게시글이 성공적으로 수정되었습니다.", null);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "게시글 수정 실패: " + e.getMessage());
+		}
+	}
+
+	// ========== 게시글 댓글 작성 ==========
+	public ApiMessage<Void> createHarmonyPostComment(String harmonyPostIdStr, HarmonyRoomRequest.CreateComment request, String authHeader) {
+		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
+			HarmonyRoomPosts post = harmonyRoomPostsRepository.findById(harmonyPostId)
+				.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
+
+			HarmonyPostComment parentComment = null;
+			if (request.getResponseTo() != null && !request.getResponseTo().trim().isEmpty()) {
+				UUID parentId = UUID.fromString(request.getResponseTo());
+				parentComment = harmonyCommentRepository.findById(parentId)
+					.orElseThrow(() -> new IllegalArgumentException("부모 댓글을 찾을 수 없습니다."));
+			}
+
+
+			HarmonyPostComment comment = (parentComment == null)
+				? HarmonyPostComment.createComment(user, post, request.getContent())
+				: HarmonyPostComment.createReply(user, post, request.getContent(), parentComment);
+
+			harmonyCommentRepository.save(comment);
+
+			return ApiMessage.success(201, "댓글이 성공적으로 작성되었습니다.", null);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "댓글 작성 실패: " + e.getMessage());
+		}
+	}
+
+	// ========== 게시글 댓글 삭제 ==========
+	public ApiMessage<Void> deleteHarmonyPostComment(String harmonyPostIdStr, String commentIdStr, String authHeader) {
+		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			UUID commentId = UUID.fromString(commentIdStr);
+
+			HarmonyPostComment comment = harmonyCommentRepository.findById(commentId)
+				.orElseThrow(() -> new IllegalArgumentException("댓글을 찾을 수 없습니다."));
+
+			if (!comment.getUser().getId().equals(userId)) {
+				return ApiMessage.fail(403, "삭제 권한이 없습니다.");
+			}
+
+			harmonyCommentRepository.delete(comment);
+
+			return ApiMessage.success(200, "댓글이 성공적으로 삭제되었습니다.", null);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (IllegalStateException e) {
+			return ApiMessage.fail(401, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "댓글 삭제 실패: " + e.getMessage());
+		}
+	}
+
+	// ========== 댓글 좋아요/취소 ==========cf
+	public ApiMessage<Void> likeOrUnlikeHarmonyComment(String harmonyPostIdStr, String commentIdStr, String authHeader) {
+		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+			UUID commentId = UUID.fromString(commentIdStr);
+			HarmonyPostComment comment = harmonyCommentRepository.findById(commentId)
+				.orElseThrow(() -> new IllegalArgumentException("댓글을 찾을 수 없습니다."));
+
+			if (comment.isLikedBy(user)) {
+				comment.removeLike(user);
+			} else {
+				comment.addLike(user);
+			}
+
+			harmonyCommentRepository.save(comment);
+
+			return ApiMessage.success(200, "댓글 좋아요/취소 완료", null);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (IllegalStateException e) {
+			return ApiMessage.fail(401, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "댓글 좋아요 처리 실패: " + e.getMessage());
+		}
+	}
+	// 유저별 하모니룸 게시글 목록 조회
+	@Transactional(readOnly = true)
+	public ApiMessage<HarmonyRoomResponse.UserHarmonyPosts> getUserHarmonyPosts(String userIdStr, String authHeader) {
+		try {
+			UUID userId = UUID.fromString(userIdStr);
+			UUID currentUserId = null;
+			if (authHeader != null) {
+				try {
+					currentUserId = authHelper.authHelperAsUUID(authHeader);
+				} catch (Exception ignored) {}
+			}
+
+			List<HarmonyRoomPosts> posts = harmonyRoomPostsRepository.findByUserIdOrderByCreatedAtDesc(userId, currentUserId);
+
+			List<HarmonyRoomResponse.UserHarmonyPosts.UserPostData> userPostList = posts.stream()
+				.map(post -> {
+					int likeCount = post.getLikes() != null ? post.getLikes().size() : 0;
+					int commentCount = post.getComments() != null ? post.getComments().size() : 0;
+					String createdAgo = calculateCreatedAgo(post.getCreatedAt());
+
+					return HarmonyRoomResponse.UserHarmonyPosts.UserPostData.builder()
+						.id(post.getId().toString())
+						.content(post.getContent())
+						.mediaType(post.getMediaType())
+						.mediaUrl(post.getMediaUrl())
+						.likeCount(likeCount)
+						.commentCount(commentCount)
+						.createdAgo(createdAgo)
+						.build();
+				})
+				.toList();
+
+			HarmonyRoomResponse.UserHarmonyPosts response = HarmonyRoomResponse.UserHarmonyPosts.builder()
+				.results(userPostList)
+				.build();
+
+			return ApiMessage.success(200, "사용자 하모니룸 게시글 조회 성공", response);
+
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다.");
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "사용자 하모니룸 게시글 조회 실패: " + e.getMessage());
+		}
+	}
+
+	// 유저별 하모니룸 북마크 게시글 목록 조회
+	@Transactional(readOnly = true)
+	public ApiMessage<HarmonyRoomResponse.UserHarmonyBookmarks> getHarmonyUserBookmarks(String userIdStr, String authHeader) {
+		try {
+			UUID userId = UUID.fromString(userIdStr);
+
+			List<HarmonyPostBookmark> bookmarks = harmonyRoomBookmarkRepository.findBookmarkAllByUserId(userId);
+
+			List<HarmonyRoomResponse.UserHarmonyBookmarks.UserBookmarkData> bookmarkList = bookmarks.stream()
+				.map(bookmark -> {
+					String createdAgo = calculateCreatedAgo(bookmark.getCreatedAt());
+					return HarmonyRoomResponse.UserHarmonyBookmarks.UserBookmarkData.builder()
+						.postId(bookmark.getHarmonyPost().getId().toString())
+						.title(bookmark.getHarmonyPost().getContent())  // 하모니룸 게시글은 title 대신 content 사용
+						.mediaUrl(bookmark.getHarmonyPost().getMediaUrl())
+						.mediaType(bookmark.getHarmonyPost().getMediaType())
+						.createdAgo(createdAgo)
+						.build();
+				})
+				.toList();
+
+			HarmonyRoomResponse.UserHarmonyBookmarks response = HarmonyRoomResponse.UserHarmonyBookmarks.builder()
+				.results(bookmarkList)
+				.build();
+
+			return ApiMessage.success(200, "사용자 하모니룸 북마크 게시글 조회 성공", response);
+
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다.");
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "사용자 하모니룸 북마크 게시글 조회 실패: " + e.getMessage());
+		}}
+
+	private String calculateCreatedAgo(LocalDateTime createdAt) {
+		if (createdAt == null) return "";
+		long hours = ChronoUnit.HOURS.between(createdAt, LocalDateTime.now());
+		if (hours < 1) return "방금 전";
+		else if (hours < 24) return hours + "시간 전";
+
+		long days = ChronoUnit.DAYS.between(createdAt.toLocalDate(), LocalDateTime.now().toLocalDate());
+		if (days == 1) return "하루 전";
+		if (days <= 30) return days + "일 전";
+
+		long months = ChronoUnit.MONTHS.between(createdAt.toLocalDate(), LocalDateTime.now().toLocalDate());
+		if (months == 1) return "한 달 전";
+		return months + "달 전";
+	}
+
+
 
 
 

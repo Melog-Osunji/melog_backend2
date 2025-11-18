@@ -66,11 +66,11 @@ public class SearchRepository {
 	/** 31번 통합 검색 데이터 조회 - /api/search/all */
 	public SearchResponse.AllSearch getAllSearchData() {
 		try {
-			System.out.println("🔍 통합 검색 데이터 조회 시작");
+			log.info("🔍 통합 검색 데이터 조회 시작");
 
 			// ✅ 실제 ELK에서 인기 검색어 20개 조회 (최근 7일)
 			List<String> livePopularSearch = getActualPopularSearchTerms();
-			System.out.println("  - ELK에서 조회된 인기 검색어 수: " + livePopularSearch.size());
+			log.info("  - ELK에서 조회된 인기 검색어 수: {} ", livePopularSearch.size());
 
 			// 추천 키워드 6개
 			List<String> recommendKeywords = Arrays.asList(
@@ -79,7 +79,7 @@ public class SearchRepository {
 
 			// 현재 시간
 			String nowTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss"));
-			System.out.println("✅ 통합 검색 데이터 조회 완료 - 현재 시간: " + nowTime);
+			log.info("✅ 통합 검색 데이터 조회 완료 - 현재 시간: {}" ,nowTime);
 
 			return SearchResponse.AllSearch.builder()
 				.recommendKeyword(recommendKeywords)
@@ -99,9 +99,9 @@ public class SearchRepository {
 
 	private List<String> getActualPopularSearchTerms() {
 		try {
-			System.out.println("📊 실제 인기 검색어 집계 시작");
+			log.info("📊 실제 인기 검색어 집계 시작");
 			List<String> popularTerms = elkSearchRepository.getPopularSearchTerms();
-			System.out.println("🔍 ELK에서 받은 데이터: " + popularTerms.size() + "개");
+			log.info("🔍 ELK에서 받은 데이터: {}개" , popularTerms.size() );
 			return popularTerms.isEmpty() ? getDefaultPopularTerms() : popularTerms;
 		} catch (Exception e) {
 			log.error("실제 인기 검색어 조회 실패: {}", e.getMessage(), e);
@@ -119,12 +119,12 @@ public class SearchRepository {
 	/** 32번 인기 작곡가 조회 - /api/search/composer */
 	public List<SearchResponse.Composer> getPopularComposers() {
 		try {
-			System.out.println("🎼 인기 작곡가 조회 시작 (검색량 순 정렬)");
+			log.info("🎼 인기 작곡가 조회 시작 (검색량 순 정렬)");
 
 			// ✅ 1단계: 사전 설정값 가져오기
 			JsonNode composerPreset = searchPresetLoader.composer();
 			if (composerPreset == null || !composerPreset.has("name") || !composerPreset.has("imgLink")) {
-				System.out.println("  - 사전 설정 파일 없음, 기본값 사용");
+				log.info("  - 사전 설정 파일 없음, 기본값 사용");
 				return getDefaultComposers();
 			}
 
@@ -133,7 +133,7 @@ public class SearchRepository {
 			List<String> allImgLinks = new ObjectMapper().convertValue(
 				composerPreset.get("imgLink"), List.class);
 
-			System.out.println("  - 사전 설정 작곡가 수: " + allComposers.size());
+			log.info("  - 사전 설정 작곡가 수:{} ", allComposers.size());
 
 			// ✅ 2단계: 각 작곡가별 검색 빈도 조회
 			Map<String, Long> searchCounts = getComposerSearchCounts(allComposers);
@@ -162,11 +162,11 @@ public class SearchRepository {
 				.collect(Collectors.toList());
 
 			// ✅ 5단계: 정렬 결과 로그 출력
-			System.out.println("  - 검색량 기준 정렬 완료:");
+			log.info("  - 검색량 기준 정렬 완료:");
 			for (int i = 0; i < Math.min(10, sortedComposers.size()); i++) {
 				String composer = sortedComposers.get(i);
 				Long count = searchCounts.getOrDefault(composer, 0L);
-				System.out.println("    " + (i + 1) + ". " + composer + " (검색 " + count + "회)");
+				log.info("    {}. {} (검색 {}회)", i + 1, composer, count);
 			}
 
 			return Arrays.asList(
@@ -189,20 +189,21 @@ public class SearchRepository {
 		Map<String, Long> searchCounts = new HashMap<>();
 
 		try {
-			System.out.println("📊 작곡가별 검색 빈도 조회 시작");
+			log.info("📊 작곡가별 검색 빈도 조회 시작");
 
 			for (String composer : composers) {
 				try {
 					Long count = getSearchCountForKeyword(composer);
 					searchCounts.put(composer, count);
 					if (count > 0) {
-						System.out.println("    " + composer + ": " + count + "회");
+						log.info("    {}: {}회", composer, count);
 					}
 				} catch (Exception e) {
-					System.out.println("    " + composer + ": 조회 실패");
+					log.warn("    {}: 조회 실패", composer, e);
 					searchCounts.put(composer, 0L);
 				}
 			}
+
 
 		} catch (Exception e) {
 			log.error("작곡가 검색 빈도 조회 실패: {}", e.getMessage());
@@ -233,12 +234,12 @@ public class SearchRepository {
 	/** 33번 인기 연주가 + 관련 키워드 조회 - /api/search/player */
 	public List<SearchResponse.Player> getPopularPlayers() {
 		try {
-			System.out.println("🎹 인기 연주가 조회 시작 (검색량 순 정렬)");
+			log.info("🎹 인기 연주가 조회 시작 (검색량 순 정렬)");
 
 			// ✅ 1단계: 사전 설정값 가져오기
 			JsonNode playerPreset = searchPresetLoader.player();
 			if (playerPreset == null || !playerPreset.isArray()) {
-				System.out.println("  - 사전 설정 파일 없음, ELK 조회");
+				log.info("  - 사전 설정 파일 없음, ELK 조회");
 				return getPlayersFromElk();
 			}
 
@@ -256,7 +257,7 @@ public class SearchRepository {
 					.build());
 			}
 
-			System.out.println("  - 사전 설정 연주가 수: " + allPlayers.size());
+			log.info("  - 사전 설정 연주가 수: {}",allPlayers.size());
 
 			// ✅ 2단계: 각 연주가별 검색 빈도 조회 후 정렬
 			allPlayers.sort((p1, p2) -> {
@@ -266,11 +267,11 @@ public class SearchRepository {
 			});
 
 			// ✅ 3단계: 정렬 결과 로그 출력
-			System.out.println("  - 검색량 기준 정렬 완료:");
+			log.info("  - 검색량 기준 정렬 완료:");
 			for (int i = 0; i < Math.min(10, allPlayers.size()); i++) {
 				SearchResponse.Player player = allPlayers.get(i);
 				Long count = getSearchCountForKeyword(player.getName());
-				System.out.println("    " + (i + 1) + ". " + player.getName() + " (검색 " + count + "회)");
+				log.info("    {}. {} (검색 {}회)", i + 1, player.getName(), count);
 			}
 
 			return allPlayers;
@@ -328,12 +329,12 @@ public class SearchRepository {
 	/** 34번 장르 + 관련 키워드 조회 - /api/search/genre */
 	public List<SearchResponse.Genre> getGenres() {
 		try {
-			System.out.println("🎵 장르 데이터 조회 시작 (검색량 순 정렬)");
+			log.info("🎵 장르 데이터 조회 시작 (검색량 순 정렬)");
 
 			// ✅ 1단계: 사전 설정값 가져오기
 			JsonNode genrePreset = searchPresetLoader.genre();
 			if (genrePreset == null || !genrePreset.isArray()) {
-				System.out.println("  - 사전 설정 파일 없음, 기본값 사용");
+				log.info("  - 사전 설정 파일 없음, 기본값 사용");
 				return getDefaultGenres();
 			}
 
@@ -351,7 +352,7 @@ public class SearchRepository {
 					.build());
 			}
 
-			System.out.println("  - 사전 설정 장르 수: " + allGenres.size());
+			log.info("  - 사전 설정 장르 수: " , allGenres.size());
 
 			// ✅ 2단계: 각 장르별 검색 빈도 조회 후 정렬
 			allGenres.sort((g1, g2) -> {
@@ -361,11 +362,11 @@ public class SearchRepository {
 			});
 
 			// ✅ 3단계: 정렬 결과 로그 출력
-			System.out.println("  - 검색량 기준 정렬 완료:");
+			log.info("  - 검색량 기준 정렬 완료:");
 			for (int i = 0; i < Math.min(10, allGenres.size()); i++) {
 				SearchResponse.Genre genre = allGenres.get(i);
 				Long count = getSearchCountForKeyword(genre.getGenre());
-				System.out.println("    " + (i + 1) + ". " + genre.getGenre() + " (검색 " + count + "회)");
+				log.info("    {}. {} (검색 {}회)", i + 1, genre.getGenre(), count);
 			}
 
 			return allGenres;
@@ -403,17 +404,17 @@ public class SearchRepository {
 	/** 35번 인기 시대 조회 - /api/search/period */
 	public SearchResponse.Period getPeriods() {
 		try {
-			System.out.println("⏰ 시대 데이터 조회 시작");
+			log.info("⏰ 시대 데이터 조회 시작");
 
 			// ✅ 1순위: 사전 설정값 사용
 			JsonNode periodPreset = searchPresetLoader.period();
 			if (periodPreset != null && periodPreset.has("era")) {
-				System.out.println("  - 사전 설정 시대 데이터 사용");
+				log.info("  - 사전 설정 시대 데이터 사용");
 
 				List<String> eras = new ObjectMapper().convertValue(
 					periodPreset.get("era"), List.class);
 
-				System.out.println("  - 사전 설정 시대 수: " + eras.size());
+				log.info("  - 사전 설정 시대 수:{} " ,eras.size());
 
 				return SearchResponse.Period.builder()
 					.era(eras)
@@ -423,7 +424,7 @@ public class SearchRepository {
 			// ✅ 2순위: Elasticsearch에서 인기 시대 조회
 			List<String> popularPeriods = elkSearchRepository.getPopularPeriods();
 			if (!popularPeriods.isEmpty()) {
-				System.out.println("  - ELK에서 조회된 시대 수: " + popularPeriods.size());
+				log.info("  - ELK에서 조회된 시대 수: {}", popularPeriods.size());
 				return SearchResponse.Period.builder()
 					.era(popularPeriods)
 					.build();
@@ -434,7 +435,7 @@ public class SearchRepository {
 		}
 
 		// ✅ 3순위: 기본값 반환
-		System.out.println("  - 기본값 시대 반환");
+		log.info("  - 기본값 시대 반환");
 		return SearchResponse.Period.builder()
 			.era(Arrays.asList("바로크", "고전주의", "낭만주의", "근현대", "현대"))
 			.build();
@@ -443,12 +444,12 @@ public class SearchRepository {
 	/** 36번 인기 악기 조회 - /api/search/instrument */
 	public SearchResponse.Instrument getInstruments() {
 		try {
-			System.out.println("🎺 인기 악기 조회 시작 (검색량 순 정렬)");
+			log.info("🎺 인기 악기 조회 시작 (검색량 순 정렬)");
 
 			// ✅ 1단계: 사전 설정값 가져오기
 			JsonNode instrumentPreset = searchPresetLoader.instrument();
 			if (instrumentPreset == null || !instrumentPreset.has("instrument") || !instrumentPreset.has("imgLink")) {
-				System.out.println("  - 사전 설정 파일 없음, 기본값 사용");
+				log.info("  - 사전 설정 파일 없음, 기본값 사용");
 				return getDefaultInstruments();
 			}
 
@@ -457,7 +458,7 @@ public class SearchRepository {
 			List<String> allImgLinks = new ObjectMapper().convertValue(
 				instrumentPreset.get("imgLink"), List.class);
 
-			System.out.println("  - 사전 설정 악기 수: " + allInstruments.size());
+			log.info("  - 사전 설정 악기 수: {}", allInstruments.size());
 
 			// ✅ 2단계: 각 악기별 검색 빈도 조회
 			Map<String, Long> searchCounts = getInstrumentSearchCounts(allInstruments);
@@ -486,11 +487,11 @@ public class SearchRepository {
 				.collect(Collectors.toList());
 
 			// ✅ 5단계: 정렬 결과 로그 출력
-			System.out.println("  - 검색량 기준 정렬 완료:");
+			log.info("  - 검색량 기준 정렬 완료:");
 			for (int i = 0; i < Math.min(10, sortedInstruments.size()); i++) {
 				String instrument = sortedInstruments.get(i);
 				Long count = searchCounts.getOrDefault(instrument, 0L);
-				System.out.println("    " + (i + 1) + ". " + instrument + " (검색 " + count + "회)");
+				log.info("    {}. {} (검색 {}회)", i + 1, instrument, count);
 			}
 
 			return SearchResponse.Instrument.builder()
@@ -511,7 +512,7 @@ public class SearchRepository {
 		Map<String, Long> searchCounts = new HashMap<>();
 
 		try {
-			System.out.println("📊 악기별 검색 빈도 조회 시작");
+			log.info("📊 악기별 검색 빈도 조회 시작");
 
 			// ✅ 각 악기별로 검색 로그에서 빈도 조회
 			for (String instrument : instruments) {
@@ -519,13 +520,14 @@ public class SearchRepository {
 					Long count = getSearchCountForKeyword(instrument);
 					searchCounts.put(instrument, count);
 					if (count > 0) {
-						System.out.println("    " + instrument + ": " + count + "회");
+						log.info("    {}: {}회", instrument, count);
 					}
 				} catch (Exception e) {
-					System.out.println("    " + instrument + ": 조회 실패");
+					log.warn("    {}: 조회 실패", instrument, e);
 					searchCounts.put(instrument, 0L);
 				}
 			}
+
 
 		} catch (Exception e) {
 			log.error("악기 검색 빈도 조회 실패: {}", e.getMessage());
@@ -541,7 +543,7 @@ public class SearchRepository {
 		try {
 			// ✅ 한글-영어 매핑
 			List<String> searchKeywords = getEquivalentKeywords(keyword);
-			System.out.println("    검색 키워드들: " + searchKeywords);
+			log.info("    검색 키워드들: {}" ,searchKeywords);
 
 			long totalCount = 0L;
 
@@ -566,7 +568,7 @@ public class SearchRepository {
 				var response = elasticsearchClient.search(searchRequest, Void.class);
 				long count = response.hits().total().value();
 				if (count > 0) {
-					System.out.println("      '" + searchKeyword + "': " + count + "회");
+					log.info("      '{}': {}회", searchKeyword, count);
 					totalCount += count;
 				}
 			}
@@ -574,7 +576,7 @@ public class SearchRepository {
 			return totalCount;
 
 		} catch (Exception e) {
-			System.out.println("        키워드 '" + keyword + "' 검색 실패: " + e.getMessage());
+			log.error("        키워드 '{}' 검색 실패: {}", keyword, e.getMessage(), e);
 			return 0L;
 		}
 	}
@@ -682,7 +684,7 @@ public class SearchRepository {
 
 	/** 37번 검색결과 - 게시글 + 인기미디어 (DB 직접 검색 추가) */
 	public SearchResponse.SearchResultAll searchAll(String query) {
-		System.out.println("🔍 통합 검색 실행: '" + query + "'");
+		log.info("🔍 통합 검색 실행: {} ",query );
 
 		UUID currentUserId = getCurrentUserId();
 		String userIdString = convertUserIdForLogging(currentUserId);
@@ -696,16 +698,16 @@ public class SearchRepository {
 		try {
 			// ✅ 1단계: Elasticsearch에서 게시글 ID 검색
 			List<String> postIdStrings = elkSearchRepository.searchPosts(query);
-			System.out.println("  - ELK 검색 결과: " + postIdStrings.size() + "개");
+			log.info("  - ELK 검색 결과: {}개", postIdStrings.size());
 
 			List<SearchResponse.PostResult> results;
 
 			if (postIdStrings.isEmpty()) {
-				System.out.println("  - ELK 결과 없음, DB 직접 검색 실행");
+				log.info("  - ELK 결과 없음, DB 직접 검색 실행");
 
 				// ✅ 2단계: DB에서 직접 검색 (제목, 내용, 태그)
 				List<Post> posts = postRepository.findByTitleContainingOrContentContaining(query);
-				System.out.println("  - DB 직접 검색 결과: " + posts.size() + "개");
+				log.info("  - DB 직접 검색 결과: {}개",posts.size());
 
 				results = posts.stream()
 					.limit(20)
@@ -733,7 +735,7 @@ public class SearchRepository {
 			List<SearchResponse.SearchResultAll.PopularMedia> popularMedia =
 				getPopularMediaForSearch(currentUserId);
 
-			System.out.println("✅ 통합 검색 완료 - 게시글: " + results.size() + "개, 미디어: " + popularMedia.size() + "개");
+			log.info("✅ 통합 검색 완료 - 게시글: {}개, 미디어: {}개",results.size(), popularMedia.size() );
 
 			return SearchResponse.SearchResultAll.builder()
 				.results(results)
@@ -748,7 +750,7 @@ public class SearchRepository {
 
 	/** 38번 검색결과 - 프로필 */
 	public SearchResponse.SearchProfile searchProfile(String query, String authHeader) {
-		System.out.println("👤 프로필 검색 실행: '" + query + "'");
+		log.info("👤 프로필 검색 실행: {}", query );
 
 		// ✅ 현재 사용자 ID 가져오기 (토큰에서 추출)
 		UUID currentUserId = authHelper.authHelperAsUUID(authHeader);
@@ -763,12 +765,12 @@ public class SearchRepository {
 		try {
 			// ✅ 1단계: Elasticsearch에서 사용자 검색
 			List<String> userIdStrings = elkSearchRepository.searchUsers(query);
-			System.out.println("  - ELK 사용자 검색 결과: " + userIdStrings.size() + "개");
+			log.info("  - ELK 사용자 검색 결과: {}개", userIdStrings.size());
 
 			List<SearchResponse.SearchProfile.UserProfile> profiles;
 
 			if (userIdStrings.isEmpty()) {
-				System.out.println("  - ELK 결과 없음, DB 직접 검색 실행");
+				log.info("  - ELK 결과 없음, DB 직접 검색 실행");
 
 				// ✅ 2단계: DB에서 직접 사용자 검색 (닉네임, 자기소개 포함)
 				List<User> users = userRepository.findAll().stream()
@@ -790,7 +792,7 @@ public class SearchRepository {
 					.limit(10)
 					.collect(Collectors.toList());
 
-				System.out.println("  - DB 직접 검색 결과: " + users.size() + "개");
+				log.info("  - DB 직접 검색 결과: {}개",users.size());
 
 				// ✅ 효율적인 팔로우 상태 확인 - 한 번에 모든 팔로우 관계 조회
 				List<UUID> targetUserIds = users.stream()
@@ -831,7 +833,7 @@ public class SearchRepository {
 					.collect(Collectors.toList());
 			}
 
-			System.out.println("✅ 프로필 검색 완료: " + profiles.size() + "개");
+			log.info("✅ 프로필 검색 완료: {}개 ", profiles.size());
 
 			return SearchResponse.SearchProfile.builder()
 				.user(profiles)
@@ -878,7 +880,7 @@ public class SearchRepository {
 
 	/** 39번 검색결과 - 피드 */
 	public SearchResponse.SearchFeed searchFeed(String query) {
-		System.out.println("📰 피드 검색 실행: '" + query + "'");
+		log.info("📰 피드 검색 실행: {}",query );
 
 		UUID currentUserId = getCurrentUserId();
 		String userIdString = convertUserIdForLogging(currentUserId);
@@ -892,17 +894,17 @@ public class SearchRepository {
 		try {
 			// ✅ 1단계: Elasticsearch에서 게시글 ID 검색
 			List<String> postIdStrings = elkSearchRepository.searchPosts(query);
-			System.out.println("  - ELK 피드 검색 결과: " + postIdStrings.size() + "개");
+			log.info("  - ELK 피드 검색 결과: {}개", postIdStrings.size());
 
 			List<Post> posts;
 
 			if (postIdStrings.isEmpty()) {
 				// ✅ ELK 결과 없으면 DB 직접 검색
-				System.out.println("  - ELK 결과 없음, DB 직접 검색 실행");
+				log.info("  - ELK 결과 없음, DB 직접 검색 실행");
 				posts = postRepository.findByTitleContainingOrContentContaining(query).stream()
 					.limit(50)
 					.collect(Collectors.toList());
-				System.out.println("  - DB 직접 검색 결과: " + posts.size() + "개");
+				log.info("  - DB 직접 검색 결과: {}개", posts.size() );
 
 				if (posts.isEmpty()) {
 					return getEmptySearchFeed();
@@ -937,8 +939,7 @@ public class SearchRepository {
 					.build())
 				.collect(Collectors.toList());
 
-			System.out.println("✅ 피드 검색 완료 - 최신: " + resultsRecent.size() + "개, 인기: " + resultsPopular.size() + "개");
-
+			log.info("✅ 피드 검색  - 최신: {}개, 인기: {}개", resultsRecent.size(), resultsPopular.size());
 			return SearchResponse.SearchFeed.builder()
 				.resultsRecent(resultsRecent)
 				.resultPopular(resultsPopular)
@@ -957,7 +958,7 @@ public class SearchRepository {
 	 */
 	private List<SearchResponse.SearchResultAll.PopularMedia> getPopularMediaForSearch(UUID currentUserId) {
 		try {
-			System.out.println("📺 인기 YouTube 미디어 조회 시작");
+			log.info("📺 인기 YouTube 미디어 조회 시작");
 
 			List<Post> youtubePosts = postRepository.findAll().stream()
 				.filter(post -> post.getMediaUrl() != null &&
@@ -972,7 +973,7 @@ public class SearchRepository {
 				.limit(10)
 				.collect(Collectors.toList());
 
-			System.out.println("  - YouTube 미디어 " + youtubePosts.size() + "개 발견");
+			log.info("  - YouTube 미디어 {}개", youtubePosts.size() );
 
 			return youtubePosts.stream()
 				.map(post -> SearchResponse.SearchResultAll.PopularMedia.builder()
@@ -1036,7 +1037,7 @@ public class SearchRepository {
 
 	/** 40번 자동완성 검색어 조회 (더 유연한 검색) */
 	public SearchResponse.Autocomplete getAutocomplete(String query) {
-		System.out.println("🔍 Elasticsearch 자동완성 검색: '" + query + "'");
+		log.info("🔍 Elasticsearch 자동완성 검색: {}", query);
 
 		try {
 			// ✅ 1단계: Elasticsearch에서 유연한 검색
@@ -1062,8 +1063,8 @@ public class SearchRepository {
 				.limit(10)
 				.collect(Collectors.toList());
 
-			System.out.println("✅ 자동완성 결과: " + finalSuggestions.size() + "개");
-			finalSuggestions.forEach(s -> System.out.println("  - " + s));
+			log.info("✅ 자동완성 결과: {}개", finalSuggestions.size() );
+			finalSuggestions.forEach(s -> log.info("  - {}", s));
 
 			// 비동기 키워드 업데이트
 			updateAutocompleteKeywords(query);
@@ -1387,7 +1388,7 @@ public class SearchRepository {
 					.document(newKeyword)
 				));
 
-				System.out.println("🆕 새로운 자동완성 키워드 추가: " + query);
+				log.info("🆕 새로운 자동완성 키워드 추가: {}",query);
 			}
 
 		} catch (Exception e) {

@@ -19,7 +19,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import javax.net.ssl.SSLContext;
-
+import lombok.extern.slf4j.Slf4j;
+@Slf4j
 @Configuration
 public class ElasticConfig {
 
@@ -63,7 +64,6 @@ public class ElasticConfig {
 
 	@Bean
 	public ElasticsearchClient elasticsearchClient(RestClient restClient) {
-		// 🎯 핵심: JavaTimeModule을 등록한 ObjectMapper 생성
 		ObjectMapper objectMapper = new ObjectMapper()
 			.registerModule(new JavaTimeModule())
 			.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)

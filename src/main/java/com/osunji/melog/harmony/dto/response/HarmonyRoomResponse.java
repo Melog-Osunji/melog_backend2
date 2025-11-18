@@ -55,7 +55,7 @@ public class HarmonyRoomResponse {
 			private String postID;
 			private String mediaUrl;
 			private String mediaType;
-			private String createdAgo;          // "오늘" 또는 "n일전"
+			private String createdAgo;
 		}
 	}
 
@@ -115,7 +115,7 @@ public class HarmonyRoomResponse {
 				private String mediaType;
 				private String mediaUrl;
 				private List<String> tags;
-				private Integer createdAgo;
+				private String createdAgo;
 				private Integer likeCount;
 				private List<String> hiddenUser;
 				private Integer commentCount;
@@ -170,7 +170,7 @@ public class HarmonyRoomResponse {
 		private String intro;
 		private Boolean isRunning;              // 내가 생성자인지 여부
 		private Boolean isPrivate;
-		private LocalDateTime createdAt;
+		private String createdAt;
 		private List<String> members;           // 멤버 ID 리스트
 		private String owner;                   // 소유자 ID
 		private Boolean isDirectAssign;
@@ -203,6 +203,8 @@ public class HarmonyRoomResponse {
 		private String intro;
 		private List<String> category;
 		private String profileImgLink;
+		private Integer memberNum;                 // 멤버 수
+		private List<String> userProfileImgsUrl;
 	}
 	/**
 	 * 멤버 여부 확인 응답 DTO
@@ -299,4 +301,124 @@ public class HarmonyRoomResponse {
 			private Boolean isDirectAssign;         // 바로 가입 여부
 		}
 	}
-}
+
+	/**
+	 * 하모니룸 게시글 단건 상세 조회 응답 DTO
+	 */
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
+	@Builder
+	public static class PostDetail {
+		private String id;
+		private String content;
+		private String mediaType;
+		private String mediaUrl;
+		private List<String> tags;
+		private String createdAgo;
+		private Integer likeCount;
+		private List<String> hiddenUser;  // 숨긴 유저 ID 리스ff트
+		private Integer commentCount;
+		private BestComment bestComment;
+		private Boolean isLiked;      // 추가 필요
+		private Boolean isBookmarked; // 추가 필요
+
+		@Data
+		@NoArgsConstructor
+		@AllArgsConstructor
+		@Builder
+		public static class BestComment {
+			private String userId;
+			private String content;
+		}
+	}
+
+	/**
+	 * 하모니룸 게시글의 모든 댓글 조회 응답 DTO
+	 */
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
+	@Builder
+	public static class HarmonyRoomPostComments {
+		private List<CommentData> comments;
+
+		@Data
+		@NoArgsConstructor
+		@AllArgsConstructor
+		@Builder
+		public static class CommentData {
+			private String id;
+			private String content;
+			private String userId;
+			private String userNickname;
+			private String userProfileImgLink;
+			private Integer likeCount;
+			private String createdAgo;
+			private List<CommentData> replies;  // 재귀 구조
+		}
+	}
+		/**
+		 * 하모니룸 게시글 베스트 댓글 DTO (단건)
+		 */
+		@Data
+		@NoArgsConstructor
+		@AllArgsConstructor
+		@Builder
+		public static class HarmonyRoomBestComment {
+			private String id;
+			private String content;
+			private String userId;
+			private String userNickname;
+			private Integer likeCount;
+		}
+
+		/**
+		 * 하모니룸 유저 게시글 목록 DTO
+		 */
+		@Data
+		@NoArgsConstructor
+		@AllArgsConstructor
+		@Builder
+		public static class UserHarmonyPosts {
+			private List<UserPostData> results;
+
+			@Data
+			@NoArgsConstructor
+			@AllArgsConstructor
+			@Builder
+			public static class UserPostData {
+				private String id;
+				private String content;
+				private String mediaType;
+				private String mediaUrl;
+				private Integer likeCount;
+				private Integer commentCount;
+				private String createdAgo;
+			}
+		}
+
+		/**
+		 * 하모니룸 유저 북마크 게시글 목록 DTO
+		 */
+		@Data
+		@NoArgsConstructor
+		@AllArgsConstructor
+		@Builder
+		public static class UserHarmonyBookmarks {
+			private List<UserBookmarkData> results;
+
+			@Data
+			@NoArgsConstructor
+			@AllArgsConstructor
+			@Builder
+			public static class UserBookmarkData {
+				private String postId;
+				private String title;
+				private String mediaUrl;
+				private String mediaType;
+				private String createdAgo;
+			}
+		}
+
+	}

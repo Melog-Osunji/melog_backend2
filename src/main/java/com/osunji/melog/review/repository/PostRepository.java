@@ -1,6 +1,7 @@
 package com.osunji.melog.review.repository;
 
 import com.osunji.melog.review.entity.Post;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -83,7 +84,13 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 	/** YouTube 미디어만 모두 조회 */
 	@Query("SELECT p FROM Post p WHERE p.mediaType = 'youtube'")
 	List<Post> findAllYoutubeMedia();
+	// 유저 미디어 게시글과 작성자 정보를 함께 조회
+	@Query("SELECT p FROM Post p JOIN FETCH p.user WHERE p.user.id = :userId")
+	List<Post> findUserMediaPostsWithAuthor(@Param("userId") UUID userId, @Param("currentUserId") UUID currentUserId);
 
+	// 유저 게시글과 작성자 정보를 함께 조회fff
+	@Query("SELECT p FROM Post p JOIN FETCH p.user WHERE p.user.id = :userId")
+	List<Post> findUserPostsWithAuthor(@Param("userId") UUID userId, @Param("currentUserId") UUID currentUserId);
 	/**
 	 * 사용자의 모든 게시글 조회 (일반 + 하모니룸 게시글 포함)
 	 */
@@ -92,7 +99,12 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 		"ORDER BY p.createdAt DESC")
 	List<Post> findAllPostsByUserIdIncludingHarmony(@Param("userId") UUID userId,
 		@Param("currentUserId") UUID currentUserId);
-
+	// 사용자(userId)가 게시글(postId)에 좋아요 눌렀는지 여부 조회
+	@Query("SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END " +
+		"FROM Post p JOIN p.likes u " +
+		"WHERE p.id = :postId AND u.id = :userId")
+	boolean existsLikeByUserIdAndPostId(@Param("userId") UUID userId,
+		@Param("postId") UUID postId);
 	/** 특정 유저의 '미디어가 있는' 게시글만 조회 + hiddenUsers 제외 */
 	@Query("""
         SELECT p FROM Post p
