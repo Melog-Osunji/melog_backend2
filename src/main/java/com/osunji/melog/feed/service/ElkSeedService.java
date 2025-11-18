@@ -78,7 +78,7 @@ public class ElkSeedService {
 
         List<PostDoc> posts = new ArrayList<>(count);
         for (int i = 1; i <= count; i++) {
-            String id = "p" + i; // 고정 아이디. 충돌 피하려면 UUID.randomUUID().toString()
+            String id = UUID.randomUUID().toString();
             String authorId = "u" + (1 + rnd.nextInt(Math.max(users, 1)));
             List<String> tags = pickN(rnd, SAMPLE_TAGS, 2 + rnd.nextInt(2)); // 2~3개
             String main = tags.get(0);
