@@ -1,6 +1,7 @@
 package com.osunji.melog.harmony.repository;
 
 import com.osunji.melog.harmony.entity.HarmonyRoom;
+import com.osunji.melog.harmony.entity.HarmonyRoomMembers;
 import com.osunji.melog.user.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -79,6 +80,31 @@ public interface HarmonyRoomRepository extends JpaRepository<HarmonyRoom, UUID> 
        OR LOWER(h.intro) LIKE LOWER(CONCAT('%', :keyword, '%'))
     """)
 	List<HarmonyRoom> searchByKeyword(@Param("keyword") String keyword);
+
+    @Query("""
+        select hr
+        from HarmonyRoom hr
+        where hr.owner.id = :userId
+           or exists (
+                select 1
+                from HarmonyRoomMembers m
+                where m.harmonyRoom = hr
+                  and m.user.id = :userId
+           )
+        order by hr.createdAt desc
+        """)
+    List<HarmonyRoom> findAllJoinedOrOwned(@Param("userId") UUID userId);
+
+
+    // 내가 어떤 룸에 어떤 역할로 속해 있는지 전부 조회
+    @Query("""
+    select m
+    from HarmonyRoomMembers m
+    join m.harmonyRoom hr
+    where m.user.id = :userId
+    """)
+    List<HarmonyRoomMembers> findByUserIdWithRoom(@Param("userId") UUID userId);
+
 
 
 
