@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -19,7 +20,7 @@ public class CalendarResponse {
     private Meta meta;
     private Calendar calendar;
     private List<Item> schedule;
-    private List<Item> items;
+//    private List<Item> items;
 
 
     @Getter
@@ -60,6 +61,30 @@ public class CalendarResponse {
     @AllArgsConstructor
     @Builder
     public static class Item {
+
+        private static final long serialVersionUID = 1L;
+
+        private UUID id;
+        private String title;
+        private String category;
+        private String thumbnailUrl;
+        private String venue; // 장소
+        private OffsetDateTime startDateTime;
+        private OffsetDateTime endDateTime;
+        private int dDay;
+        private boolean bookmarked;
+        private UUID eventId;
+    }
+
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class RedisItem implements Serializable {
+
+        private static final long serialVersionUID = 1L;
+
         private UUID id;
         private String title;
         private String category;

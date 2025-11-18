@@ -13,8 +13,6 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 
-import static com.osunji.melog.calendar.CultureCategory.ALL;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -24,7 +22,7 @@ public class CalendarService {
 
     private static final DayOfWeek WEEK_START = DayOfWeek.SATURDAY;
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    private final CultureOpenApiService cultureOpenApiService;
+    private final CultureOpenApiClient cultureOpenApiClient;
 
     public ApiMessage<CalendarResponse> calendarMain(UUID userId, Integer year, Integer month) {
         log.debug("📅 [calendarMain] called with userId={}, year={}, month={}", userId, year, month);
@@ -81,7 +79,7 @@ public class CalendarService {
         List<List<CalendarResponse.Day>> weeks = buildWeeksGrid(fromDate, toDate, eventsByDate);
         log.debug("🧱 달력 주차 수 = {}", weeks.size());
 
-        List<CalendarResponse.Item> CNV060Items = cultureOpenApiService.fetchItems(ALL);
+//        List<CalendarResponse.Item> CNV060Items = cultureOpenApiService.fetchItems(ALL);
         log.debug("✅ fetchItems() 완료: count={}", items.size());
 
         CalendarResponse body = CalendarResponse.builder()
@@ -96,7 +94,7 @@ public class CalendarService {
                         .weeks(weeks)
                         .build())
                 .schedule(items)
-                .items(CNV060Items)
+//                .items(CNV060Items)
                 .build();
 
         log.debug("✅ CalendarResponse 생성 완료 (items={}, weeks={})", items.size(), weeks.size());
