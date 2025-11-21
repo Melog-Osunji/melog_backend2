@@ -24,6 +24,8 @@ import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch._types.FieldSort;
 import co.elastic.clients.elasticsearch._types.ScoreSort;
 import com.osunji.melog.search.dto.AutocompleteKeyword;
+
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Async;
 import java.util.Map;
 import java.util.HashMap;
@@ -723,7 +725,7 @@ public class SearchRepository {
 					.map(UUID::fromString)
 					.collect(Collectors.toList());
 
-				results = postRepository.findAllByIdIn(postIds).stream()
+				results = postRepository.findAllByIdInWithUser(postIds).stream()
 					.map(post -> SearchResponse.PostResult.builder()
 						.post(post)
 						.user(post.getUser())
@@ -864,6 +866,7 @@ public class SearchRepository {
 			return new HashSet<>();
 		}
 	}
+	// List<Post> posts = postRepository.findAllByIdInWithUser(postIds);
 
 	/**
 	 * ✅ 현재 사용자 ID 가져오기 (기존 메서드 활용 또는 수정)
@@ -892,57 +895,57 @@ public class SearchRepository {
 		}
 
 		try {
-			// ✅ 1단계: Elasticsearch에서 게시글 ID 검색
-			List<String> postIdStrings = elkSearchRepository.searchPosts(query);
-			log.info("  - ELK 피드 검색 결과: {}개", postIdStrings.size());
+			CompletableFuture<List<Post>> postsFuture = CompletableFuture.supplyAsync(() -> {
+				List<String> postIdStrings = elkSearchRepository.searchPosts(query);
+				log.info("  - ELK 피드 검색 결과: {}개", postIdStrings.size());
 
-			List<Post> posts;
-
-			if (postIdStrings.isEmpty()) {
-				// ✅ ELK 결과 없으면 DB 직접 검색
-				log.info("  - ELK 결과 없음, DB 직접 검색 실행");
-				posts = postRepository.findByTitleContainingOrContentContaining(query).stream()
-					.limit(50)
-					.collect(Collectors.toList());
-				log.info("  - DB 직접 검색 결과: {}개", posts.size() );
-
-				if (posts.isEmpty()) {
-					return getEmptySearchFeed();
+				if (postIdStrings.isEmpty()) {
+					log.info("  - ELK 결과 없음, DB 직접 검색 실행");
+					return postRepository.findByTitleContainingOrContentContaining(query)
+						.stream()
+						.limit(50)
+						.collect(Collectors.toList());
+				} else {
+					List<UUID> postIds = postIdStrings.stream()
+						.limit(50)
+						.map(UUID::fromString)
+						.collect(Collectors.toList());
+					return postRepository.findAllByIdInWithUser(postIds);
 				}
-			} else {
-				List<UUID> postIds = postIdStrings.stream()
-					.limit(50)
-					.map(UUID::fromString)
-					.collect(Collectors.toList());
-				posts = postRepository.findAllByIdIn(postIds);
-			}
+			});
 
-			// ✅ 최신순 정렬 - Entity 기반 (기존과 동일)
-			List<SearchResponse.PostResult> resultsRecent = posts.stream()
-				.sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
-				.map(post -> SearchResponse.PostResult.builder()
-					.post(post)
-					.user(post.getUser())
-					.build())
-				.collect(Collectors.toList());
+			// 최신순 정렬 병렬 처리
+			CompletableFuture<List<SearchResponse.PostResult>> recentFuture = postsFuture.thenApplyAsync(posts ->
+				posts.stream()
+					.sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+					.map(post -> SearchResponse.PostResult.builder()
+						.post(post)
+						.user(post.getUser())
+						.build())
+					.collect(Collectors.toList())
+			);
 
-			// ✅ 인기순 정렬 - likes.size() 기준으로 수정
-			List<SearchResponse.PostResult> resultsPopular = posts.stream()
-				.sorted((a, b) -> {
-					int likesA = a.getLikes() != null ? a.getLikes().size() : 0;
-					int likesB = b.getLikes() != null ? b.getLikes().size() : 0;
-					return Integer.compare(likesB, likesA); // 좋아요 내림차순
-				})
-				.map(post -> SearchResponse.PostResult.builder()
-					.post(post)
-					.user(post.getUser())
-					.build())
-				.collect(Collectors.toList());
+			// 인기순 정렬 병렬 처리
+			CompletableFuture<List<SearchResponse.PostResult>> popularFuture = postsFuture.thenApplyAsync(posts ->
+				posts.stream()
+					.sorted((a, b) -> {
+						int likesA = a.getLikes() != null ? a.getLikes().size() : 0;
+						int likesB = b.getLikes() != null ? b.getLikes().size() : 0;
+						return Integer.compare(likesB, likesA);
+					})
+					.map(post -> SearchResponse.PostResult.builder()
+						.post(post)
+						.user(post.getUser())
+						.build())
+					.collect(Collectors.toList())
+			);
 
-			log.info("✅ 피드 검색  - 최신: {}개, 인기: {}개", resultsRecent.size(), resultsPopular.size());
+			// 결과 기다림
+			CompletableFuture.allOf(recentFuture, popularFuture).join();
+
 			return SearchResponse.SearchFeed.builder()
-				.resultsRecent(resultsRecent)
-				.resultPopular(resultsPopular)
+				.resultsRecent(recentFuture.get())
+				.resultPopular(popularFuture.get())
 				.build();
 
 		} catch (Exception e) {
@@ -950,6 +953,7 @@ public class SearchRepository {
 			return getEmptySearchFeed();
 		}
 	}
+
 
 	// ========== 헬퍼 메서드 ==========
 

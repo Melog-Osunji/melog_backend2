@@ -633,7 +633,42 @@ public class HarmonyController {
 
 
 
+	// ----------- 숨김 처리 기능 -----------
 
+	/** 하모니룸 게시글 숨김 추가 (POST /api/harmony/posts/{postId}/hidden) */
+	@PostMapping("/harmony/posts/{postId}/hidden")
+	public ResponseEntity<ApiMessage<Void>> addHiddenUser(
+		@PathVariable String postId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Void> response = harmonyService.addHiddenUser(postId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	/** 하모니룸 게시글 숨김 취소 (DELETE /api/harmony/posts/{postId}/hidden) */
+	@DeleteMapping("/harmony/posts/{postId}/hidden")
+	public ResponseEntity<ApiMessage<Void>> removeHiddenUser(
+		@PathVariable String postId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Void> response = harmonyService.removeHiddenUser(postId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	/** 해당 게시글의 숨김 유저 UUID 목록 조회 (GET /api/harmony/posts/{postId}/hidden) */
+	@GetMapping("/harmony/posts/{postId}/hidden")
+	public ResponseEntity<ApiMessage<List<String>>> getHiddenUserUUID(
+		@PathVariable String postId) {
+		ApiMessage<List<String>> response = harmonyService.getHiddenUserUUID(postId);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	/** 본인 하모니룸 게시글 숨김 여부 조회 (GET /api/harmony/posts/{postId}/hidden/check) */
+	@GetMapping("/harmony/posts/{postId}/hidden/check")
+	public ResponseEntity<ApiMessage<Boolean>> isHiddenByMe(
+		@PathVariable String postId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Boolean> response = harmonyService.isHiddenByMe(postId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
 
 
 

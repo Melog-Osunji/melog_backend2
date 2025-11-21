@@ -3,14 +3,23 @@ package com.osunji.melog.search.service;
 import com.osunji.melog.search.dto.response.SearchResponse;
 import com.osunji.melog.search.repository.SearchRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+@Slf4j
 
 @Service
 @RequiredArgsConstructor
 public class SearchService {
-
+	private final CacheManager cacheManager;
+	private final ObjectMapper objectMapper;
 	private final SearchRepository searchRepository;
 
 	/**
@@ -77,12 +86,63 @@ public class SearchService {
 	/**
 	 * api(39번) 검색결과 - 피드 (최신순 + 인기순)
 	 */
+
 	public SearchResponse.SearchFeed searchFeed(String query) {
-		return searchRepository.searchFeed(query);
+		Cache cache = cacheManager.getCache("searchFeedCache");
+
+		if (cache != null) {
+			Cache.ValueWrapper cached = cache.get(query);
+			if (cached != null) {
+				try {
+					String json = (String) cached.get();
+					return objectMapper.readValue(json, SearchResponse.SearchFeed.class);
+				} catch (Exception e) {
+					// 캐시 역직렬화 실패 시 캐시 무시 후 새로 조회
+					log.warn("캐시 역직렬화 실패, 새로 검색 진행: {}", e.getMessage());
+				}
+			}
+		}
+
+		// 캐시 미스일 경우 실제 검색 수행
+		SearchResponse.SearchFeed result = searchRepository.searchFeed(query);
+
+		if (cache != null) {
+			try {
+				String json = objectMapper.writeValueAsString(result);
+				cache.put(query, json);
+			} catch (Exception e) {
+				log.warn("캐시 저장 실패: {}", e.getMessage());
+			}
+		}
+
+		return result;
 	}
 
 	public SearchResponse.Autocomplete getAutocomplete(String query) {
-		return searchRepository.getAutocomplete(query);
-	}
+		Cache cache = cacheManager.getCache("autocompleteCache");
+		if (cache != null) {
+			Cache.ValueWrapper cached = cache.get(query);
+			if (cached != null) {
+				try {
+					String json = (String) cached.get();
+					return objectMapper.readValue(json, SearchResponse.Autocomplete.class);
+				} catch (Exception e) {
+					// JSON 역직렬화 실패 시 캐시 무시하고 새로 조회
+				}
+			}
+		}
 
+		SearchResponse.Autocomplete result = searchRepository.getAutocomplete(query);
+
+		if (cache != null) {
+			try {
+				String json = objectMapper.writeValueAsString(result);
+				cache.put(query, json);
+			} catch (Exception e) {
+				// 캐시 저장 실패 로그 기록
+			}
+		}
+
+		return result;
+	}
 }

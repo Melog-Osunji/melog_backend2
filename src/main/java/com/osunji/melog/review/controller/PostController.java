@@ -1,5 +1,7 @@
 package com.osunji.melog.review.controller;
 
+import java.util.List;
+
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.review.dto.request.CommentRequest;
 import com.osunji.melog.review.dto.request.PostRequest;
@@ -211,4 +213,41 @@ public class PostController {
 		ApiMessage<FilterPostResponse.UserPostList> response = postService.getUserPosts(userId);
 		return ResponseEntity.status(response.getCode()).body(response);
 	}
+	//---------------숨김 처리 기능-----------------//
+
+	/** 게시글 숨김 추가 (POST /api/posts/{postId}/hidden) */
+	@PostMapping("/posts/{postId}/hidden")
+	public ResponseEntity<ApiMessage<Void>> addHiddenUser(
+		@PathVariable String postId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Void> response = postService.addHiddenUser(postId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	/** 게시글 숨김 취소 (DELETE /api/posts/{postId}/hidden) */
+	@DeleteMapping("/posts/{postId}/hidden")
+	public ResponseEntity<ApiMessage<Void>> removeHiddenUser(
+		@PathVariable String postId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Void> response = postService.removeHiddenUser(postId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	/** 특정 게시글의 숨김 유저 닉네임 목록 조회 (GET /api/posts/{postId}/hidden) */
+	@GetMapping("/posts/{postId}/hidden")
+	public ResponseEntity<ApiMessage<List<String>>> getHiddenUserUUID(
+		@PathVariable String postId) {
+		ApiMessage<List<String>> response = postService.getHiddenUserUUID(postId);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
+	/** 본인 게시글 숨김 여부 조회 (GET /api/posts/{postId}/hidden/check) */
+	@GetMapping("/posts/{postId}/hidden/check")
+	public ResponseEntity<ApiMessage<Boolean>> isHiddenByMe(
+		@PathVariable String postId,
+		@RequestHeader("Authorization") String authHeader) {
+		ApiMessage<Boolean> response = postService.isHiddenByMe(postId, authHeader);
+		return ResponseEntity.status(response.getCode()).body(response);
+	}
+
 }
