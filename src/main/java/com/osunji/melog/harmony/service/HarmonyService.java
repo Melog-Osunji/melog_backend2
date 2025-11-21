@@ -1598,6 +1598,82 @@ public class HarmonyService {
 	}
 
 
+	/** 하모니룸 게시글 숨김 추가 */
+	@Transactional
+	public ApiMessage<Void> addHiddenUser(String postIdStr, String authHeader) {
+		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			User user = userRepository.findById(userId)
+				.orElseThrow(() -> new IllegalArgumentException("사용자 없음"));
+			UUID postId = UUID.fromString(postIdStr);
+			HarmonyRoomPosts post = harmonyRoomPostsRepository.findById(postId)
+				.orElseThrow(() -> new IllegalArgumentException("하모니룸 게시글 없음"));
+			post.getHiddenUsers().add(user);
+			harmonyRoomPostsRepository.save(post);
+			return ApiMessage.success(200, "숨김 처리 완료", null);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "숨김 처리 실패: " + e.getMessage());
+		}
+	}
+
+	/** 하모니룸 게시글 숨김 취소 */
+	@Transactional
+	public ApiMessage<Void> removeHiddenUser(String postIdStr, String authHeader) {
+		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			User user = userRepository.findById(userId)
+				.orElseThrow(() -> new IllegalArgumentException("사용자 없음"));
+			UUID postId = UUID.fromString(postIdStr);
+			HarmonyRoomPosts post = harmonyRoomPostsRepository.findById(postId)
+				.orElseThrow(() -> new IllegalArgumentException("하모니룸 게시글 없음"));
+			post.getHiddenUsers().remove(user);
+			harmonyRoomPostsRepository.save(post);
+			return ApiMessage.success(200, "숨김 취소 완료", null);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "숨김 취소 실패: " + e.getMessage());
+		}
+	}
+
+	/** 하모니룸 게시글 숨김 유저 UUID 목록 조회 */
+	@Transactional(readOnly = true)
+	public ApiMessage<List<String>> getHiddenUserUUID(String postIdStr) {
+		try {
+			UUID postId = UUID.fromString(postIdStr);
+			HarmonyRoomPosts post = harmonyRoomPostsRepository.findById(postId)
+				.orElseThrow(() -> new IllegalArgumentException("하모니룸 게시글 없음"));
+			List<String> hiddenUserUUIDs = post.getHiddenUsers().stream()
+				.map(user -> user.getId().toString())
+				.collect(Collectors.toList());
+			return ApiMessage.success(200, "숨김 유저 조회 성공", hiddenUserUUIDs);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "숨김 유저 조회 실패: " + e.getMessage());
+		}
+	}
+
+	/** 본인 하모니룸 게시글 숨김 여부 조회 */
+	@Transactional(readOnly = true)
+	public ApiMessage<Boolean> isHiddenByMe(String postIdStr, String authHeader) {
+		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			User user = userRepository.findById(userId)
+				.orElseThrow(() -> new IllegalArgumentException("사용자 없음"));
+			UUID postId = UUID.fromString(postIdStr);
+			HarmonyRoomPosts post = harmonyRoomPostsRepository.findById(postId)
+				.orElseThrow(() -> new IllegalArgumentException("하모니룸 게시글 없음"));
+			boolean isHidden = post.getHiddenUsers().contains(user);
+			return ApiMessage.success(200, "숨김 여부 조회 성공", isHidden);
+		} catch (IllegalArgumentException e) {
+			return ApiMessage.fail(400, e.getMessage());
+		} catch (Exception e) {
+			return ApiMessage.fail(500, "숨김 여부 조회 실패: " + e.getMessage());
+		}
+	}
 
 
 
