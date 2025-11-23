@@ -36,4 +36,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {  // UUID →
     Optional<User> findByOidcAndPlatform(String oidc, Platform platform);
 
     Optional<User> findIdByNickname(String nickname);
+    boolean existsByNickname(String nickname);
+
 }
