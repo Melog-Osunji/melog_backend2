@@ -541,5 +541,28 @@ public class UserService {
         };
     }
 
+    @Transactional(readOnly = true)
+    public ApiMessage<UserResponse.NicknameExistResponse> isNicknameExist(String nickname) {
+
+        // 필요하면 간단 검증
+        if (nickname == null || nickname.isBlank()) {
+            return ApiMessage.<UserResponse.NicknameExistResponse>builder()
+                    .code(HttpStatus.BAD_REQUEST.value())
+                    .message("닉네임은 비어 있을 수 없습니다.")
+                    .data(null)
+                    .build();
+        }
+
+        boolean exists = userRepository.existsByNickname(nickname.trim());
+
+        UserResponse.NicknameExistResponse body =
+                new UserResponse.NicknameExistResponse(exists);
+
+        return ApiMessage.<UserResponse.NicknameExistResponse>builder()
+                .code(HttpStatus.OK.value())
+                .message("닉네임 중복 여부 조회 성공")
+                .data(body)
+                .build();
+    }
 
 }
