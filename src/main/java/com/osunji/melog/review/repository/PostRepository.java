@@ -14,6 +14,8 @@ import java.util.UUID;
 
 @Repository
 public interface PostRepository extends JpaRepository<Post, UUID> {
+	@Query("SELECT p FROM Post p JOIN FETCH p.user WHERE p.id IN :ids")
+	List<Post> findAllByIdInWithUser(@Param("ids") List<UUID> ids);
 
 	//---------------특정 게시글 조회용-----------------//
 	/** 기본 postID로 조회 + 유저 정보 추가 */
