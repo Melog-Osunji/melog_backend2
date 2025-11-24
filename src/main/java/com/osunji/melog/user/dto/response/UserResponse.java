@@ -100,4 +100,12 @@ public class UserResponse {
         private String roomImg;
         private boolean bookmark;
     }
+
+
+    @Getter
+    @AllArgsConstructor
+    public static class NicknameExistResponse {
+        private boolean exists;   // true면 이미 사용 중, false면 사용 가능
+    }
+
 }
