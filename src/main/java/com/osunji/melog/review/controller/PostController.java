@@ -3,6 +3,7 @@ package com.osunji.melog.review.controller;
 import java.util.List;
 
 import com.osunji.melog.global.dto.ApiMessage;
+import com.osunji.melog.harmony.dto.request.HarmonyRoomRequest;
 import com.osunji.melog.review.dto.request.CommentRequest;
 import com.osunji.melog.review.dto.request.PostRequest;
 import com.osunji.melog.review.dto.response.BookmarkResponse;
@@ -13,11 +14,13 @@ import com.osunji.melog.review.service.BookmarkService;
 import com.osunji.melog.review.service.CommentService;
 import com.osunji.melog.review.service.PostService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 
+@Slf4j
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -249,5 +252,29 @@ public class PostController {
 		ApiMessage<Boolean> response = postService.isHiddenByMe(postId, authHeader);
 		return ResponseEntity.status(response.getCode()).body(response);
 	}
+//
+//    @PostMapping("/posts/{postId}/report")
+//    public ResponseEntity<ApiMessage<Void>> reportPost(
+//            @PathVariable String postId,
+//            @RequestBody PostRequest.Report reportRequest,
+//            @RequestHeader("Authorization") String authHeader) {
+//
+//        log.info("🚨 게시물 신고 요청: {} - 사유: {}, 카테고리: {}",
+//                postId, reportRequest.getReason(), reportRequest.getCategory());
+//
+//        try {
+//            postService.reportPost(postId, reportRequest, authHeader);
+//            return ResponseEntity.ok(ApiMessage.success(200, "신고가 접수되었습니다", null));
+//        } catch (IllegalArgumentException e) {
+//            log.error("게시물 신고 실패 - 잘못된 요청: {}", e.getMessage());
+//            return ResponseEntity.badRequest().body(ApiMessage.fail(400, e.getMessage()));
+//        } catch (IllegalStateException e) {
+//            log.error("게시물 신고 실패 - 인증 오류: {}", e.getMessage());
+//            return ResponseEntity.status(401).body(ApiMessage.fail(401, "인증이 필요합니다"));
+//        } catch (Exception e) {
+//            log.error("게시물 신고 처리 실패: {}", e.getMessage(), e);
+//            return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "신고 처리에 실패했습니다"));
+//        }
+//    }
 
 }

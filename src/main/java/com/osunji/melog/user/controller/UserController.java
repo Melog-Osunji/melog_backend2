@@ -131,9 +131,13 @@ public class UserController {
 
     @GetMapping("/myPage")
     public ResponseEntity<?> myPage(
-            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId,
+            @RequestParam(required = false) UUID profileUser
     ) {
-        ApiMessage<UserResponse.MyPageResponse> response = userService.getMyPage(userId);
+        UUID targetUserId = (profileUser == null || userId.equals(profileUser))
+                ? userId
+                : profileUser;
+        ApiMessage<UserResponse.MyPageResponse> response = userService.getMyPage(targetUserId);
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
