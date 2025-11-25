@@ -657,76 +657,76 @@ public class PostService {
 			return ApiMessage.fail(500, "숨김 유저 조회 실패: " + e.getMessage());
 		}
 	}
-
-    @Transactional
-    public void reportPost(String postId, PostRequest.Report reportRequest, String authHeader) {
-        try {
-            log.info("🚨 게시물 신고 시작: {} - 사유: {}", postId, reportRequest.getReason());
-
-            // 1. 사용자 인증
-            UUID userId = authHelper.authHelperAsUUID(authHeader);
-            User reporter = userRepository.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
-
-            // 2. 하모니룸 존재 확인
-            UUID harmonyRoomUuid = UUID.fromString(postId);
-            HarmonyRoom harmonyRoom = postRepository.findById(harmonyRoomUuid)
-                    .orElseThrow(() -> new IllegalArgumentException("게시물을 찾을 수 없습니다"));
-
-            // 3. 중복 신고 방지 (DB 기반)
-            boolean alreadyReported = harmonyRoomReportRepository
-                    .existsByReporterIdAndHarmonyRoomId(userId, harmonyRoomUuid);
-
-            if (alreadyReported) {
-                log.warn("⚠️ 이미 신고한 하모니룸: 사용자={}, 하모니룸={}",
-                        reporter.getNickname(), harmonyRoom.getName());
-                throw new IllegalArgumentException("이미 신고한 하모니룸입니다");
-            }
-
-            // 4. 신고 기록 저장 (DB)
-            HarmonyRoomReport report = HarmonyRoomReport.create(
-                    reporter,
-                    harmonyRoom,
-                    reportRequest.getReason(),
-                    reportRequest.getCategory(),
-                    reportRequest.getDetails()
-            );
-
-            harmonyRoomReportRepository.save(report);
-            log.info("📝 신고 기록 DB 저장 완료: {} - 신고자: {}", report.getId(), reporter.getNickname());
-
-            // 5. ✅ ElasticSearch에 안전한 로그 기록 (Field 오류 해결)
-            try {
-                harmonyReportLogService.logHarmonyReportByCategory(
-                        report.getId().toString(),      // reportId
-                        harmonyRoom.getId().toString(), // harmonyId
-                        harmonyRoom.getName(),          // harmonyName (한글 지원)
-                        reporter.getId().toString(),    // reporterId
-                        reportRequest.getReason(),      // reason (한글 지원)
-                        reportRequest.getCategory(),    // category
-                        reportRequest.getDetails()      // details (한글 지원, null 허용)
-                );
-                log.info("📊 ElasticSearch 신고 로그 기록 완료");
-            } catch (Exception e) {
-                log.warn("⚠️ ElasticSearch 로그 기록 실패: {}", e.getMessage());
-                // ElasticSearch 실패해도 신고는 정상 처리
-            }
-
-            // 6. 통계 업데이트
-            try {
-                harmonyReportLogService.logReportStatistics(harmonyId);
-            } catch (Exception e) {
-                log.warn("신고 통계 업데이트 실패: {}", e.getMessage());
-            }
-
-        } catch (IllegalArgumentException e) {
-            log.error("❌ 신고 처리 오류: {}", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            log.error("💥 신고 처리 실패: {}", e.getMessage(), e);
-            throw new RuntimeException("신고 처리에 실패했습니다", e);
-        }
-    }
+//
+//    @Transactional
+//    public void reportPost(String postId, PostRequest.Report reportRequest, String authHeader) {
+//        try {
+//            log.info("🚨 게시물 신고 시작: {} - 사유: {}", postId, reportRequest.getReason());
+//
+//            // 1. 사용자 인증
+//            UUID userId = authHelper.authHelperAsUUID(authHeader);
+//            User reporter = userRepository.findById(userId)
+//                    .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
+//
+//            // 2. 하모니룸 존재 확인
+//            UUID harmonyRoomUuid = UUID.fromString(postId);
+//            HarmonyRoom harmonyRoom = postRepository.findById(harmonyRoomUuid)
+//                    .orElseThrow(() -> new IllegalArgumentException("게시물을 찾을 수 없습니다"));
+//
+//            // 3. 중복 신고 방지 (DB 기반)
+//            boolean alreadyReported = harmonyRoomReportRepository
+//                    .existsByReporterIdAndHarmonyRoomId(userId, harmonyRoomUuid);
+//
+//            if (alreadyReported) {
+//                log.warn("⚠️ 이미 신고한 하모니룸: 사용자={}, 하모니룸={}",
+//                        reporter.getNickname(), harmonyRoom.getName());
+//                throw new IllegalArgumentException("이미 신고한 하모니룸입니다");
+//            }
+//
+//            // 4. 신고 기록 저장 (DB)
+//            HarmonyRoomReport report = HarmonyRoomReport.create(
+//                    reporter,
+//                    harmonyRoom,
+//                    reportRequest.getReason(),
+//                    reportRequest.getCategory(),
+//                    reportRequest.getDetails()
+//            );
+//
+//            harmonyRoomReportRepository.save(report);
+//            log.info("📝 신고 기록 DB 저장 완료: {} - 신고자: {}", report.getId(), reporter.getNickname());
+//
+//            // 5. ✅ ElasticSearch에 안전한 로그 기록 (Field 오류 해결)
+//            try {
+//                harmonyReportLogService.logHarmonyReportByCategory(
+//                        report.getId().toString(),      // reportId
+//                        harmonyRoom.getId().toString(), // harmonyId
+//                        harmonyRoom.getName(),          // harmonyName (한글 지원)
+//                        reporter.getId().toString(),    // reporterId
+//                        reportRequest.getReason(),      // reason (한글 지원)
+//                        reportRequest.getCategory(),    // category
+//                        reportRequest.getDetails()      // details (한글 지원, null 허용)
+//                );
+//                log.info("📊 ElasticSearch 신고 로그 기록 완료");
+//            } catch (Exception e) {
+//                log.warn("⚠️ ElasticSearch 로그 기록 실패: {}", e.getMessage());
+//                // ElasticSearch 실패해도 신고는 정상 처리
+//            }
+//
+//            // 6. 통계 업데이트
+//            try {
+//                harmonyReportLogService.logReportStatistics(harmonyId);
+//            } catch (Exception e) {
+//                log.warn("신고 통계 업데이트 실패: {}", e.getMessage());
+//            }
+//
+//        } catch (IllegalArgumentException e) {
+//            log.error("❌ 신고 처리 오류: {}", e.getMessage());
+//            throw e;
+//        } catch (Exception e) {
+//            log.error("💥 신고 처리 실패: {}", e.getMessage(), e);
+//            throw new RuntimeException("신고 처리에 실패했습니다", e);
+//        }
+//    }
 	/** 본인 게시글 숨김 여부 조회 */
 	@Transactional(readOnly = true)
 	public ApiMessage<Boolean> isHiddenByMe(String postIdStr, String authHeader) {

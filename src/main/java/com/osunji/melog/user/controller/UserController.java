@@ -132,7 +132,7 @@ public class UserController {
     @GetMapping("/myPage")
     public ResponseEntity<?> myPage(
             @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId,
-            @RequestParam UUID profileUser
+            @RequestParam(required = false) UUID profileUser
     ) {
         UUID targetUserId = (profileUser == null || userId.equals(profileUser))
                 ? userId
