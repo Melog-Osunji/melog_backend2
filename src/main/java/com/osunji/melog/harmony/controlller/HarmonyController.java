@@ -6,7 +6,6 @@ import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.harmony.dto.request.HarmonyRoomRequest;
 import com.osunji.melog.harmony.dto.response.HarmonyRoomResponse;
 import com.osunji.melog.harmony.service.HarmonyService;
-import com.osunji.melog.review.dto.request.PostRequest;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -554,7 +553,7 @@ public class HarmonyController {
 	}
 
 	// ========== 하모니룸 게시글 북마크 제거 ==========
-	@DeleteMapping("/harmony/posts/{harmonyPostId}/bookmark")
+	@DeleteMapping("/harmony/posts/{harmonyPostId}/bookmarks")
 	public ResponseEntity<ApiMessage<Void>> unbookmarkHarmonyPost(
 		@PathVariable String harmonyPostId,
 		@RequestHeader("Authorization") String authHeader) {
@@ -613,10 +612,10 @@ public class HarmonyController {
 
 	// ========== 유저별 하모니룸 게시글 목록 ==========
 	@GetMapping("/harmony/users/{userId}/posts")
-	public ResponseEntity<ApiMessage<HarmonyRoomResponse.UserHarmonyPosts>> getUserHarmonyPosts(
+	public ResponseEntity<ApiMessage<List<HarmonyRoomResponse.PostDetail>>> getUserHarmonyPosts(
 		@PathVariable String userId,
 		@RequestHeader(value = "Authorization", required = false) String authHeader) {
-		ApiMessage<HarmonyRoomResponse.UserHarmonyPosts> response = harmonyService.getUserHarmonyPosts(userId, authHeader);
+		ApiMessage<List<HarmonyRoomResponse.PostDetail>> response = harmonyService.getUserHarmonyPosts(userId, authHeader);
 		return ResponseEntity.status(response.getCode()).body(response);
 	}
 

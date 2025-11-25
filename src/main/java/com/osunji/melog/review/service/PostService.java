@@ -118,7 +118,7 @@ public class PostService {
 			// 1. postId String → UUID 변환
 			UUID postId = UUID.fromString(postIdStr);
 
-			// 2. 토큰에서 userId 추출 (선택적)
+			// 2. 토큰에서 userId 추출
 			UUID userId = null;
 			try {
 				userId = authHelper.authHelperAsUUID(authHeader);
@@ -344,18 +344,23 @@ public class PostService {
 			log.info("  - 전체 게시글 수:{} " , allPosts.size());
 
 			// 좋아요 수 기준으로 정렬
+			UUID finalUserId = userId;
 			List<Post> popularPosts = allPosts.stream()
-				.filter(post -> post.getUser() != null) // user가 null인 게시글 제외
+				.filter(post -> post.getUser() != null)
+				// 추가: 현재 로그인 유저가 숨김 처리한 게시글 제외
+				.filter(post -> {
+					if (finalUserId == null) return true;
+					return post.getHiddenUsers() == null || post.getHiddenUsers().stream()
+						.noneMatch(user -> user.getId().equals(finalUserId));
+				})
 				.sorted((p1, p2) -> {
-					int likes1 = (p1.getLikes() != null) ? p1.getLikes().size() : 0;
-					int likes2 = (p2.getLikes() != null) ? p2.getLikes().size() : 0;
-					log.info("    게시글 {}: {}개 좋아요", p1.getId(), likes1);
-					log.info("    게시글 {}: {}개 좋아요", p2.getId(), likes2);
-
-					return Integer.compare(likes2, likes1); // 좋아요 많은 순 (내림차순)
+					int likes1 = p1.getLikes() != null ? p1.getLikes().size() : 0;
+					int likes2 = p2.getLikes() != null ? p2.getLikes().size() : 0;
+					return Integer.compare(likes2, likes1);
 				})
 				.limit(50)
 				.collect(Collectors.toList());
+
 
 			log.info("  - 인기 게시글 (좋아요 순){} 개 선별 완료 ", popularPosts.size() );
 
@@ -455,18 +460,20 @@ public class PostService {
 			// 팔로잉하는 사용자의 게시글만 필터링
 			List<Post> followingPosts = allPosts.stream()
 				.filter(post -> {
-					if (post.getUser() == null) {
-						log.info("    ⚠️ 게시글 {}의 user가 null", post.getId());
-						return false;
-					}
-					boolean isFollowing = followingUserIds.contains(post.getUser().getId());
-					log.info("    게시글 {} 작성자 {} 팔로잉 여부: {}", post.getId(), post.getUser().getId(), isFollowing);
-					return isFollowing;
-				})
+					if (post.getUser() == null) return false;
 
-				.sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt())) // 최신순
+					boolean isFollowing = followingUserIds.contains(post.getUser().getId());
+
+					// 현재 로그인 유저가 숨김 처리한 게시글 제외
+					boolean notHidden = userId == null || post.getHiddenUsers() == null
+						|| post.getHiddenUsers().stream().noneMatch(u -> u.getId().equals(userId));
+
+					return isFollowing && notHidden;
+				})
+				.sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt()))
 				.limit(50)
 				.toList();
+
 
 			log.info("  - 팔로잉 사용자 게시글 수: {}" , followingPosts.size());
 

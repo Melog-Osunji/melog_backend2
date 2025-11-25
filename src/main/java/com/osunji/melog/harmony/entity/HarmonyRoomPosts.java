@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.osunji.melog.harmony.converter.StringListConverter;
 import com.osunji.melog.user.domain.User;
 
 import jakarta.persistence.*;
@@ -76,9 +77,11 @@ public class HarmonyRoomPosts {
 	/**
 	 * 태그 필수x
 	 */
+	@Column(columnDefinition = "jsonb")
 	@JdbcTypeCode(SqlTypes.JSON)
-	@Column(name = "tags", columnDefinition = "json")
+	@Convert(converter = StringListConverter.class)
 	private List<String> tags;
+
 
 	/**
 	 * 생성 시간 필수/자동 dddddddd

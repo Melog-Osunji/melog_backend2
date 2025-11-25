@@ -2,6 +2,7 @@ package com.osunji.melog.harmony.repository;
 
 import com.osunji.melog.harmony.entity.HarmonyRoom;
 import com.osunji.melog.harmony.entity.HarmonyRoomPosts;
+import com.osunji.melog.user.domain.User;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,19 +20,16 @@ public interface HarmonyRoomPostsRepository extends JpaRepository<HarmonyRoomPos
 	 * 여러 하모니룸에서 미디어가 있는 게시글만 조회 (최신순)
 	 */
 	List<HarmonyRoomPosts> findByHarmonyRoomInAndMediaTypeIsNotNullOrderByCreatedAtDesc(List<HarmonyRoom> harmonyRooms);
-
-	/**
-	 * 특정 하모니룸에서 미디어가 있는 게시글만 조회
-	 */
-	List<HarmonyRoomPosts> findByHarmonyRoomAndMediaTypeIsNotNullOrderByCreatedAtDesc(HarmonyRoom harmonyRoom);
-	// 연관관계 모두 fetch join
+	// 하모니룸 게시글 + User, Likes, Comments, Bookmarks, HiddenUsers 한 번에 페치
 	@Query("SELECT p FROM HarmonyRoomPosts p " +
 		"LEFT JOIN FETCH p.user " +
-		"LEFT JOIN FETCH p.likes " +
-		"LEFT JOIN FETCH p.comments " +
-		"LEFT JOIN FETCH p.bookmarks " +
-		"WHERE p.id = :id")
-	Optional<HarmonyRoomPosts> findByIdWithAssociations(@Param("id") UUID id);
+		"LEFT JOIN FETCH p.likes l " +
+		"LEFT JOIN FETCH p.comments c " +
+		"LEFT JOIN FETCH p.bookmarks b " +
+		"LEFT JOIN FETCH p.hiddenUsers hu " +
+		"WHERE p.id = :postId")
+	Optional<HarmonyRoomPosts> findByIdWithAssociations(@Param("postId") UUID postId);
+
 
 	// 좋아요 관계만 fetch join
 	@Query("SELECT p FROM HarmonyRoomPosts p LEFT JOIN FETCH p.likes WHERE p.id = :id")
@@ -94,8 +92,8 @@ public interface HarmonyRoomPostsRepository extends JpaRepository<HarmonyRoomPos
 	@Query("SELECT p FROM HarmonyRoomPosts p WHERE p.user.id = :userId " +
 		"AND (:currentUserId IS NULL OR :currentUserId NOT MEMBER OF p.hiddenUsers) " +
 		"ORDER BY p.createdAt DESC")
-	List<HarmonyRoomPosts> findByUserIdOrderByCreatedAtDesc(
-		@Param("userId") UUID userId,
-		@Param("currentUserId") UUID currentUserId);
+
+
+	List<HarmonyRoomPosts> findByUserOrderByCreatedAtDesc(User user);
 
 }

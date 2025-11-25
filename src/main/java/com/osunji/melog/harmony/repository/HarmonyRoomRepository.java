@@ -105,7 +105,10 @@ public interface HarmonyRoomRepository extends JpaRepository<HarmonyRoom, UUID> 
     """)
     List<HarmonyRoomMembers> findByUserIdWithRoom(@Param("userId") UUID userId);
 
-
+	@Query("SELECT CASE WHEN COUNT(l) > 0 THEN true ELSE false END " +
+		"FROM HarmonyPostLike l " +
+		"WHERE l.harmonyPost.id = :postId AND l.user.id = :userId")
+	boolean existsLikeByPostIdAndUserId(@Param("postId") UUID postId, @Param("userId") UUID userId);
 
 
 
