@@ -120,18 +120,6 @@ public class HarmonyRoomRequest {
 		private String userID;
 	}
 
-	@Getter
-	@Setter
-	@NoArgsConstructor
-	@AllArgsConstructor
-	@Builder
-	public static class Report {
-		private String reason;
-
-		private String category;
-
-		private String details;
-	}
 
 	@Getter
 	@Setter
