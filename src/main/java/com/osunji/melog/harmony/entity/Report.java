@@ -86,4 +86,5 @@ public class Report {
 		report.createdAt = LocalDateTime.now();
 		return report;
 	}
+
 }
