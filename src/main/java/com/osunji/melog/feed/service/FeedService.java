@@ -275,4 +275,17 @@ public class FeedService {
         }
         return out;
     }
+
+    /**
+     * 현재 로그인 유저 기준으로 숨김 처리된 게시물 제거
+     */
+    public List<Post> filterHiddenPostsForUser(List<Post> posts, UUID userId) {
+        if (posts == null || posts.isEmpty() || userId == null) {
+            return posts;
+        }
+
+        return posts.stream()
+                .filter(post -> !post.isHiddenByUserId(userId))
+                .toList();
+    }
 }
