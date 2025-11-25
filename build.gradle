@@ -45,6 +45,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
 
+	// 메모리 테스트용
+	implementation 'io.micrometer:micrometer-registry-prometheus'
 
 	// 보안 테스트용
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'

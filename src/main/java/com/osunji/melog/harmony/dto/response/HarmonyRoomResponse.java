@@ -1,12 +1,14 @@
 package com.osunji.melog.harmony.dto.response;
 
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Setter;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 public class HarmonyRoomResponse {
 
@@ -310,29 +312,40 @@ public class HarmonyRoomResponse {
 	@AllArgsConstructor
 	@Builder
 	public static class PostDetail {
-		private String id;
-		private String content;
-		private String mediaType;
-		private String mediaUrl;
-		private List<String> tags;
-		private String createdAgo;
-		private Integer likeCount;
-		private List<String> hiddenUser;  // 숨긴 유저 ID 리스ff트
-		private Integer commentCount;
-		private BestComment bestComment;
-		private Boolean isLiked;      // 추가 필요
-		private Boolean isBookmarked; // 추가 필요
+		private String id;                      // 게시글고유아이디
+		private String title;                   // 제목
+		private String content;                 // 내용
+		private String mediaType;               // 미디어타입
+		private String mediaUrl;                // 미디어url
+		private List<String> tags;              // ["베토벤", "감상", "피아노"]
+		private String createdAgo;              // 언제작성인지 n시간 전/n일 전/n달 전
+		private int likeCount;                  // 좋아요개수
+		private List<String> hiddenUser;        // ["숨김처리","유저","리스트"]
+		private int commentCount;               // 댓글개수
+		private BestComment bestComment;    // 베댓정보
+		private Boolean isLike;
+		private Boolean isBookmark;
+		private UserData user;
 
-		@Data
-		@NoArgsConstructor
-		@AllArgsConstructor
-		@Builder
-		public static class BestComment {
-			private String userId;
-			private String content;
-		}
+
+	}
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
+	@Builder
+	public static class BestComment {
+		private String userId;
+		private String content;
 	}
 
+	@Getter
+	@Setter
+	@Builder
+	public static class UserData {
+		private String id;                      // 작성자아이디
+		private String nickName;                // 닉네임
+		private String profileImg;              // 프로필사진url
+	}
 	/**
 	 * 하모니룸 게시글의 모든 댓글 조회 응답 DTO
 	 */
@@ -370,7 +383,8 @@ public class HarmonyRoomResponse {
 			private String content;
 			private String userId;
 			private String userNickname;
-			private Integer likeCount;
+			private String profilUrl;
+			private Integer likes;
 		}
 
 		/**
@@ -392,9 +406,12 @@ public class HarmonyRoomResponse {
 				private String content;
 				private String mediaType;
 				private String mediaUrl;
+				private String tags;
 				private Integer likeCount;
 				private Integer commentCount;
+				private List<UUID> hiddenUser;
 				private String createdAgo;
+
 			}
 		}
 

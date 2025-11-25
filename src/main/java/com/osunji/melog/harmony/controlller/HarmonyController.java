@@ -6,7 +6,6 @@ import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.harmony.dto.request.HarmonyRoomRequest;
 import com.osunji.melog.harmony.dto.response.HarmonyRoomResponse;
 import com.osunji.melog.harmony.service.HarmonyService;
-import com.osunji.melog.review.dto.request.PostRequest;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -362,32 +361,6 @@ public class HarmonyController {
 		}
 	}
 
-	/**
-	 * 15. 하모니룸 신고 - POST /api/harmony/{harmonyID}/report
-	 */
-	@PostMapping("/harmony/{harmonyId}/report")
-	public ResponseEntity<ApiMessage<Void>> reportHarmony(
-		@PathVariable String harmonyId,
-		@RequestBody HarmonyRoomRequest.Report reportRequest,
-		@RequestHeader("Authorization") String authHeader) {
-
-		log.info("🚨 하모니룸 신고 요청: {} - 사유: {}, 카테고리: {}",
-			harmonyId, reportRequest.getReason(), reportRequest.getCategory());
-
-		try {
-			harmonyService.reportHarmony(harmonyId, reportRequest, authHeader);
-			return ResponseEntity.ok(ApiMessage.success(200, "신고가 접수되었습니다", null));
-		} catch (IllegalArgumentException e) {
-			log.error("하모니룸 신고 실패 - 잘못된 요청: {}", e.getMessage());
-			return ResponseEntity.badRequest().body(ApiMessage.fail(400, e.getMessage()));
-		} catch (IllegalStateException e) {
-			log.error("하모니룸 신고 실패 - 인증 오류: {}", e.getMessage());
-			return ResponseEntity.status(401).body(ApiMessage.fail(401, "인증이 필요합니다"));
-		} catch (Exception e) {
-			log.error("하모니룸 신고 처리 실패: {}", e.getMessage(), e);
-			return ResponseEntity.internalServerError().body(ApiMessage.fail(500, "신고 처리에 실패했습니다"));
-		}
-	}
 
 
 	/**
@@ -554,7 +527,7 @@ public class HarmonyController {
 	}
 
 	// ========== 하모니룸 게시글 북마크 제거 ==========
-	@DeleteMapping("/harmony/posts/{harmonyPostId}/bookmark")
+	@DeleteMapping("/harmony/posts/{harmonyPostId}/bookmarks")
 	public ResponseEntity<ApiMessage<Void>> unbookmarkHarmonyPost(
 		@PathVariable String harmonyPostId,
 		@RequestHeader("Authorization") String authHeader) {
@@ -613,10 +586,10 @@ public class HarmonyController {
 
 	// ========== 유저별 하모니룸 게시글 목록 ==========
 	@GetMapping("/harmony/users/{userId}/posts")
-	public ResponseEntity<ApiMessage<HarmonyRoomResponse.UserHarmonyPosts>> getUserHarmonyPosts(
+	public ResponseEntity<ApiMessage<List<HarmonyRoomResponse.PostDetail>>> getUserHarmonyPosts(
 		@PathVariable String userId,
 		@RequestHeader(value = "Authorization", required = false) String authHeader) {
-		ApiMessage<HarmonyRoomResponse.UserHarmonyPosts> response = harmonyService.getUserHarmonyPosts(userId, authHeader);
+		ApiMessage<List<HarmonyRoomResponse.PostDetail>> response = harmonyService.getUserHarmonyPosts(userId, authHeader);
 		return ResponseEntity.status(response.getCode()).body(response);
 	}
 

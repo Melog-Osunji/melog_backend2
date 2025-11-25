@@ -48,6 +48,7 @@ public class CommentResponse {
 		private String id;
 		private String userID;                  // ✅ API 명세: "userID" (작성자아이디)
 		private String nickname;
+		private String profileUrl;              // ✅ API 명세: "profileUrl"
 		private String content;                 // 댓글내용
 		private Integer likes;                  // ✅ Integer 타입으로 통일
 		private List<RecommentData> recomments; // 대대댓글 (재귀 구조)

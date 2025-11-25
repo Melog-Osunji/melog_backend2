@@ -11,6 +11,7 @@ import com.osunji.melog.user.repository.UserRepository;
 import com.osunji.melog.review.repository.CommentRepository;
 import com.osunji.melog.elk.service.HarmonyReportLogService;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -37,6 +38,7 @@ public class HarmonyService {
 	private final HarmonyRoomReportRepository harmonyRoomReportRepository;
 	private final AuthHelper authHelper;
 	private final HarmonyCommentRepository harmonyCommentRepository;
+	private final HarmonyPostLikeRepository harmonyPostLikeRepository;
 	/**
 	 * 1. 하모니룸 생성
 	 */
@@ -299,7 +301,6 @@ public class HarmonyService {
 		HarmonyRoom harmonyRoom = harmonyRoomRepository.findById(harmonyRoomId)
 			.orElseThrow(() -> new IllegalArgumentException("하모니룸을 찾을 수 없습니다"));
 
-		// 연관 데이터와 함께 조회 (N+1 문제 해결)
 		List<HarmonyRoomPosts> harmonyRoomPostsList = harmonyRoomPostsRepository
 			.findByHarmonyRoomWithAllAssociations(harmonyRoom);
 
@@ -315,19 +316,26 @@ public class HarmonyService {
 
 		final String finalCurrentUserId = currentUserId;
 
-		// 베스트 댓글을 미리 한 번에 조회 (배치 처리)
+		// 현재 로그인 유저가 숨김 처리된 게시글은 제외
+		List<HarmonyRoomPosts> visiblePosts = harmonyRoomPostsList.stream()
+			.filter(post -> {
+				if (finalCurrentUserId == null) return true; // 비로그인 사용자는 모두 보기
+				return post.getHiddenUsers() == null || post.getHiddenUsers().stream()
+					.map(user -> user.getId().toString())
+					.noneMatch(id -> id.equals(finalCurrentUserId));
+			})
+			.collect(Collectors.toList());
+
 		Map<UUID, HarmonyPostComment> bestCommentsMap = getBestCommentsForPosts(
-			harmonyRoomPostsList.stream().map(HarmonyRoomPosts::getId).collect(Collectors.toList())
+			visiblePosts.stream().map(HarmonyRoomPosts::getId).collect(Collectors.toList())
 		);
 
-		// 추천 (최신순)
-		List<HarmonyRoomResponse.HarmonyRoomPosts.PostResult> recommend = harmonyRoomPostsList.stream()
+		List<HarmonyRoomResponse.HarmonyRoomPosts.PostResult> recommend = visiblePosts.stream()
 			.sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
 			.map(post -> createHarmonyPostResult(post, finalCurrentUserId, bestCommentsMap.get(post.getId())))
 			.collect(Collectors.toList());
 
-		// 인기 (좋아요순)
-		List<HarmonyRoomResponse.HarmonyRoomPosts.PostResult> popular = harmonyRoomPostsList.stream()
+		List<HarmonyRoomResponse.HarmonyRoomPosts.PostResult> popular = visiblePosts.stream()
 			.sorted((a, b) -> {
 				int likesA = a.getLikes() != null ? a.getLikes().size() : 0;
 				int likesB = b.getLikes() != null ? b.getLikes().size() : 0;
@@ -343,6 +351,7 @@ public class HarmonyService {
 			.popular(popular)
 			.build();
 	}
+
 
 	/**
 	 *수정된 createHarmonyPostResult (베스트 댓글을 파라미터로 받음)
@@ -885,80 +894,6 @@ public class HarmonyService {
 	}
 
 	/**
-	 * 15. 하모니룸 신고 (Field 오류 해결 버전)
-	 */
-	@Transactional
-	public void reportHarmony(String harmonyId, HarmonyRoomRequest.Report reportRequest, String authHeader) {
-		try {
-			log.info("🚨 하모니룸 신고 시작: {} - 사유: {}", harmonyId, reportRequest.getReason());
-
-			// 1. 사용자 인증
-			UUID userId = authHelper.authHelperAsUUID(authHeader);
-			User reporter = userRepository.findById(userId)
-				.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
-
-			// 2. 하모니룸 존재 확인
-			UUID harmonyRoomUuid = UUID.fromString(harmonyId);
-			HarmonyRoom harmonyRoom = harmonyRoomRepository.findById(harmonyRoomUuid)
-				.orElseThrow(() -> new IllegalArgumentException("하모니룸을 찾을 수 없습니다"));
-
-			// 3. 중복 신고 방지 (DB 기반)
-			boolean alreadyReported = harmonyRoomReportRepository
-				.existsByReporterIdAndHarmonyRoomId(userId, harmonyRoomUuid);
-
-			if (alreadyReported) {
-				log.warn("⚠️ 이미 신고한 하모니룸: 사용자={}, 하모니룸={}",
-					reporter.getNickname(), harmonyRoom.getName());
-				throw new IllegalArgumentException("이미 신고한 하모니룸입니다");
-			}
-
-			// 4. 신고 기록 저장 (DB)
-			HarmonyRoomReport report = HarmonyRoomReport.create(
-				reporter,
-				harmonyRoom,
-				reportRequest.getReason(),
-				reportRequest.getCategory(),
-				reportRequest.getDetails()
-			);
-
-			harmonyRoomReportRepository.save(report);
-			log.info("📝 신고 기록 DB 저장 완료: {} - 신고자: {}", report.getId(), reporter.getNickname());
-
-			// 5. ✅ ElasticSearch에 안전한 로그 기록 (Field 오류 해결)
-			try {
-				harmonyReportLogService.logHarmonyReportByCategory(
-					report.getId().toString(),      // reportId
-					harmonyRoom.getId().toString(), // harmonyId
-					harmonyRoom.getName(),          // harmonyName (한글 지원)
-					reporter.getId().toString(),    // reporterId
-					reportRequest.getReason(),      // reason (한글 지원)
-					reportRequest.getCategory(),    // category
-					reportRequest.getDetails()      // details (한글 지원, null 허용)
-				);
-				log.info("📊 ElasticSearch 신고 로그 기록 완료");
-			} catch (Exception e) {
-				log.warn("⚠️ ElasticSearch 로그 기록 실패: {}", e.getMessage());
-				// ElasticSearch 실패해도 신고는 정상 처리
-			}
-
-			// 6. 통계 업데이트
-			try {
-				harmonyReportLogService.logReportStatistics(harmonyId);
-			} catch (Exception e) {
-				log.warn("신고 통계 업데이트 실패: {}", e.getMessage());
-			}
-
-		} catch (IllegalArgumentException e) {
-			log.error("❌ 신고 처리 오류: {}", e.getMessage());
-			throw e;
-		} catch (Exception e) {
-			log.error("💥 신고 처리 실패: {}", e.getMessage(), e);
-			throw new RuntimeException("신고 처리에 실패했습니다", e);
-		}
-	}
-
-
-	/**
 	 * ElasticSearch에 신고 로그 기록
 	 */
 	private void logReportToElasticsearch(HarmonyRoomReport report) {
@@ -1108,32 +1043,69 @@ public class HarmonyService {
 	@Transactional(readOnly = true)
 	public ApiMessage<HarmonyRoomResponse.PostDetail> getHarmonyPostDetail(String harmonyPostIdStr, String authHeader) {
 		try {
+			// 유저식별
 			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
+			//유저 헤더 확인
 			UUID userId = null;
 			try {
 				if (authHeader != null) {
 					userId = authHelper.authHelperAsUUID(authHeader);
 				}
 			} catch (Exception ignored) {}
-
-			final UUID finalUserId = userId;  // 람다에서 사용할 final 변수로 복사
-
+			// 게시글 식별
 			HarmonyRoomPosts post = harmonyRoomPostsRepository.findByIdWithAssociations(harmonyPostId)
 				.orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
-
+			// is Liked 확인
 			boolean isLiked = false;
+			if (userId != null) {
+				isLiked = harmonyPostLikeRepository.existsByHarmonyPost_IdAndUser_Id(harmonyPostId, userId);
+			}
+			// IS BOOKMARK확인
 			boolean isBookmarked = false;
-			if (finalUserId != null) {
-				User user = userRepository.findById(finalUserId).orElse(null);
-				if (user != null) {
-					isLiked = post.getLikes().stream().anyMatch(like -> like.getUser().getId().equals(finalUserId));
-					isBookmarked = post.getBookmarks().stream().anyMatch(b -> b.getUser().getId().equals(finalUserId));
+			if (userId != null) {
+				isBookmarked = harmonyRoomBookmarkRepository.existsByHarmonyRoom_IdAndUser_Id(harmonyPostId, userId);
+			}
+			// 숨김처리유저 목록 확인
+			List<String> hiddenUser = post.getHiddenUsers() != null
+				? post.getHiddenUsers().stream().map(u -> u.getId().toString()).toList()
+				: List.of();
+
+			Optional<HarmonyPostComment> bestCommentOpt = harmonyCommentRepository.findBestComment(post.getId());
+
+			HarmonyRoomResponse.BestComment bestCommentData;
+
+			if (bestCommentOpt.isPresent()) {
+				HarmonyPostComment best = bestCommentOpt.get();
+				if (best.getUser() != null) {
+					bestCommentData = HarmonyRoomResponse.BestComment.builder()
+						.userId(best.getUser().getId().toString())
+						.content(best.getContent())
+						.build();
+				} else {
+					// 유저가 null인 경우에도 빈값으로 처리
+					bestCommentData = HarmonyRoomResponse.BestComment.builder()
+						.userId("")
+						.content("")
+						.build();
 				}
+			} else {
+				// 댓글 자체가 없으면 빈 값으로 생성
+				bestCommentData = HarmonyRoomResponse.BestComment.builder()
+					.userId("")
+					.content("")
+					.build();
 			}
 
 
-			int likeCount = post.getLikes() != null ? post.getLikes().size() : 0;
-			int commentCount = post.getComments() != null ? post.getComments().size() : 0;
+
+			HarmonyRoomResponse.UserData userData = null;
+			if (post.getUser() != null) {
+				userData = HarmonyRoomResponse.UserData.builder()
+					.id(post.getUser().getId().toString())
+					.nickName(post.getUser().getNickname())
+					.profileImg(post.getUser().getProfileImageUrl())
+					.build();
+			}
 
 			String createdAgo = calculateCreatedAgo(post.getCreatedAt());
 
@@ -1144,10 +1116,13 @@ public class HarmonyService {
 				.mediaUrl(post.getMediaUrl())
 				.tags(post.getTags())
 				.createdAgo(createdAgo)
-				.likeCount(likeCount)
-				.commentCount(commentCount)
-				.isLiked(isLiked)
-				.isBookmarked(isBookmarked)
+				.likeCount(post.getLikes() != null ? post.getLikes().size() : 0)
+				.hiddenUser(hiddenUser)
+				.commentCount(post.getComments() != null ? post.getComments().size() : 0)
+				.bestComment(bestCommentData)
+				.isLike(isLiked)
+				.isBookmark(isBookmarked)
+				.user(userData)
 				.build();
 
 			return ApiMessage.success(200, "게시글 상세 조회 성공", postDetail);
@@ -1158,6 +1133,7 @@ public class HarmonyService {
 			return ApiMessage.fail(500, "게시글 상세 조회 실패: " + e.getMessage());
 		}
 	}
+
 	// ========== 게시글 전체 댓글 조회 ==========
 	@Transactional(readOnly = true)
 	public ApiMessage<HarmonyRoomResponse.HarmonyRoomPostComments> getHarmonyPostComments(String harmonyPostIdStr, String authHeader) {
@@ -1224,7 +1200,8 @@ public class HarmonyService {
 				.content(bestComment.getContent())
 				.userId(bestComment.getUser().getId().toString())              // userID → userId 변경
 				.userNickname(bestComment.getUser().getNickname())            // profileUrl 대신 userNickname 사용
-				.likeCount(bestComment.getLikeCount())                        // likes → likeCount 변경
+				.profilUrl((bestComment.getUser().getProfileImageUrl()))
+				.likes(bestComment.getLikeCount())                        // likes → likeCount 변경
 				.build();
 
 			return ApiMessage.success(200, "베스트 댓글 조회 성공", bestDto);
@@ -1506,48 +1483,104 @@ public class HarmonyService {
 	}
 	// 유저별 하모니룸 게시글 목록 조회
 	@Transactional(readOnly = true)
-	public ApiMessage<HarmonyRoomResponse.UserHarmonyPosts> getUserHarmonyPosts(String userIdStr, String authHeader) {
+	public ApiMessage<List<HarmonyRoomResponse.PostDetail>> getUserHarmonyPosts(String userIdStr, String authHeader) {
 		try {
-			UUID userId = UUID.fromString(userIdStr);
 			UUID currentUserId = null;
-			if (authHeader != null) {
+			if (authHeader != null && !authHeader.isEmpty()) {
 				try {
 					currentUserId = authHelper.authHelperAsUUID(authHeader);
 				} catch (Exception ignored) {}
 			}
 
-			List<HarmonyRoomPosts> posts = harmonyRoomPostsRepository.findByUserIdOrderByCreatedAtDesc(userId, currentUserId);
+			UUID userId = UUID.fromString(userIdStr);
 
-			List<HarmonyRoomResponse.UserHarmonyPosts.UserPostData> userPostList = posts.stream()
+			// 유저 체크 (필요시)
+			User user = userRepository.findById(userId)
+				.orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+			// 게시글 리스트 조회
+			List<HarmonyRoomPosts> posts = harmonyRoomPostsRepository.findAllByUserIdOrderByCreatedAtDesc(userId);
+
+			// DTO로 매핑
+			UUID finalCurrentUserId = currentUserId;
+			List<HarmonyRoomResponse.PostDetail> postDetails = posts.stream()
 				.map(post -> {
+					// 좋아요 수, 댓글 수 계산
 					int likeCount = post.getLikes() != null ? post.getLikes().size() : 0;
 					int commentCount = post.getComments() != null ? post.getComments().size() : 0;
 					String createdAgo = calculateCreatedAgo(post.getCreatedAt());
 
-					return HarmonyRoomResponse.UserHarmonyPosts.UserPostData.builder()
+					// 숨김 유저 리스트 (닉네임)
+					List<String> hiddenUser = post.getHiddenUsers() != null
+						? post.getHiddenUsers().stream()
+						.map(User::getNickname)
+						.collect(Collectors.toList())
+						: List.of();
+
+					// 베스트 댓글 조회
+					HarmonyRoomResponse.BestComment bestComment;
+					Optional<HarmonyPostComment> bestCommentOpt = harmonyCommentRepository.findBestComment(post.getId());
+					if (bestCommentOpt.isPresent() && bestCommentOpt.get().getUser() != null) {
+						bestComment = HarmonyRoomResponse.BestComment.builder()
+							.userId(bestCommentOpt.get().getUser().getId().toString())
+							.content(bestCommentOpt.get().getContent())
+							.build();
+					} else {
+						bestComment = HarmonyRoomResponse.BestComment.builder()
+							.userId("")
+							.content("")
+							.build();
+					}
+
+					// 현재 사용자의 좋아요 여부
+					boolean isLike = finalCurrentUserId != null && post.getLikes() != null &&
+						post.getLikes().stream().anyMatch(like -> like.getUser().getId().equals(finalCurrentUserId));
+
+					// 현재 사용자의 북마크 여부
+					boolean isBookmark = finalCurrentUserId != null && post.getBookmarks() != null &&
+						post.getBookmarks().stream().anyMatch(bookmark -> bookmark.getUser().getId().equals(
+							finalCurrentUserId));
+
+					// 작성자 정보 세팅
+					HarmonyRoomResponse.UserData userData = null;
+					if (post.getUser() != null) {
+						userData = HarmonyRoomResponse.UserData.builder()
+							.id(post.getUser().getId().toString())
+							.nickName(post.getUser().getNickname())
+							.profileImg(post.getUser().getProfileImageUrl())
+							.build();
+					}
+
+					return HarmonyRoomResponse.PostDetail.builder()
 						.id(post.getId().toString())
+						.title(post.getContent())  // 제목 별도 관리한다면 수정 필요
 						.content(post.getContent())
 						.mediaType(post.getMediaType())
 						.mediaUrl(post.getMediaUrl())
-						.likeCount(likeCount)
-						.commentCount(commentCount)
+						.tags(post.getTags())
 						.createdAgo(createdAgo)
+						.likeCount(likeCount)
+						.hiddenUser(hiddenUser)
+						.commentCount(commentCount)
+						.bestComment(bestComment)
+						.isLike(isLike)
+						.isBookmark(isBookmark)
+						.user(userData)
 						.build();
 				})
 				.toList();
 
-			HarmonyRoomResponse.UserHarmonyPosts response = HarmonyRoomResponse.UserHarmonyPosts.builder()
-				.results(userPostList)
-				.build();
-
-			return ApiMessage.success(200, "사용자 하모니룸 게시글 조회 성공", response);
+			return ApiMessage.success(200, "사용자 하모니룸 게시글 조회 성공", postDetails);
 
 		} catch (IllegalArgumentException e) {
 			return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다.");
+		} catch (EntityNotFoundException e) {
+			return ApiMessage.fail(404, e.getMessage());
 		} catch (Exception e) {
 			return ApiMessage.fail(500, "사용자 하모니룸 게시글 조회 실패: " + e.getMessage());
 		}
 	}
+
 
 	// 유저별 하모니룸 북마크 게시글 목록 조회
 	@Transactional(readOnly = true)

@@ -53,6 +53,7 @@ public class CommentMapper {
 			.id(comment.getId().toString())
 			.userID(comment.getUser().getId().toString())         // ✅ API 명세: "userID"
 			.nickname((comment.getUser().getNickname()))
+			.profileUrl(comment.getUser().getProfileImageUrl())  // 수정: child → comment
 			.content(comment.getContent())
 			.likes(comment.getLikeCount())                        // ✅ Entity 메서드 사용
 			.recomments(toRecommentList(comment.getChildComments())) // ✅ 재귀 처리
