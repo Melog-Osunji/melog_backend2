@@ -1,8 +1,6 @@
 package com.osunji.melog.review.dto.request;
 
-import lombok.Getter;
-import lombok.Setter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 
@@ -36,4 +34,17 @@ public class PostRequest {
 		private String mediaUrl;     // null이면 수정하지 않음
 		private List<String> tags;   // null이면 수정하지 않음
 	}
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class Report {
+        private String reason;
+
+        private String category;
+
+        private String details;
+    }
 }

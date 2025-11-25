@@ -59,20 +59,21 @@ public class CalendarService {
                 .toList();
         log.debug("🧩 매핑된 CalendarResponse.Item 개수 = {}", items.size());
 
-        // 3-1) 날짜별 event 집계
+        // 3-1) 날짜별 event 집계 (유저가 실제로 저장한 날짜만 표시)
         Map<LocalDate, List<UUID>> eventsByDate = new HashMap<>();
         for (EventSchedule es : schedules) {
-            var c = es.getCalendar();
-            LocalDate start = c.getStartDate();
-            LocalDate end   = (c.getEndDate() != null) ? c.getEndDate() : start;
+            LocalDate d = es.getEventDate();
 
-            LocalDate s = (start.isBefore(fromDate)) ? fromDate : start;
-            LocalDate e = (end.isAfter(toDate))     ? toDate   : end;
-
-            for (LocalDate d = s; !d.isAfter(e); d = d.plusDays(1)) {
-                eventsByDate.computeIfAbsent(d, __ -> new ArrayList<>()).add(es.getId());
+            // 혹시라도 범위를 벗어나는 데이터 방어적 체크
+            if (d.isBefore(fromDate) || d.isAfter(toDate)) {
+                continue;
             }
+
+            eventsByDate
+                    .computeIfAbsent(d, __ -> new ArrayList<>())
+                    .add(es.getId());   // scheduleId
         }
+
         log.debug("📆 날짜별 이벤트 집계 완료: 총 {}일에 이벤트 존재", eventsByDate.size());
 
         // 4) 그리드 생성
