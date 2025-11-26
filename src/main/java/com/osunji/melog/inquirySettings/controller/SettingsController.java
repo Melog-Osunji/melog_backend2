@@ -38,7 +38,7 @@ public class SettingsController {
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
-    @GetMapping("/block")
+    @GetMapping("/follower/block")
     public ResponseEntity<?> getBlock(
             @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
     ) {
@@ -57,13 +57,23 @@ public class SettingsController {
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
-    @PostMapping("/follower/block")
+    @PostMapping("/block")
     public ResponseEntity<?> postBlockUser(
             @RequestBody SettingsRequest request,
             @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
     ) {
         ApiMessage<SettingsResponse.CheckResponse> response;
         response = settingsService.postBlockUser(userId, request);
+        return ResponseEntity.status(response.getCode()).body(response);
+    }
+
+    @PostMapping("/unblock")
+    public ResponseEntity<?> postUnblockUser(
+            @RequestBody SettingsRequest request,
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+    ) {
+        ApiMessage<SettingsResponse.CheckResponse> response;
+        response = settingsService.postUnblockUser(userId, request);
         return ResponseEntity.status(response.getCode()).body(response);
     }
 

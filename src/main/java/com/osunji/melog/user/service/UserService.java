@@ -341,7 +341,6 @@ public class UserService {
         return s == null ? null : s.trim();
     }
 
-
     @Transactional
     public ApiMessage<UserResponse.followingResponse> following(UserRequest.following request, UUID userId) {
 
@@ -377,11 +376,13 @@ public class UserService {
 
         String msg;
 
-        // === 토글 로직 ===
-        if (rel == null || rel.getStatus() == FollowStatus.UNFOLLOW) {
-            // 지금은 "팔로우 안 되어 있는 상태"
+        boolean isPublicAccount = target.isPublicAccount();
 
-            // 👉 이 경우에만 블록 체크해서 "새 팔로우"를 막는다
+        // === 토글 로직 ===
+        if (rel == null || rel.isUnfollowed()) {
+            // 지금은 "팔로우/요청이 안 되어 있는 상태"
+
+            // 👉 새로 시도할 때만 블록 체크
             if (blocked) {
                 return ApiMessage.fail(
                         HttpStatus.FORBIDDEN.value(),
@@ -389,19 +390,35 @@ public class UserService {
                 );
             }
 
-            // 관계 자체가 없거나, 과거 언팔로우 → 새로/재팔로우
+            FollowStatus nextStatus = isPublicAccount ? FollowStatus.ACCEPTED : FollowStatus.REQUESTED;
+
             if (rel == null) {
-                rel = Follow.createFollow(me, target);
+                // 새 관계 생성
+                rel = Follow.createFollow(me, target, nextStatus);
                 followRepository.save(rel);
             } else {
-                rel.activate(LocalDateTime.now());
+                // 기존 row 재활성화
+                rel.activate(LocalDateTime.now(), nextStatus);
             }
-            msg = "followed";
-        } else {
-            // rel != null && status == ACCEPTED → 현재 팔로우 중
-            // 여기서는 "언팔로우"만 수행 (차단 여부 상관없이 끊을 수 있어야 함)
+
+            msg = isPublicAccount ? "followed" : "requested";
+
+        } else if (rel.getStatus() == FollowStatus.REQUESTED) {
+            // 🔹 비공개 계정에 이미 팔로우 요청 보낸 상태 → 다시 누르면 "요청 취소"
+            rel.deactivate();
+            msg = "request_canceled";
+
+        } else if (rel.getStatus() == FollowStatus.ACCEPTED) {
+            // 🔹 현재 팔로잉 상태 → 언팔로우
             rel.deactivate();
             msg = "unfollowed";
+
+        } else {
+            // BLOCKED 등 예외케이스가 걸리면 필요 시 별도 처리
+            return ApiMessage.fail(
+                    HttpStatus.BAD_REQUEST.value(),
+                    "지원하지 않는 팔로우 상태입니다."
+            );
         }
 
         UserResponse.followingResponse body = UserResponse.followingResponse.builder()
@@ -415,18 +432,26 @@ public class UserService {
 
 
 
-    @Transactional
+    @Transactional(readOnly = true)
     public ApiMessage<UserResponse.followingCheckResponse> followingListByNickname(UUID userId, String nickname) {
         UUID targetId = userRepository.findIdByNickname(nickname)
-                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다.")).getId();
+                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다."))
+                .getId();
 
-        boolean iFollow   = followRepository.existsByFollower_IdAndFollowing_Id(userId, targetId);
+        boolean iFollow = followRepository
+                .existsByFollower_IdAndFollowing_IdAndStatus(
+                        userId,
+                        targetId,
+                        FollowStatus.ACCEPTED
+                );
 
         UserResponse.followingCheckResponse body = UserResponse.followingCheckResponse.builder()
                 .result(iFollow)
                 .build();
+
         return ApiMessage.success(HttpStatus.OK.value(), "팔로우 정보 조회 성공", body);
     }
+
 
     @Transactional(readOnly = true)
     public ApiMessage<UserResponse.MyPageResponse> getMyPage(UUID userId) {
