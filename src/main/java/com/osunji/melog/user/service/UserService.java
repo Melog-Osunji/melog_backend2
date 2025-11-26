@@ -17,10 +17,7 @@ import com.osunji.melog.user.domain.User;
 import com.osunji.melog.user.domain.enums.FollowStatus;
 import com.osunji.melog.user.dto.request.UserRequest;
 import com.osunji.melog.user.dto.response.UserResponse;
-import com.osunji.melog.user.repository.AgreementRepository;
-import com.osunji.melog.user.repository.FollowRepository;
-import com.osunji.melog.user.repository.OnboardingRepository;
-import com.osunji.melog.user.repository.UserRepository;
+import com.osunji.melog.user.repository.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -46,8 +43,9 @@ public class UserService {
     private final UserProfileMusicService userProfileMusicService;
     private final BookmarkService bookmarkService;
     private final DtoMapperUtil dtoMapperUtil;
+    private final BlockRepository blockRepository;
 
-    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository, HarmonyRoomRepository harmonyRoomRepository, HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository, PostService postService, UserProfileMusicService userProfileMusicService, BookmarkService bookmarkService, DtoMapperUtil dtoMapperUtil) {
+    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository, HarmonyRoomRepository harmonyRoomRepository, HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository, PostService postService, UserProfileMusicService userProfileMusicService, BookmarkService bookmarkService, DtoMapperUtil dtoMapperUtil, BlockRepository blockRepository) {
         this.userRepository = userRepository;
         this.agreementRepository = agreementRepository;
         this.onboardingRepository = onboardingRepository;
@@ -58,6 +56,7 @@ public class UserService {
         this.userProfileMusicService = userProfileMusicService;
         this.bookmarkService = bookmarkService;
         this.dtoMapperUtil = dtoMapperUtil;
+        this.blockRepository = blockRepository;
     }
 
     private static final Set<String> PROFILE_UPDATABLE_FIELDS = Set.of(
@@ -345,7 +344,7 @@ public class UserService {
     @Transactional
     public ApiMessage<UserResponse.followingResponse> following(UserRequest.following request, UUID userId) {
 
-        // 0) 파라미터 해석 및 기본 검증
+        // 0) 파라미터 검증
         if (request == null || request.getFollower() == null) {
             return ApiMessage.fail(HttpStatus.BAD_REQUEST.value(), "대상 사용자 ID가 없습니다.");
         }
@@ -361,7 +360,7 @@ public class UserService {
             return ApiMessage.fail(HttpStatus.BAD_REQUEST.value(), "자기 자신을 팔로우할 수 없습니다.");
         }
 
-        // 1) 주체/대상 유저 로드
+        // 1) 유저 로드
         User me = userRepository.findById(userId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
         User target = userRepository.findById(targetId)
@@ -370,16 +369,39 @@ public class UserService {
         // 2) 기존 팔로우 관계 조회
         Follow rel = followRepository.findByFollower_IdAndFollowing_Id(userId, targetId).orElse(null);
 
+        // 3) 블록 상태 조회
+        boolean iBlockedHim = blockRepository.existsByBlocker_IdAndBlocked_Id(userId, targetId);   // 내가 상대를 차단
+        boolean heBlockedMe = blockRepository.existsByBlocker_IdAndBlocked_Id(targetId, userId);   // 상대가 나를 차단
+        boolean blocked = iBlockedHim || heBlockedMe;
+
         String msg;
-        if (rel == null) {
-            // 없으면 새로 팔로우
-            rel = Follow.createFollow(me, target);
-            followRepository.save(rel);
+
+        // === 토글 로직 ===
+        if (rel == null || rel.getStatus() == FollowStatus.UNFOLLOW) {
+            // 지금은 "팔로우 안 되어 있는 상태"
+
+            // 👉 이 경우에만 블록 체크해서 "새 팔로우"를 막는다
+            if (blocked) {
+                return ApiMessage.fail(
+                        HttpStatus.FORBIDDEN.value(),
+                        "차단된 사용자와는 팔로우할 수 없습니다."
+                );
+            }
+
+            // 관계 자체가 없거나, 과거 언팔로우 → 새로/재팔로우
+            if (rel == null) {
+                rel = Follow.createFollow(me, target);
+                followRepository.save(rel);
+            } else {
+                rel.activate(LocalDateTime.now());
+            }
+            msg = "followed";
         } else {
-            // 기존 기록은 있는데 비활성 상태면 다시 팔로우
-            rel.activate(LocalDateTime.now());
+            // rel != null && status == ACCEPTED → 현재 팔로우 중
+            // 여기서는 "언팔로우"만 수행 (차단 여부 상관없이 끊을 수 있어야 함)
+            rel.deactivate();
+            msg = "unfollowed";
         }
-        msg = "followed";
 
         UserResponse.followingResponse body = UserResponse.followingResponse.builder()
                 .userId(me.getId().toString())
@@ -389,6 +411,8 @@ public class UserService {
 
         return ApiMessage.success(HttpStatus.OK.value(), msg, body);
     }
+
+
 
     @Transactional
     public ApiMessage<UserResponse.followingCheckResponse> followingListByNickname(UUID userId, String nickname) {
