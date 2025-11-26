@@ -1,6 +1,7 @@
 package com.osunji.melog.inquirySettings.dto.response;
 
 import com.osunji.melog.user.domain.User;
+import com.osunji.melog.user.domain.enums.FollowStatus;
 import com.osunji.melog.user.domain.enums.Platform;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -44,6 +45,7 @@ public class SettingsResponse {
     @AllArgsConstructor
     public static class CheckResponse {
         private UUID userId;
+        private FollowStatus status;
 
     }
 }

@@ -61,7 +61,7 @@ public class User {
     @NotNull
     private String oidc;
 
-    @Column
+    @Column // 공개 계정인지 여부 공개==false / 비공개 true
     private Boolean active = false;
 
     //생성자 - 필수 정보로만 이루어짐
@@ -112,4 +112,13 @@ public class User {
     public void updateIntro(String intro) {
         this.intro = intro;
     }
+
+    public boolean isPrivateAccount() {
+        return Boolean.TRUE.equals(this.active);
+    }
+
+    public boolean isPublicAccount() {
+        return !isPrivateAccount();
+    }
+
 }
