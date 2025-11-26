@@ -140,6 +140,18 @@ public class UserController {
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
+    // 팔로우 여부 조회(new!)
+    @GetMapping("/following/check")
+    public ResponseEntity<?> getFollowing(
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId,
+            @RequestParam(required = false) UUID targetId
+    ) {
+        ApiMessage<UserResponse.followingCheckResponse> response =
+                userService.followingListByUserId(userId, targetId);
+
+        return ResponseEntity.status(response.getCode()).body(response);
+    }
+
     @GetMapping("/myPage")
     public ResponseEntity<?> myPage(
             @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId,
