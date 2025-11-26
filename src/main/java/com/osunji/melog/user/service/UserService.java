@@ -330,6 +330,7 @@ public class UserService {
                 .id(user.getId().toString())
                 .email(user.getEmail())
                 .nickName(user.getNickname())
+                .profileImg(user.getProfileImageUrl())
                 .platform(user.getPlatform().name())
                 .build();
 

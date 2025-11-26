@@ -7,12 +7,14 @@ import com.osunji.melog.user.dto.response.UserResponse;
 import com.osunji.melog.user.service.UserProfileMusicService;
 import com.osunji.melog.user.service.UserService;
 import com.osunji.melog.youtube.dto.YoutubeItemDTO;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -98,9 +100,18 @@ public class UserController {
     // 프로필 조회
     @GetMapping("/profile")
     public ResponseEntity<?> profile(
-            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId,
+            @RequestParam(required = false) UUID profileUser
+
     ) {
-        ApiMessage<UserResponse.ProfileResponse> response = userService.getProfile(userId);
+        UUID targetUserId = (profileUser == null || userId.equals(profileUser))
+                ? userId
+                : profileUser;
+
+        log.debug("profile request - loginUser={}, profileUser={}, targetUser={}",
+                userId, profileUser, targetUserId);
+
+        ApiMessage<UserResponse.ProfileResponse> response = userService.getProfile(targetUserId);
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
@@ -137,9 +148,14 @@ public class UserController {
         UUID targetUserId = (profileUser == null || userId.equals(profileUser))
                 ? userId
                 : profileUser;
+
+        log.debug("MyPage request - loginUser={}, profileUser={}, targetUser={}",
+                userId, profileUser, targetUserId);
+
         ApiMessage<UserResponse.MyPageResponse> response = userService.getMyPage(targetUserId);
         return ResponseEntity.status(response.getCode()).body(response);
     }
+
 
     @PostMapping("/myPage/musicChange")
     public ResponseEntity<?> updateProfileMusic(
