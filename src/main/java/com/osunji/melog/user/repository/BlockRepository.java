@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -26,5 +27,8 @@ public interface BlockRepository extends JpaRepository<Block, UUID> {
 
     void deleteByBlockerIdAndBlockedId(UUID blockerId, UUID blockedId);
     boolean existsByBlocker_IdAndBlocked_Id(UUID blockerId, UUID blockedId);
+
+    Optional<Block> findByBlocker_IdAndBlocked_Id(UUID blockerId, UUID blockedId);
+
 
 }
