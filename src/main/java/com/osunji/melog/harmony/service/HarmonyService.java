@@ -324,7 +324,7 @@ public class HarmonyService {
 					.map(user -> user.getId().toString())
 					.noneMatch(id -> id.equals(finalCurrentUserId));
 			})
-			.collect(Collectors.toList());
+			.toList();
 
 		Map<UUID, HarmonyPostComment> bestCommentsMap = getBestCommentsForPosts(
 			visiblePosts.stream().map(HarmonyRoomPosts::getId).collect(Collectors.toList())
@@ -390,6 +390,7 @@ public class HarmonyService {
 			bestCommentDto = HarmonyRoomResponse.HarmonyRoomPosts.PostResult.PostDetail.BestComment.builder()
 				.userId(bestComment.getUser().getId().toString())
 				.content(bestComment.getContent())
+				.profileImgUrl(bestComment.getUser().getProfileImageUrl())
 				.build();
 		} else {
 			log.debug("🔍 베스트 댓글 없음: postId={}", post.getId());
@@ -407,6 +408,8 @@ public class HarmonyService {
 				.likeCount(likeCount)
 				.hiddenUser(List.of())  // 숨김 사용자 (추후 구현)
 				.commentCount(commentCount)
+				.isLike(isLiked)
+				.isBookmark((isBookmarked))
 				.bestComment(bestCommentDto)
 				.build();
 
@@ -1138,13 +1141,22 @@ public class HarmonyService {
 	@Transactional(readOnly = true)
 	public ApiMessage<HarmonyRoomResponse.HarmonyRoomPostComments> getHarmonyPostComments(String harmonyPostIdStr, String authHeader) {
 		try {
+			UUID userId = null;
+			User user1;
+			if (authHeader != null && !authHeader.isEmpty()) {
+				userId = authHelper.authHelperAsUUID(authHeader);
+				user1 = userRepository.findById(userId)
+					.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+			} else {
+				user1 = null;
+			}
+
 			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
-			// 최상위 댓글 조회 (자식 댓글은 재귀적으로 CommentData 내 replies 필드로 포함)
 			List<HarmonyPostComment> rootComments = harmonyCommentRepository.findRootCommentsByPostId(harmonyPostId);
 
 			List<HarmonyRoomResponse.HarmonyRoomPostComments.CommentData> commentDataList =
 				rootComments.stream()
-					.map(this::toCommentData)
+					.map(comment -> toCommentData(comment, user1))  // 현재 로그인 사용자 전달
 					.collect(Collectors.toList());
 
 			HarmonyRoomResponse.HarmonyRoomPostComments response =
@@ -1161,11 +1173,17 @@ public class HarmonyService {
 		}
 	}
 
-	// 댓글 DTO 변환 메서드 (재귀 처리)
-	private HarmonyRoomResponse.HarmonyRoomPostComments.CommentData toCommentData(HarmonyPostComment comment) {
+	// 변경된 DTO 변환 메서드 (현재 로그인 사용자 인자 추가)
+	private HarmonyRoomResponse.HarmonyRoomPostComments.CommentData toCommentData(HarmonyPostComment comment, User currentUser) {
 		List<HarmonyRoomResponse.HarmonyRoomPostComments.CommentData> childCommentDtos = comment.getChildComments().stream()
-			.map(this::toCommentData) // 재귀 호출
+			.map(child -> toCommentData(child, currentUser)) // 재귀 호출 시 동일 사용자 전달
 			.collect(Collectors.toList());
+
+		boolean isLike = false;
+		if (currentUser != null && comment.getLikedUsers() != null) {
+			isLike = comment.getLikedUsers().stream()
+				.anyMatch(user -> user.getId().equals(currentUser.getId()));
+		}
 
 		return HarmonyRoomResponse.HarmonyRoomPostComments.CommentData.builder()
 			.id(comment.getId().toString())
@@ -1173,6 +1191,7 @@ public class HarmonyService {
 			.userId(comment.getUser().getId().toString())
 			.userNickname(comment.getUser().getNickname())
 			.userProfileImgLink(comment.getUser().getProfileImageUrl())
+			.isLike(isLike)
 			.likeCount(comment.getLikeCount())
 			.createdAgo(calculateCreatedAgo(comment.getCreatedAt()))
 			.replies(childCommentDtos)
@@ -1184,8 +1203,11 @@ public class HarmonyService {
 
 	// ========== 게시글 베스트 댓글 조회 ==========
 	@Transactional(readOnly = true)
-	public ApiMessage<HarmonyRoomResponse.HarmonyRoomBestComment> getBestHarmonyPostComment(String harmonyPostIdStr) {
+	public ApiMessage<HarmonyRoomResponse.HarmonyRoomBestComment> getBestHarmonyPostComment(String harmonyPostIdStr,String authHeader) {
 		try {
+			UUID userId = authHelper.authHelperAsUUID(authHeader);
+			User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
 			UUID harmonyPostId = UUID.fromString(harmonyPostIdStr);
 			Optional<HarmonyPostComment> bestCommentOpt = harmonyCommentRepository.findBestComment(harmonyPostId);
 
@@ -1194,14 +1216,19 @@ public class HarmonyService {
 			}
 
 			HarmonyPostComment bestComment = bestCommentOpt.get();
+			boolean isLike = false;
+			if (userId != null && bestComment.getLikedUsers() != null) {
+				isLike = bestComment.getLikedUsers().stream()
+					.anyMatch(u -> user.getId().equals(userId));
+			}
 
 			HarmonyRoomResponse.HarmonyRoomBestComment bestDto = HarmonyRoomResponse.HarmonyRoomBestComment.builder()
 				.id(bestComment.getId().toString())
 				.content(bestComment.getContent())
-				.userId(bestComment.getUser().getId().toString())              // userID → userId 변경
-				.userNickname(bestComment.getUser().getNickname())            // profileUrl 대신 userNickname 사용
+				.userId(bestComment.getUser().getId().toString())
+				.userNickname(bestComment.getUser().getNickname())
 				.profilUrl((bestComment.getUser().getProfileImageUrl()))
-				.likes(bestComment.getLikeCount())                        // likes → likeCount 변경
+				.likes(bestComment.getLikeCount())
 				.build();
 
 			return ApiMessage.success(200, "베스트 댓글 조회 성공", bestDto);
