@@ -805,6 +805,7 @@ public class SearchRepository {
 
 				profiles = users.stream()
 					.map(user -> SearchResponse.SearchProfile.UserProfile.builder()
+						.userId(user.getId().toString())
 						.userNickname(user.getNickname())
 						.profileUrl(user.getProfileImageUrl())
 						.intro(user.getIntro())

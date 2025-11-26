@@ -61,4 +61,6 @@ public interface HarmonyRoomBookmarkRepository extends JpaRepository<HarmonyRoom
 	boolean existsByHarmonyRoom_IdAndUser_Id(UUID harmonyRoomId, UUID userId);
 
 
+
+
 }

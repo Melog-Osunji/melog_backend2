@@ -25,5 +25,6 @@ public interface BlockRepository extends JpaRepository<Block, UUID> {
     boolean existsByBlockerIdAndBlockedId(UUID blockerId, UUID blockedId);
 
     void deleteByBlockerIdAndBlockedId(UUID blockerId, UUID blockedId);
+    boolean existsByBlocker_IdAndBlocked_Id(UUID blockerId, UUID blockedId);
 
 }

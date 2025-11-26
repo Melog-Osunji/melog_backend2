@@ -119,6 +119,8 @@ public class HarmonyRoomResponse {
 				private List<String> tags;
 				private String createdAgo;
 				private Integer likeCount;
+				private Boolean isLike;
+				private Boolean isBookmark;
 				private List<String> hiddenUser;
 				private Integer commentCount;
 				private BestComment bestComment;
@@ -130,6 +132,7 @@ public class HarmonyRoomResponse {
 				public static class BestComment {
 					private String userId;
 					private String content;
+					private String profileImgUrl;
 				}
 			}
 
@@ -368,6 +371,7 @@ public class HarmonyRoomResponse {
 			private String userProfileImgLink;
 			private Integer likeCount;
 			private String createdAgo;
+			private Boolean isLike;
 			private List<CommentData> replies;  // 재귀 구조
 		}
 	}

@@ -36,10 +36,7 @@ public class SearchController {
 	 * [32번] 인기 작곡가 조회
 	 * GET /api/search/composer
 	 */
-	/**
-	 * [32번] 인기 작곡가 조회
-	 * GET /api/search/composer
-	 */
+
 	@GetMapping("/search/composer")
 	public ResponseEntity<ApiMessage<SearchResponse.Composer>> getPopularComposers() {
 		log.info("🎼 인기 작곡가 API 호출됨");

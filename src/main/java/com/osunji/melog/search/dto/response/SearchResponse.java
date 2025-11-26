@@ -86,6 +86,7 @@ public class SearchResponse {
 
 		@Data @Builder
 		public static class UserProfile {
+			private String userId;
 			private String userNickname;
 			private String profileUrl;
 			private String intro;
