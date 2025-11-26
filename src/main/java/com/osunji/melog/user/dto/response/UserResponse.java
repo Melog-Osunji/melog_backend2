@@ -2,6 +2,7 @@ package com.osunji.melog.user.dto.response;
 
 import com.osunji.melog.review.dto.response.BookmarkResponse;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
+import com.osunji.melog.user.domain.enums.FollowStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -62,6 +63,7 @@ public class UserResponse {
     @Builder
     public static class followingCheckResponse{
         private boolean result;
+        private FollowStatus status;
     }
 
     @Getter @Builder

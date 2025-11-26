@@ -30,7 +30,7 @@ public class SettingsController {
     }
 
     @GetMapping("/follower")
-    public ResponseEntity<?> getAcceptFollow(
+    public ResponseEntity<?> getFollow(
             @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
     ) {
         ApiMessage<List<SettingsResponse.FollowResponse>> response;

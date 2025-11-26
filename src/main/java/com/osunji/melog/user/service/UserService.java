@@ -452,6 +452,24 @@ public class UserService {
         return ApiMessage.success(HttpStatus.OK.value(), "팔로우 정보 조회 성공", body);
     }
 
+    @Transactional(readOnly = true)
+    public ApiMessage<UserResponse.followingCheckResponse> followingListByUserId(UUID userId, UUID targetId) {
+
+        Optional<FollowStatus> statusOpt = followRepository.findStatus(userId, targetId);
+
+        FollowStatus status = statusOpt.orElse(FollowStatus.UNFOLLOW);
+
+        boolean iFollow = (status == FollowStatus.ACCEPTED);
+
+        UserResponse.followingCheckResponse body = UserResponse.followingCheckResponse.builder()
+                .result(iFollow)
+                .status(status)
+                .build();
+
+        return ApiMessage.success(HttpStatus.OK.value(), "팔로우 정보 조회 성공", body);
+    }
+
+
 
     @Transactional(readOnly = true)
     public ApiMessage<UserResponse.MyPageResponse> getMyPage(UUID userId) {
