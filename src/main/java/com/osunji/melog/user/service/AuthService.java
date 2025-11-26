@@ -15,6 +15,7 @@ import com.osunji.melog.user.domain.enums.Platform;
 import com.osunji.melog.user.dto.RefreshResult;
 import com.osunji.melog.user.repository.RefreshTokenRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,16 +26,16 @@ import org.springframework.web.server.ResponseStatusException;
 import java.text.ParseException;
 import java.util.List;
 
+@Slf4j
 @Service
 public class AuthService {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
-    private final OidcService oidcService;
     private final JWTUtil jwtUtil;
     private final RefreshTokenRepository refreshRepo;
     private final UserRepository userRepository;
     private final NaverApiClient naverApiClient;
+    private final GoogleApiClient googleApiClient;
 
 
     private final long accessTtlMs;
@@ -48,17 +49,17 @@ public class AuthService {
             @Value("${jwt.access-expiration}") long accessTtlMs,
             @Value("${jwt.refresh-expiration}") long refreshTtlMs,
             @Value("${jwt.refresh-below}") long refreshRotateBelow,
-            OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo,
-            UserRepository userRepository, NaverApiClient naverApiClient, KakaoOidcUtil kakaoOidcUtil, GoogleOidcUtil googleOidcUtil, NaverOidcUtil naverOidcUtil) {
+            JWTUtil jwtUtil, RefreshTokenRepository refreshRepo,
+            UserRepository userRepository, NaverApiClient naverApiClient, GoogleApiClient googleApiClient, KakaoOidcUtil kakaoOidcUtil, GoogleOidcUtil googleOidcUtil, NaverOidcUtil naverOidcUtil) {
 
         this.accessTtlMs = accessTtlMs;
         this.refreshTtlMs = refreshTtlMs;
         this.refreshRoateBelow = refreshRotateBelow;
-        this.oidcService = oidcService;
         this.jwtUtil = jwtUtil;
         this.refreshRepo = refreshRepo;
         this.userRepository = userRepository;
         this.naverApiClient = naverApiClient;
+        this.googleApiClient = googleApiClient;
         this.kakaoOidcUtil = kakaoOidcUtil;
 
         log.info("✅ AuthService initialized (accessTtlMs={}ms, refreshTtlMs={}ms, rotateBelow={}s)",
@@ -132,9 +133,14 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_sub");
         }
 
-        String email = requireClaim(claims, "email");
-        String nickname = requireClaim(claims, "nickname");
-        String picture = requireClaim(claims, "picture");
+//        String email = requireClaim(claims, "email");
+//        String nickname = requireClaim(claims, "nickname");
+//        String picture = requireClaim(claims, "picture");
+        var googleUser = googleApiClient.fetchUserInfo(request.getAccessToken());
+        String email = googleUser.getEmail();
+        String nickname = googleUser.getName();
+        String picture = googleUser.getPicture();
+
         Platform platform = request.getPlatform();
 
         log.debug("📦 Extracted user info: sub={}, email={}, nickname={}, platform={}", sub, email, nickname, platform);
