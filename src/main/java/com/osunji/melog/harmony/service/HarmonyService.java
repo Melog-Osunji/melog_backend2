@@ -39,6 +39,7 @@ public class HarmonyService {
 	private final AuthHelper authHelper;
 	private final HarmonyCommentRepository harmonyCommentRepository;
 	private final HarmonyPostLikeRepository harmonyPostLikeRepository;
+	private final HarmonyRoomPostBookmarkRepository harmonyRoomPostBookmarkRepository;
 	/**
 	 * 1. 하모니룸 생성
 	 */
@@ -1066,7 +1067,7 @@ public class HarmonyService {
 			// IS BOOKMARK확인
 			boolean isBookmarked = false;
 			if (userId != null) {
-				isBookmarked = harmonyRoomBookmarkRepository.existsByHarmonyRoom_IdAndUser_Id(harmonyPostId, userId);
+				isBookmarked = harmonyRoomPostBookmarkRepository.existsByHarmonyPost_IdAndUser_Id(harmonyPostId, userId);
 			}
 			// 숨김처리유저 목록 확인
 			List<String> hiddenUser = post.getHiddenUsers() != null
