@@ -61,8 +61,19 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
     boolean existsByFollower_IdAndFollowing_IdAndStatus(UUID followerId,
                                                         UUID followingId,
                                                         FollowStatus status);
+
+
     // follower와 following으로 단건 조회
     Optional<Follow> findByFollowerIdAndFollowingId(UUID followerId, UUID followingId);
+
+    @Query("""
+    select f.status 
+    from Follow f
+    where f.follower.id = :followerId
+      and f.following.id = :followingId
+""")
+    Optional<FollowStatus> findStatus(UUID followerId, UUID followingId);
+
 
     // 이미 존재하는지 체크(선택)
     boolean existsByFollowerIdAndFollowingId(UUID followerId, UUID followingId);
