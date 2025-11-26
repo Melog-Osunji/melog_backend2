@@ -453,7 +453,7 @@ public class HarmonyController {
 	@PostMapping("/harmony/{harmonyId}/posts")
 	public ResponseEntity<ApiMessage<Void>> createHarmonyRoomPost(
 		@PathVariable String harmonyId,
-		@RequestBody HarmonyRoomRequest.CreateHarmonyPost request,  // ✅ 타입 변경
+		@RequestBody HarmonyRoomRequest.CreateHarmonyPost request,
 		@RequestHeader("Authorization") String authHeader) {
 
 		log.info("📝 하모니룸 게시글 생성 요청: {} - 내용: {}", harmonyId, request.getContent());
@@ -486,7 +486,7 @@ public class HarmonyController {
 	@GetMapping("/harmony/posts/{harmonyPostId}/comments")
 	public ResponseEntity<ApiMessage<HarmonyRoomResponse.HarmonyRoomPostComments>> getHarmonyPostComments(
 		@PathVariable String harmonyPostId,
-		@RequestHeader(value = "Authorization", required = false) String authHeader) {
+		@RequestHeader("Authorization") String authHeader) {
 		ApiMessage<HarmonyRoomResponse.HarmonyRoomPostComments> response = harmonyService.getHarmonyPostComments(harmonyPostId, authHeader);
 		return ResponseEntity.status(response.getCode()).body(response);
 	}
@@ -494,8 +494,9 @@ public class HarmonyController {
 	// ========== 하모니룸 게시글 베스트 댓글 조회 ==========
 	@GetMapping("/harmony/posts/{harmonyPostId}/bestComment")
 	public ResponseEntity<ApiMessage<HarmonyRoomResponse.HarmonyRoomBestComment>> getBestHarmonyPostComment(
-		@PathVariable String harmonyPostId) {
-		ApiMessage<HarmonyRoomResponse.HarmonyRoomBestComment> response = harmonyService.getBestHarmonyPostComment(harmonyPostId);
+		@PathVariable String harmonyPostId,
+		@RequestHeader("Authorization") String authHeader){
+		ApiMessage<HarmonyRoomResponse.HarmonyRoomBestComment> response = harmonyService.getBestHarmonyPostComment(harmonyPostId,authHeader);
 		return ResponseEntity.status(response.getCode()).body(response);
 	}
 
