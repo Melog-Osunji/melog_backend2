@@ -23,12 +23,19 @@ public class FeedController {
     public ResponseEntity<FeedResponse> recommend(
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) List<String> seen,
-            HttpServletRequest request
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
     ) {
-        String userIdStr = (String) request.getAttribute(JwtAuthFilter.USER_ID_ATTR);
-        UUID userId = UUID.fromString(userIdStr);
-
         FeedResponse response = feedFacade.recommend(userId, size, (seen == null ? List.of() : seen));
         return ResponseEntity.ok(response);
     }
+
+//    @GetMapping("/recommend/{post_id}")
+//    public ResponseEntity<FeedResponse> recommendPost(
+//            @PathVariable("post_id") UUID postId,
+//            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+//    ){
+//        FeedResponse response =
+//        return ResponseEntity.status(response.getCode()).body(response);
+//
+//    }
 }

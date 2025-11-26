@@ -215,4 +215,14 @@ public class Post {
             .filter(nickname -> nickname != null)
             .toList();
     }
+    /**
+     * userId 기준으로 숨김 처리했는지 확인 (UUID만 있을 때 사용)
+     */
+    public boolean isHiddenByUserId(UUID userId) {
+        if (userId == null || hiddenUsers == null || hiddenUsers.isEmpty()) {
+            return false;
+        }
+        return hiddenUsers.stream()
+                .anyMatch(u -> userId.equals(u.getId()));
+    }
 }

@@ -23,7 +23,8 @@ public class WhitelistPaths {
             "/api/secretMelog/notices0128/**",
             "/actuator/health",
             "/actuator",
-            "/error"
+            "/error",
+            "/api/users/nickname/exist"
 
     };
 

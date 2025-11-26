@@ -2,7 +2,6 @@ package com.osunji.melog.user.controller;
 
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.global.security.JwtAuthFilter;
-import com.osunji.melog.user.domain.UserProfileMusic;
 import com.osunji.melog.user.dto.request.UserRequest;
 import com.osunji.melog.user.dto.response.UserResponse;
 import com.osunji.melog.user.service.UserProfileMusicService;
@@ -132,9 +131,13 @@ public class UserController {
 
     @GetMapping("/myPage")
     public ResponseEntity<?> myPage(
-            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId,
+            @RequestParam(required = false) UUID profileUser
     ) {
-        ApiMessage<UserResponse.MyPageResponse> response = userService.getMyPage(userId);
+        UUID targetUserId = (profileUser == null || userId.equals(profileUser))
+                ? userId
+                : profileUser;
+        ApiMessage<UserResponse.MyPageResponse> response = userService.getMyPage(targetUserId);
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
@@ -147,4 +150,12 @@ public class UserController {
         return ResponseEntity.ok(ApiMessage.success(200,"success",saved ));
     }
 
+    @GetMapping("/nickname/exist")
+    public ResponseEntity<?> isNicknameExist(
+//            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId,
+            @RequestParam String nickname
+    ) {
+        ApiMessage<UserResponse.NicknameExistResponse> response = userService.isNicknameExist(nickname);
+        return ResponseEntity.status(response.getCode()).body(response);
+    }
 }

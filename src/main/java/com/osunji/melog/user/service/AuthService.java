@@ -34,6 +34,8 @@ public class AuthService {
     private final JWTUtil jwtUtil;
     private final RefreshTokenRepository refreshRepo;
     private final UserRepository userRepository;
+    private final NaverApiClient naverApiClient;
+
 
     private final long accessTtlMs;
     private final long refreshTtlMs;
@@ -47,7 +49,7 @@ public class AuthService {
             @Value("${jwt.refresh-expiration}") long refreshTtlMs,
             @Value("${jwt.refresh-below}") long refreshRotateBelow,
             OidcService oidcService, JWTUtil jwtUtil, RefreshTokenRepository refreshRepo,
-            UserRepository userRepository, KakaoOidcUtil kakaoOidcUtil, GoogleOidcUtil googleOidcUtil, NaverOidcUtil naverOidcUtil) {
+            UserRepository userRepository, NaverApiClient naverApiClient, KakaoOidcUtil kakaoOidcUtil, GoogleOidcUtil googleOidcUtil, NaverOidcUtil naverOidcUtil) {
 
         this.accessTtlMs = accessTtlMs;
         this.refreshTtlMs = refreshTtlMs;
@@ -56,6 +58,7 @@ public class AuthService {
         this.jwtUtil = jwtUtil;
         this.refreshRepo = refreshRepo;
         this.userRepository = userRepository;
+        this.naverApiClient = naverApiClient;
         this.kakaoOidcUtil = kakaoOidcUtil;
 
         log.info("✅ AuthService initialized (accessTtlMs={}ms, refreshTtlMs={}ms, rotateBelow={}s)",
@@ -176,9 +179,14 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_sub");
         }
 
-        String email = requireClaim(claims, "email");
-        String nickname = requireClaim(claims, "nickname");
-        String picture = requireClaim(claims, "picture");
+//        String email = requireClaim(claims, "email");
+//        String nickname = requireClaim(claims, "nickname");
+//        String picture = requireClaim(claims, "picture");
+        var naverUser = naverApiClient.fetchUserInfo(request.getAccessToken());
+        String email = naverUser.getEmail();
+        String nickname = naverUser.getNickname();
+        String picture = naverUser.getProfile_image();
+
         Platform platform = request.getPlatform();
 
         log.debug("📦 Extracted user info: sub={}, email={}, nickname={}, platform={}", sub, email, nickname, platform);
