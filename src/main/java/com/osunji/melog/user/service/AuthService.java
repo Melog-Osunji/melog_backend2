@@ -133,13 +133,13 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no_sub");
         }
 
-//        String email = requireClaim(claims, "email");
-//        String nickname = requireClaim(claims, "nickname");
-//        String picture = requireClaim(claims, "picture");
-        var googleUser = googleApiClient.fetchUserInfo(request.getAccessToken());
-        String email = googleUser.getEmail();
-        String nickname = googleUser.getName();
-        String picture = googleUser.getPicture();
+        String email = requireClaim(claims, "email");
+        String nickname = requireClaim(claims, "name");
+        String picture = requireClaim(claims, "picture");
+//        var googleUser = googleApiClient.fetchUserInfo(request.getAccessToken());
+//        String email = googleUser.getEmail();
+//        String nickname = googleUser.getName();
+//        String picture = googleUser.getPicture();
 
         Platform platform = request.getPlatform();
 
