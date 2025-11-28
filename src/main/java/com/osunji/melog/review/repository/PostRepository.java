@@ -107,6 +107,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 		"WHERE p.id = :postId AND u.id = :userId")
 	boolean existsLikeByUserIdAndPostId(@Param("userId") UUID userId,
 		@Param("postId") UUID postId);
+
 	/** 특정 유저의 '미디어가 있는' 게시글만 조회 + hiddenUsers 제외 */
 	@Query("""
         SELECT p FROM Post p
@@ -118,5 +119,4 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
         """)
 	List<Post> findMediaPostsByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId,
 														  @Param("currentUserId") UUID currentUserId);
-
 }
