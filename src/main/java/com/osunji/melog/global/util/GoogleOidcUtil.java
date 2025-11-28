@@ -75,6 +75,10 @@ public class GoogleOidcUtil {
             log.error("❌ Invalid issuer: {}", claims.getIssuer());
             throw new BadJWTException("Invalid iss");
         }
+
+        log.warn("🔎 Token aud claim = {}", claims.getAudience());
+        log.warn("🔎 Server googleClientId = {}", googleClientId);
+
         var aud = claims.getAudience();
         if (aud == null || aud.stream().noneMatch(googleClientId::equals)) {
             log.error("❌ Invalid audience: {}", aud);
