@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 
 import java.text.ParseException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 @Component
@@ -28,7 +29,6 @@ public class GoogleOidcUtil {
 
     private final String googleIssuer;
     private final String googleClientId;
-    private final JWKSource<SecurityContext> googleJwkSource;
     private final ConfigurableJWTProcessor<SecurityContext> googleJwtProcessor;
 
     public GoogleOidcUtil(
@@ -38,11 +38,11 @@ public class GoogleOidcUtil {
     ) {
         this.googleIssuer = googleIssuer;
         this.googleClientId = googleClientId;
-        this.googleJwkSource = googleJwkSource;
 
-        log.info("🔧 Initializing googleOidcUtil with issuer={}, clientId={}", googleIssuer, googleClientId);
+        log.info("🔧 GoogleOidcUtil initialized.");
+        log.info("     ▸ Expected issuer     : {}", googleIssuer);
+        log.info("     ▸ Expected clientId   : {}", googleClientId);
 
-        // Nimbus Processor 1회 구성 후 재사용
         var proc = new DefaultJWTProcessor<SecurityContext>();
         proc.setJWSKeySelector(new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, googleJwkSource));
         this.googleJwtProcessor = proc;
@@ -53,63 +53,65 @@ public class GoogleOidcUtil {
 
         log.debug("🟡 Start verifying google ID Token...");
 
+        // Header 로그
         var header = SignedJWT.parse(idToken).getHeader();
-        log.debug("🧩 Parsed JWT header: alg={}, kid={}", header.getAlgorithm(), header.getKeyID());
+        log.debug("🧩 Header: alg={}, kid={}", header.getAlgorithm(), header.getKeyID());
 
+        // alg check
         if (!JWSAlgorithm.RS256.equals(header.getAlgorithm())) {
             log.error("❌ Unsupported algorithm: {}", header.getAlgorithm());
             throw new IllegalArgumentException("Unsupported alg: " + header.getAlgorithm());
         }
+
+        // kid check
         if (header.getKeyID() == null || header.getKeyID().isBlank()) {
             log.error("❌ Missing kid in JWT header");
             throw new IllegalArgumentException("Missing kid in JWT header");
         }
 
-        log.debug("✅ Header validation passed. Processing JWT with Nimbus...");
-
+        // 서명 검증 및 기본 파싱
         JWTClaimsSet claims = googleJwtProcessor.process(idToken, null);
-        log.info("✅ Successfully processed JWT. Subject={}", claims.getSubject());
+        log.info("✅ Signature valid. sub={}", claims.getSubject());
 
-        // 표준 OIDC 수동 검증
+        // Issuer 검증
         if (!Objects.equals(googleIssuer, claims.getIssuer())) {
             log.error("❌ Invalid issuer: {}", claims.getIssuer());
             throw new BadJWTException("Invalid iss");
         }
 
-        log.warn("🔎 Token aud claim = {}", claims.getAudience());
-        log.warn("🔎 Server googleClientId = {}", googleClientId);
+        // ▣ 여기서부터 aud/azp 상세 디버깅
+        List<String> audList = claims.getAudience();
+        String azp = (String) claims.getClaim("azp");
 
-        var aud = claims.getAudience();
-        if (aud == null || aud.stream().noneMatch(googleClientId::equals)) {
-            log.error("❌ Invalid audience: {}", aud);
+        log.warn("🎯 Token Client Info (for debugging)");
+        log.warn("   ▸ Token aud list : {}", audList);
+        log.warn("   ▸ Token azp      : {}", azp);
+        log.warn("   ▸ Expected clientId : {}", googleClientId);
+
+        // aud 검증
+        if (audList == null || audList.stream().noneMatch(googleClientId::equals)) {
+            log.error("❌ Invalid audience.");
+            log.error("   ▸ aud in token      : {}", audList);
+            log.error("   ▸ expected clientId : {}", googleClientId);
             throw new BadJWTException("Invalid aud");
         }
 
-        var exp = claims.getExpirationTime();
-        log.debug("🕒 Token expiration time: {}", exp);
-        if (exp == null || exp.toInstant().isBefore(Instant.now().minusSeconds(60))) {
-            log.error("❌ Expired id_token (exp={})", exp);
-            throw new BadJWTException("Expired id_token");
-        }
-
-        var azp = (String) claims.getClaim("azp");
+        // azp 검증 (optional but recommended)
         if (azp != null && !googleClientId.equals(azp)) {
-            log.error("❌ Invalid azp: {}", azp);
+            log.error("❌ Invalid azp.");
+            log.error("   ▸ azp in token      : {}", azp);
+            log.error("   ▸ expected clientId : {}", googleClientId);
             throw new BadJWTException("Invalid azp");
         }
 
-        if (claims.getSubject() == null) {
-            log.error("❌ Missing subject (sub)");
-            throw new BadJWTException("Missing sub");
+        // Expiration
+        var exp = claims.getExpirationTime();
+        if (exp == null || exp.toInstant().isBefore(Instant.now().minusSeconds(60))) {
+            log.error("❌ Token expired (exp={})", exp);
+            throw new BadJWTException("Expired id_token");
         }
 
-        if (claims.getIssueTime() != null &&
-                claims.getIssueTime().toInstant().isAfter(Instant.now().plusSeconds(60))) {
-            log.error("❌ Invalid iat (future issue time): {}", claims.getIssueTime());
-            throw new BadJWTException("Invalid iat (future)");
-        }
-
-        log.info("✅ OIDC validation complete for user sub={}", claims.getSubject());
+        log.info("✅ OIDC validation complete. sub={}", claims.getSubject());
         return claims;
     }
 }
