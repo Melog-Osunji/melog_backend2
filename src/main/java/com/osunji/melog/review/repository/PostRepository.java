@@ -50,8 +50,24 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 	List<Post> findByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId,
 		@Param("currentUserId") UUID currentUserId);
 
+    @Query("""
+    SELECT p
+    FROM Post p
+    WHERE p.user.id = :userId
+      AND (:currentUserId IS NULL
+        OR NOT EXISTS (
+            SELECT 1
+            FROM p.hiddenUsers hu
+            WHERE hu.id = :currentUserId
+        )
+      )
+    ORDER BY p.createdAt DESC
+    """)
+    List<Post> findByUserIdOrderByCreatedAtDesc2(@Param("userId") UUID userId,
+                                                @Param("currentUserId") UUID currentUserId);
 
-	//---------------미디어 관련-----------------//
+
+    //---------------미디어 관련-----------------//
 	/** 인기 미디어 조회 + hiddenUsers 제외 */
 	@Query("SELECT p FROM Post p JOIN FETCH p.user " +
 		"WHERE p.mediaUrl IS NOT NULL " +
@@ -109,14 +125,48 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 		@Param("postId") UUID postId);
 
 	/** 특정 유저의 '미디어가 있는' 게시글만 조회 + hiddenUsers 제외 */
-	@Query("""
-        SELECT p FROM Post p
-        WHERE p.user.id = :userId
-          AND p.mediaUrl IS NOT NULL
-          AND p.mediaUrl <> ''
-          AND (:currentUserId IS NULL OR :currentUserId NOT MEMBER OF p.hiddenUsers)
-        ORDER BY p.createdAt DESC
-        """)
-	List<Post> findMediaPostsByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId,
-														  @Param("currentUserId") UUID currentUserId);
+    @Query("""
+    SELECT p
+    FROM Post p
+    WHERE p.user.id = :userId
+      AND p.mediaUrl IS NOT NULL
+      AND p.mediaUrl <> ''
+      AND (
+        :currentUserId IS NULL
+        OR NOT EXISTS (
+            SELECT 1
+            FROM p.hiddenUsers hu
+            WHERE hu.id = :currentUserId
+        )
+      )
+    ORDER BY p.createdAt DESC
+    """)
+    List<Post> findMediaPostsByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId,
+                                                          @Param("currentUserId") UUID currentUserId);
+
+    /**
+     * 특정 유저(userId)가 북마크한 게시글 중에서,
+     * profileUserId가 hiddenUsers에 포함된 게시글은 제외하고 반환.
+     * 정렬 기준: 게시글 작성일(post.createdAt) 최신순.
+     */
+    @Query("""
+    SELECT pb.post
+    FROM PostBookmark pb
+    JOIN pb.post p
+    WHERE pb.user.id = :userId
+      AND (
+        :profileUserId IS NULL
+        OR NOT EXISTS (
+            SELECT 1
+            FROM p.hiddenUsers hu
+            WHERE hu.id = :profileUserId
+        )
+      )
+    ORDER BY p.createdAt DESC
+    """)
+    List<Post> findBookmarkedPostsByUserIdExcludingProfileHidden(
+            @Param("userId") UUID userId,
+            @Param("profileUserId") UUID profileUserId
+    );
+
 }
