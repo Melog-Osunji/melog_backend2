@@ -95,14 +95,14 @@ public class GoogleOidcUtil {
             log.error("   ▸ expected clientId : {}", googleClientId);
             throw new BadJWTException("Invalid aud");
         }
-
-        // azp 검증 (optional but recommended)
-        if (azp != null && !googleClientId.equals(azp)) {
-            log.error("❌ Invalid azp.");
-            log.error("   ▸ azp in token      : {}", azp);
-            log.error("   ▸ expected clientId : {}", googleClientId);
-            throw new BadJWTException("Invalid azp");
-        }
+//
+//        // azp 검증 (optional but recommended)
+//        if (azp != null && !googleClientId.equals(azp)) {
+//            log.error("❌ Invalid azp.");
+//            log.error("   ▸ azp in token      : {}", azp);
+//            log.error("   ▸ expected clientId : {}", googleClientId);
+//            throw new BadJWTException("Invalid azp");
+//        }
 
         // Expiration
         var exp = claims.getExpirationTime();
