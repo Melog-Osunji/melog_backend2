@@ -1,5 +1,6 @@
 package com.osunji.melog.user.service;
 
+import com.osunji.melog.feed.util.BuildFeedUtil;
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.global.util.DtoMapperUtil;
 import com.osunji.melog.harmony.entity.HarmonyRoom;
@@ -8,6 +9,8 @@ import com.osunji.melog.harmony.repository.HarmonyRoomBookmarkRepository;
 import com.osunji.melog.harmony.repository.HarmonyRoomRepository;
 import com.osunji.melog.review.dto.response.BookmarkResponse;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
+import com.osunji.melog.review.entity.Post;
+import com.osunji.melog.review.repository.PostRepository;
 import com.osunji.melog.review.service.BookmarkService;
 import com.osunji.melog.review.service.PostService;
 import com.osunji.melog.user.domain.Agreement;
@@ -44,8 +47,10 @@ public class UserService {
     private final BookmarkService bookmarkService;
     private final DtoMapperUtil dtoMapperUtil;
     private final BlockRepository blockRepository;
+    private final BuildFeedUtil buildFeedUtil;
+    private final PostRepository postRepository;
 
-    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository, HarmonyRoomRepository harmonyRoomRepository, HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository, PostService postService, UserProfileMusicService userProfileMusicService, BookmarkService bookmarkService, DtoMapperUtil dtoMapperUtil, BlockRepository blockRepository) {
+    public UserService(UserRepository userRepository, AgreementRepository agreementRepository, OnboardingRepository onboardingRepository, FollowRepository followRepository, HarmonyRoomRepository harmonyRoomRepository, HarmonyRoomBookmarkRepository harmonyRoomBookmarkRepository, PostService postService, UserProfileMusicService userProfileMusicService, BookmarkService bookmarkService, DtoMapperUtil dtoMapperUtil, BlockRepository blockRepository, BuildFeedUtil buildFeedUtil, PostRepository postRepository) {
         this.userRepository = userRepository;
         this.agreementRepository = agreementRepository;
         this.onboardingRepository = onboardingRepository;
@@ -57,6 +62,8 @@ public class UserService {
         this.bookmarkService = bookmarkService;
         this.dtoMapperUtil = dtoMapperUtil;
         this.blockRepository = blockRepository;
+        this.buildFeedUtil = buildFeedUtil;
+        this.postRepository = postRepository;
     }
 
     private static final Set<String> PROFILE_UPDATABLE_FIELDS = Set.of(
@@ -472,21 +479,30 @@ public class UserService {
 
 
     @Transactional(readOnly = true)
-    public ApiMessage<UserResponse.MyPageResponse> getMyPage(UUID userId) {
+    public ApiMessage<UserResponse.MyPageResponse> getMyPage(UUID userId, UUID profileUserId) {
         // 1) 유저 조회
-        User user = userRepository.findById(userId).orElse(null);
+
+        UUID targetUserId = (profileUserId == null || userId.equals(profileUserId))
+                ? userId
+                : profileUserId;
+
+        User user = userRepository.findById(targetUserId).orElse(null);
+
         if (user == null) {
             return ApiMessage.fail(HttpStatus.NOT_FOUND.value(), "user_not_found");
         }
 
+        log.debug("MyPage request - loginUser={}, profileUser={}, targetUser={}",
+                userId, profileUserId, targetUserId);
+
         // 2) 팔로워/팔로잉 카운트 (ACCEPTED만 집계)
-        long followers = followRepository.countByFollowing_IdAndStatus(userId, FollowStatus.ACCEPTED);
-        long followings = followRepository.countByFollower_IdAndStatus(userId, FollowStatus.ACCEPTED);
+        long followers = followRepository.countByFollowing_IdAndStatus(targetUserId, FollowStatus.ACCEPTED);
+        long followings = followRepository.countByFollower_IdAndStatus(targetUserId, FollowStatus.ACCEPTED);
 
         // 3) 하모니룸(내가 소유 + 내가 멤버인 모든 방)
-        List<HarmonyRoom> rooms = harmonyRoomRepository.findAllJoinedOrOwned(userId);
+        List<HarmonyRoom> rooms = harmonyRoomRepository.findAllJoinedOrOwned(targetUserId);
         // 멤버(role) 조회
-        List<HarmonyRoomMembers> memberships =  harmonyRoomRepository.findByUserIdWithRoom(userId);
+        List<HarmonyRoomMembers> memberships =  harmonyRoomRepository.findByUserIdWithRoom(targetUserId);
 
         // roomId -> role 맵
         Map<UUID, String> roleByRoomId = memberships.stream()
@@ -503,7 +519,7 @@ public class UserService {
 
                     // 소유자인지
                     boolean isOwner = r.getOwner() != null
-                            && userId.equals(r.getOwner().getId());
+                            && targetUserId.equals(r.getOwner().getId());
 
                     // 내가 가진 역할 (없으면 null)
                     String role = roleByRoomId.get(roomId);
@@ -514,7 +530,7 @@ public class UserService {
                             || "ADMIN".equalsIgnoreCase(role);
 
                     boolean bookmarked = harmonyRoomBookmarkRepository
-                            .existsByHarmonyRoom_IdAndUser_Id(roomId, userId);
+                            .existsByHarmonyRoom_IdAndUser_Id(roomId, targetUserId);
 
                     return UserResponse.HarmonyRoomItem.builder()
                             .roomId(roomId)
@@ -528,7 +544,7 @@ public class UserService {
 
 
         // 4) 프로필 음악
-        UserResponse.ProfileMusic profileMusic = userProfileMusicService.getActive(userId)
+        UserResponse.ProfileMusic profileMusic = userProfileMusicService.getActive(targetUserId)
                 .map(m -> UserResponse.ProfileMusic.builder()
                         .youtube(m.getUrl())
                         .title(m.getTitle())
@@ -536,51 +552,70 @@ public class UserService {
                 .orElse(null);
 
         // 5) 사용자 게시글
-        List<FilterPostResponse.UserPostData> posts = Collections.emptyList();
+        FilterPostResponse.FeedList posts;
         try {
-            var postsMsg = postService.getUserPosts(userId.toString());
-            if (postsMsg == null) {
-                log.warn("getUserPosts: ApiMessage가 null");
-            } else if (postsMsg.isSuccess() && postsMsg.getData() != null) {
-                posts = Optional.ofNullable(postsMsg.getData().getResults()).orElse(List.of());
-            } else {
-                log.warn("getUserPosts 실패: code={}, message={}", postsMsg.getCode(), postsMsg.getMessage());
-            }
+            List<Post> items = postRepository.findByUserIdOrderByCreatedAtDesc2(targetUserId, userId);
+
+//            List<Post> posts = postService.getUserMyPagePosts(targetUserId);
+            posts = buildFeedUtil.buildFeedmyPageList(items, userId);
+        } catch (IllegalArgumentException e) {
+            return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다.");
+        } catch (RuntimeException e) {
+            return ApiMessage.fail(500, "사용자 게시글 런타임 초과: " + e.getMessage());
         } catch (Exception e) {
-            if (log.isWarnEnabled()) log.warn("getUserPosts 예외: {}", e, e);
+            return ApiMessage.fail(500, "사용자 게시글 조회 실패: " + e.getMessage());
         }
 
         // 5-1) 사용자 '미디어 포함' 게시글 → FeedList로 수신 (댓글/베댓 포함)
-        List<FilterPostResponse.UserPostData> mediaFeed = Collections.emptyList();
+        FilterPostResponse.FeedList mediaFeed;
+
         try {
             // 본인 마이페이지라면 currentUserId = userId 로 넘겨 숨김 필터 등 동일 적용
-            var mediaMsg = postService.getUserMediaPosts(userId.toString(), userId.toString());
-            if (mediaMsg == null) {
-                log.warn("getUserMediaFeed: ApiMessage가 null");
-            } else if (mediaMsg.isSuccess() && mediaMsg.getData() != null) {
-                mediaFeed = Optional.ofNullable(mediaMsg.getData().getResults()).orElse(List.of());
+            List<Post> mediaItems =
+                    postRepository.findMediaPostsByUserIdOrderByCreatedAtDesc(targetUserId, userId);
+
+            if (mediaItems == null || mediaItems.isEmpty()) {
+                log.warn("getUserMediaFeed: 조회된 미디어 게시글이 없습니다.");
+                mediaFeed = FilterPostResponse.FeedList.builder()
+                        .results(List.of())
+                        .build();
             } else {
-                log.warn("getUserMediaFeed 실패: code={}, message={}", mediaMsg.getCode(), mediaMsg.getMessage());
+                mediaFeed = buildFeedUtil.buildFeedList(mediaItems, userId);
             }
+        } catch (IllegalArgumentException e) {
+            return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다: " + e.getMessage());
+
+        } catch (RuntimeException e) {
+            log.warn("getUserMediaFeed RuntimeException 발생", e);
+            return ApiMessage.fail(500, "미디어 게시글 조회 중 서버 오류가 발생했습니다.");
+
         } catch (Exception e) {
-            if (log.isWarnEnabled()) log.warn("getUserMediaFeed 예외: {}", e, e);
+            log.warn("getUserMediaFeed Exception 발생", e);
+            return ApiMessage.fail(500, "미디어 게시글 조회 중 알 수 없는 오류가 발생했습니다.");
         }
 
-//        List<FilterPostResponse.UserPostData> mediaPosts = Collections.emptyList();
-
         // 5-2) 사용자 북마크
-        List<BookmarkResponse.BookmarkData> bookmarks = Collections.emptyList();
+        FilterPostResponse.FeedList bookmarks;
         try {
-            var bmMsg = bookmarkService.getBookmarksByUser(userId.toString());
-            if (bmMsg == null) {
-                log.warn("getBookmarksByUser: ApiMessage가 null");
-            } else if (bmMsg.isSuccess() && bmMsg.getData() != null) {
-                bookmarks = Optional.ofNullable(bmMsg.getData().getResults()).orElse(List.of());
+            List<Post> boomarkItems = postRepository.findBookmarkedPostsByUserIdExcludingProfileHidden(targetUserId, userId);
+            if (boomarkItems == null || boomarkItems.isEmpty()) {
+                log.warn("getUserBookMarkFeed: 조회된 미디어 게시글이 없습니다.");
+                bookmarks = FilterPostResponse.FeedList.builder()
+                        .results(List.of())
+                        .build();
             } else {
-                log.warn("getBookmarksByUser 실패: code={}, message={}", bmMsg.getCode(), bmMsg.getMessage());
+                bookmarks = buildFeedUtil.buildFeedList(boomarkItems, userId);
             }
+        } catch (IllegalArgumentException e) {
+            return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다: " + e.getMessage());
+
+        } catch (RuntimeException e) {
+            log.warn("getUserMediaFeed RuntimeException 발생", e);
+            return ApiMessage.fail(500, "북마크 게시글 조회 중 서버 오류가 발생했습니다.");
+
         } catch (Exception e) {
-            if (log.isWarnEnabled()) log.warn("getBookmarksByUser 예외: {}", e, e);
+            log.warn("getUserMediaFeed Exception 발생", e);
+            return ApiMessage.fail(500, "북마크 게시글 조회 중 알 수 없는 오류가 발생했습니다.");
         }
 
         // 6) 응답 DTO
