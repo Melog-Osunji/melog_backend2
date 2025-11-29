@@ -1,10 +1,5 @@
 package com.osunji.melog.feed.service;
 
-import com.osunji.melog.feed.dto.FeedResponse;
-import com.osunji.melog.feed.repository.CommentReader;
-import com.osunji.melog.feed.repository.PostReader;
-import com.osunji.melog.feed.repository.UserReader;
-import com.osunji.melog.feed.view.FeedItem;
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
 import com.osunji.melog.review.entity.Post;
@@ -34,6 +29,8 @@ public class RecommendationFacade {
         try {
             // 1) ES에서 1차 후보 뽑기
             List<Post> items = feedService.recommend(userId, size, (seen == null) ? List.of() : seen);
+
+            // 2) DTO 형식에 맞춰서 매핑하기
             FilterPostResponse.FeedList response = buildFeedList(items, userId);
             return ApiMessage.success(200, "추천 피드 조회 성공", response);
         } catch (Exception e) {

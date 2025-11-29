@@ -5,11 +5,9 @@ import java.util.*;
 
 import com.osunji.melog.feed.service.RecommendationFacade;
 
-import com.osunji.melog.feed.dto.FeedResponse;
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.global.security.JwtAuthFilter;
 import com.osunji.melog.review.dto.response.FilterPostResponse;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

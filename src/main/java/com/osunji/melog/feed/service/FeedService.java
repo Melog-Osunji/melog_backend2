@@ -3,7 +3,6 @@ package com.osunji.melog.feed.service;
 import co.elastic.clients.elasticsearch._types.Time;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.query_dsl.*;
-import com.osunji.melog.feed.view.FeedItem;
 import com.osunji.melog.review.entity.Post;
 import com.osunji.melog.review.repository.PostRepository;
 import lombok.extern.slf4j.Slf4j;
