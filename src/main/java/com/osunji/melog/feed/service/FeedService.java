@@ -51,7 +51,7 @@ public class FeedService {
         this.scale = scale;
     }
 
-    public List<FeedItem> recommend(UUID userId, int size, List<String> seenIds) {
+    public List<Post> recommend(UUID userId, int size, List<String> seenIds) {
 
         // 0) 유저 시그널 (태그/팔로잉) 수집
         var sig       = signalService.build(userId);
@@ -199,25 +199,11 @@ public class FeedService {
 
         log.debug("[FeedService] diversified result size={}", diversified.size());
 
-        // 8) 최종 매핑
-        List<FeedItem> result = diversified.stream()
-                .map(p -> {
-                    Float score = idToScore.getOrDefault(p.getId().toString(), 0f);
-                    return FeedItem.builder()
-                            .id(p.getId().toString())
-                            .title(p.getTitle())
-                            .excerpt(snippet(p.getContent()))
-                            .tags(extractTagNames(p))
-                            .authorId(p.getUser().getId().toString())
-                            .likeCount(p.getLikeCount())
-                            .createdAt(p.getCreatedAt())
-                            .score(score.doubleValue())
-                            .build();
-                })
-                .collect(Collectors.toList());
+        // 8) 유저 userId 기반으로 숨긴 처리한 게시물 제외
+        List<Post> filteredPosts = filterHiddenPostsForUser(diversified, userId);
 
-        log.debug("[FeedService] recommend end: final size={}", result.size());
-        return result;
+        log.debug("[FeedService] recommend end: final size={}", filteredPosts.size());
+        return filteredPosts;
     }
 
     // ===== helpers =====
