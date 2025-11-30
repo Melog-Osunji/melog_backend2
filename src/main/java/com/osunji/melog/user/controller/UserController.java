@@ -3,6 +3,7 @@ package com.osunji.melog.user.controller;
 import com.osunji.melog.global.dto.ApiMessage;
 import com.osunji.melog.global.security.JwtAuthFilter;
 import com.osunji.melog.user.dto.request.UserRequest;
+import com.osunji.melog.user.dto.response.ResignationResponseDTO;
 import com.osunji.melog.user.dto.response.UserResponse;
 import com.osunji.melog.user.service.UserProfileMusicService;
 import com.osunji.melog.user.service.UserService;
@@ -178,5 +179,13 @@ public class UserController {
     ) {
         ApiMessage<UserResponse.NicknameExistResponse> response = userService.isNicknameExist(nickname);
         return ResponseEntity.status(response.getCode()).body(response);
+    }
+
+    @DeleteMapping("/resignation")
+    public ResponseEntity<?> updateProfileMusic(
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+    ) {
+        ResignationResponseDTO saved = userService.resignation(userId);
+        return ResponseEntity.ok(ApiMessage.success(200,"success",saved ));
     }
 }

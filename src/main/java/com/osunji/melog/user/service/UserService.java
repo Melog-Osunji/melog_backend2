@@ -19,8 +19,10 @@ import com.osunji.melog.user.domain.Onboarding;
 import com.osunji.melog.user.domain.User;
 import com.osunji.melog.user.domain.enums.FollowStatus;
 import com.osunji.melog.user.dto.request.UserRequest;
+import com.osunji.melog.user.dto.response.ResignationResponseDTO;
 import com.osunji.melog.user.dto.response.UserResponse;
 import com.osunji.melog.user.repository.*;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -647,6 +649,32 @@ public class UserService {
 
         return ApiMessage.success(200, "response successful", body);
     }
+
+    @Transactional
+    public ResignationResponseDTO resignation(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("user_not_found"));
+
+        // 이미 탈퇴한 유저라면 기존 값 그대로 돌려줌
+        if (user.getDeleteAt() != null) {
+            log.info("이미 탈퇴 처리된 유저 요청 - userId={}, deleteAt={}",
+                    userId, user.getDeleteAt());
+
+            return ResignationResponseDTO.builder()
+                    .deleteAt(user.getDeleteAt())
+                    .build();
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        user.resign(now);
+
+        log.info("유저 탈퇴 처리 완료 - userId={}, deleteAt={}", userId, now);
+
+        return ResignationResponseDTO.builder()
+                .deleteAt(now)
+                .build();
+    }
+
 
 
     private int rankRole(String role) {
