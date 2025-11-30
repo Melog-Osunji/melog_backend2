@@ -480,51 +480,56 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public ApiMessage<UserResponse.MyPageResponse> getMyPage(UUID userId, UUID profileUserId) {
-        // 1) 유저 조회
 
+        log.debug("➡️ getMyPage 요청: loginUser={}, profileUser={}", userId, profileUserId);
+
+        // 1) 타겟 유저 결정
         UUID targetUserId = (profileUserId == null || userId.equals(profileUserId))
                 ? userId
                 : profileUserId;
 
-        User user = userRepository.findById(targetUserId).orElse(null);
+        log.debug("🎯 targetUserId 결정 완료: {}", targetUserId);
 
+        // 1) 유저 조회
+        User user = userRepository.findById(targetUserId).orElse(null);
         if (user == null) {
+            log.warn("❌ 유저 조회 실패: targetUserId={}", targetUserId);
             return ApiMessage.fail(HttpStatus.NOT_FOUND.value(), "user_not_found");
         }
 
-        log.debug("MyPage request - loginUser={}, profileUser={}, targetUser={}",
-                userId, profileUserId, targetUserId);
+        log.debug("👤 유저 조회 성공: nickname={}, id={}", user.getNickname(), targetUserId);
 
-        // 2) 팔로워/팔로잉 카운트 (ACCEPTED만 집계)
+
+        // 2) 팔로워/팔로잉
         long followers = followRepository.countByFollowing_IdAndStatus(targetUserId, FollowStatus.ACCEPTED);
         long followings = followRepository.countByFollower_IdAndStatus(targetUserId, FollowStatus.ACCEPTED);
 
-        // 3) 하모니룸(내가 소유 + 내가 멤버인 모든 방)
-        List<HarmonyRoom> rooms = harmonyRoomRepository.findAllJoinedOrOwned(targetUserId);
-        // 멤버(role) 조회
-        List<HarmonyRoomMembers> memberships =  harmonyRoomRepository.findByUserIdWithRoom(targetUserId);
+        log.debug("📊 팔로워/팔로잉 조회: followers={}, followings={}", followers, followings);
 
-        // roomId -> role 맵
+
+        // 3) 하모니룸
+        List<HarmonyRoom> rooms = harmonyRoomRepository.findAllJoinedOrOwned(targetUserId);
+        log.debug("🏠 하모니룸 조회: roomCount={}", rooms.size());
+
+        List<HarmonyRoomMembers> memberships = harmonyRoomRepository.findByUserIdWithRoom(targetUserId);
+        log.debug("👥 하모니룸 멤버십 조회: membershipCount={}", memberships.size());
+
+
         Map<UUID, String> roleByRoomId = memberships.stream()
                 .collect(Collectors.toMap(
                         m -> m.getHarmonyRoom().getId(),
                         HarmonyRoomMembers::getRole,
-                        // 한 방에 여러 레코드가 있을 경우 OWNER > ADMIN > MEMBER 우선
                         (r1, r2) -> rankRole(r1) >= rankRole(r2) ? r1 : r2
                 ));
+
+        log.debug("🔑 역할 매핑 완료: mappedRoles={}", roleByRoomId.size());
+
 
         List<UserResponse.HarmonyRoomItem> roomItems = rooms.stream()
                 .map(r -> {
                     UUID roomId = r.getId();
-
-                    // 소유자인지
-                    boolean isOwner = r.getOwner() != null
-                            && targetUserId.equals(r.getOwner().getId());
-
-                    // 내가 가진 역할 (없으면 null)
+                    boolean isOwner = r.getOwner() != null && targetUserId.equals(r.getOwner().getId());
                     String role = roleByRoomId.get(roomId);
-
-                    // 관리자 여부: OWNER 이거나, role 이 OWNER/ADMIN 인 경우만 true
                     boolean isManager = isOwner
                             || "OWNER".equalsIgnoreCase(role)
                             || "ADMIN".equalsIgnoreCase(role);
@@ -542,6 +547,8 @@ public class UserService {
                 })
                 .toList();
 
+        log.debug("🏷️ 하모니룸 DTO 생성 완료: size={}", roomItems.size());
+
 
         // 4) 프로필 음악
         UserResponse.ProfileMusic profileMusic = userProfileMusicService.getActive(targetUserId)
@@ -551,74 +558,78 @@ public class UserService {
                         .build())
                 .orElse(null);
 
+        log.debug("🎵 프로필 음악 조회: exists={}", profileMusic != null);
+
+
         // 5) 사용자 게시글
         FilterPostResponse.FeedList posts;
         try {
+            log.debug("📝 사용자 게시글 조회 시작...");
             List<Post> items = postRepository.findByUserIdOrderByCreatedAtDesc2(targetUserId, userId);
+            log.debug("📝 사용자 게시글 조회: count={}", items.size());
 
-//            List<Post> posts = postService.getUserMyPagePosts(targetUserId);
-            posts = buildFeedUtil.buildFeedmyPageList(items, userId);
-        } catch (IllegalArgumentException e) {
-            return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다.");
-        } catch (RuntimeException e) {
-            return ApiMessage.fail(500, "사용자 게시글 런타임 초과: " + e.getMessage());
+            posts = buildFeedUtil.buildFeedList(items, userId);
+            log.debug("📝 사용자 게시글 DTO 변환 완료");
         } catch (Exception e) {
-            return ApiMessage.fail(500, "사용자 게시글 조회 실패: " + e.getMessage());
+            log.error("❌ 사용자 게시글 조회 실패", e);
+            if (e instanceof IllegalArgumentException) {
+                return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다.");
+            }
+            return ApiMessage.fail(500, "사용자 게시글 런타임 초과: " + e.getMessage());
         }
 
-        // 5-1) 사용자 '미디어 포함' 게시글 → FeedList로 수신 (댓글/베댓 포함)
-        FilterPostResponse.FeedList mediaFeed;
 
+        // 5-1) 사용자 '미디어 포함' 게시글
+        FilterPostResponse.FeedList mediaFeed;
         try {
-            // 본인 마이페이지라면 currentUserId = userId 로 넘겨 숨김 필터 등 동일 적용
+            log.debug("🎬 미디어 게시글 조회 시작...");
             List<Post> mediaItems =
                     postRepository.findMediaPostsByUserIdOrderByCreatedAtDesc(targetUserId, userId);
 
-            if (mediaItems == null || mediaItems.isEmpty()) {
-                log.warn("getUserMediaFeed: 조회된 미디어 게시글이 없습니다.");
-                mediaFeed = FilterPostResponse.FeedList.builder()
-                        .results(List.of())
-                        .build();
-            } else {
-                mediaFeed = buildFeedUtil.buildFeedList(mediaItems, userId);
-            }
-        } catch (IllegalArgumentException e) {
-            return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다: " + e.getMessage());
+            log.debug("🎬 미디어 게시글 조회: count={}", mediaItems.size());
 
-        } catch (RuntimeException e) {
-            log.warn("getUserMediaFeed RuntimeException 발생", e);
-            return ApiMessage.fail(500, "미디어 게시글 조회 중 서버 오류가 발생했습니다.");
+            mediaFeed = mediaItems.isEmpty()
+                    ? FilterPostResponse.FeedList.builder().results(List.of()).build()
+                    : buildFeedUtil.buildFeedList(mediaItems, userId);
+
+            log.debug("🎬 미디어 게시글 DTO 변환 완료");
 
         } catch (Exception e) {
-            log.warn("getUserMediaFeed Exception 발생", e);
-            return ApiMessage.fail(500, "미디어 게시글 조회 중 알 수 없는 오류가 발생했습니다.");
+            log.error("❌ 미디어 게시글 조회 실패", e);
+            if (e instanceof IllegalArgumentException) {
+                return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다: " + e.getMessage());
+            }
+            return ApiMessage.fail(500, "미디어 게시글 조회 중 서버 오류가 발생했습니다.");
         }
 
-        // 5-2) 사용자 북마크
+
+        // 5-2) 북마크 게시글
         FilterPostResponse.FeedList bookmarks;
         try {
-            List<Post> boomarkItems = postRepository.findBookmarkedPostsByUserIdExcludingProfileHidden(targetUserId, userId);
-            if (boomarkItems == null || boomarkItems.isEmpty()) {
-                log.warn("getUserBookMarkFeed: 조회된 미디어 게시글이 없습니다.");
-                bookmarks = FilterPostResponse.FeedList.builder()
-                        .results(List.of())
-                        .build();
-            } else {
-                bookmarks = buildFeedUtil.buildFeedList(boomarkItems, userId);
-            }
-        } catch (IllegalArgumentException e) {
-            return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다: " + e.getMessage());
+            log.debug("🔖 북마크 게시글 조회 시작...");
+            List<Post> bookmarkItems =
+                    postRepository.findBookmarkedPostsByUserIdExcludingProfileHidden(targetUserId, userId);
 
-        } catch (RuntimeException e) {
-            log.warn("getUserMediaFeed RuntimeException 발생", e);
-            return ApiMessage.fail(500, "북마크 게시글 조회 중 서버 오류가 발생했습니다.");
+            log.debug("🔖 북마크 게시글 조회: count={}", bookmarkItems.size());
+
+            bookmarks = bookmarkItems.isEmpty()
+                    ? FilterPostResponse.FeedList.builder().results(List.of()).build()
+                    : buildFeedUtil.buildFeedList(bookmarkItems, userId);
+
+            log.debug("🔖 북마크 게시글 DTO 변환 완료");
 
         } catch (Exception e) {
-            log.warn("getUserMediaFeed Exception 발생", e);
-            return ApiMessage.fail(500, "북마크 게시글 조회 중 알 수 없는 오류가 발생했습니다.");
+            log.error("❌ 북마크 게시글 조회 실패", e);
+            if (e instanceof IllegalArgumentException) {
+                return ApiMessage.fail(400, "잘못된 사용자 ID 형식입니다: " + e.getMessage());
+            }
+            return ApiMessage.fail(500, "북마크 게시글 조회 중 서버 오류가 발생했습니다.");
         }
 
+
         // 6) 응답 DTO
+        log.debug("📦 최종 응답 DTO 생성 완료");
+
         UserResponse.MyPageResponse body = UserResponse.MyPageResponse.builder()
                 .profileImg(user.getProfileImageUrl())
                 .nickname(user.getNickname())
@@ -632,8 +643,11 @@ public class UserService {
                 .bookmarks(bookmarks)
                 .build();
 
+        log.debug("✅ getMyPage 처리 성공: targetUserId={}", targetUserId);
+
         return ApiMessage.success(200, "response successful", body);
     }
+
 
     private int rankRole(String role) {
         if (role == null) return 0;

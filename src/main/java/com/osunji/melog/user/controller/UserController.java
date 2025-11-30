@@ -157,13 +157,6 @@ public class UserController {
             @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId,
             @RequestParam(required = false) UUID profileUser
     ) {
-//        UUID targetUserId = (profileUser == null || userId.equals(profileUser))
-//                ? userId
-//                : profileUser;
-//
-//        log.debug("MyPage request - loginUser={}, profileUser={}, targetUser={}",
-//                userId, profileUser, targetUserId);
-
         ApiMessage<UserResponse.MyPageResponse> response = userService.getMyPage(userId, profileUser);
         return ResponseEntity.status(response.getCode()).body(response);
     }
