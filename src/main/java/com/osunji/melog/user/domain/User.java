@@ -64,6 +64,9 @@ public class User {
     @Column // 공개 계정인지 여부 공개==false / 비공개 true
     private Boolean active = false;
 
+    @Column(name = "delete_at")
+    private LocalDateTime deleteAt;
+
     //생성자 - 필수 정보로만 이루어짐
     public User(String email, Platform platform) {
         this.email = email;
@@ -119,6 +122,16 @@ public class User {
 
     public boolean isPublicAccount() {
         return !isPrivateAccount();
+    }
+
+    public void resign(LocalDateTime deletedAt) { // TODO: 해당 유저의 관련 게시물도 모두 DELETE
+        this.deleteAt = deletedAt;
+        this.active = false;
+
+        // 개인정보 최소화 + 화면용 디폴트 값
+        this.nickname = "탈퇴한 사용자";
+        this.profileImageUrl = null;
+        this.intro = null;
     }
 
 }

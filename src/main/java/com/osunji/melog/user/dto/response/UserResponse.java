@@ -80,9 +80,9 @@ public class UserResponse {
 
         private List<HarmonyRoomItem> harmonyRooms;
 
-        private List<FilterPostResponse.UserPostData> posts;
-        private List<FilterPostResponse.UserPostData> mediaPosts;
-        private List<BookmarkResponse.BookmarkData> bookmarks;
+        private FilterPostResponse.FeedList posts;
+        private FilterPostResponse.FeedList mediaPosts;
+        private FilterPostResponse.FeedList bookmarks;
 
     }
 
