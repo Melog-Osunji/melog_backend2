@@ -24,7 +24,8 @@ public class WhitelistPaths {
             "/actuator/health",
             "/actuator",
             "/error",
-            "/api/users/nickname/exist"
+            "/api/users/nickname/exist",
+            "/privacy"
 
     };
 
