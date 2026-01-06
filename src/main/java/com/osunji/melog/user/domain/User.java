@@ -124,6 +124,16 @@ public class User {
         return !isPrivateAccount();
     }
 
+    // 계정 비공개로 전환
+    public void makePrivate() {
+        this.active = true;
+    }
+
+    // 계정 공개로 전환
+    public void makePublic() {
+        this.active = false;
+    }
+
     public void resign(LocalDateTime deletedAt) { // TODO: 해당 유저의 관련 게시물도 모두 DELETE
         this.deleteAt = deletedAt;
         this.active = false;

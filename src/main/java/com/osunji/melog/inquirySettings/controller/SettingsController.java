@@ -77,6 +77,16 @@ public class SettingsController {
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
+    @PatchMapping("/active")
+    public ResponseEntity<?> postActivateUser(
+//            @RequestBody SettingsRequest request,
+            @RequestAttribute(JwtAuthFilter.USER_ID_ATTR) UUID userId
+    ) {
+        ApiMessage<SettingsResponse.ActivateResponse> response;
+        response = settingsService.postActivateUser(userId);
+        return ResponseEntity.status(response.getCode()).body(response);
+    }
+
 
 
 }
