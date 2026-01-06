@@ -212,5 +212,31 @@ public class SettingsService {
         return ApiMessage.success(HttpStatus.OK.value(), "unblocked", body);
     }
 
+    @Transactional
+    public ApiMessage<SettingsResponse.ActivateResponse> postActivateUser(UUID userId) {
+
+        User target = userRepository.findById(userId)
+                .orElseThrow(() -> new NoSuchElementException("대상 사용자를 찾을 수 없습니다: " + userId));
+
+        boolean wasPublic = target.isPublicAccount();
+
+        if (wasPublic) {
+            target.makePrivate();   // 공개 -> 비공개
+        } else {
+            target.makePublic();    // 비공개 -> 공개
+        }
+
+        boolean isPublicNow = target.isPublicAccount();
+
+        String msg = isPublicNow ? "Public" : "Private";
+
+        SettingsResponse.ActivateResponse body = SettingsResponse.ActivateResponse.builder()
+                .userId(target.getId())
+                .status(isPublicNow)
+                .build();
+
+        return ApiMessage.success(HttpStatus.OK.value(), msg, body);
+    }
+
 
 }

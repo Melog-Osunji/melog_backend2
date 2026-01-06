@@ -48,4 +48,13 @@ public class SettingsResponse {
         private FollowStatus status;
 
     }
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    public static class ActivateResponse {
+        private UUID userId;
+        private boolean status;
+
+    }
 }
