@@ -25,7 +25,8 @@ public class WhitelistPaths {
             "/actuator",
             "/error",
             "/api/users/nickname/exist",
-            "/privacy"
+            "/privacy",
+            "/api/admin/login"
 
     };
 
