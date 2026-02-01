@@ -14,23 +14,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-public interface InquiryRepository extends JpaRepository<Inquiry, UUID> {
+public interface InquiryRepository extends JpaRepository<Inquiry, UUID>,
+        org.springframework.data.jpa.repository.JpaSpecificationExecutor<Inquiry> {
     List<Inquiry> findByUser_IdOrderByCreatedAtDesc(UUID userId);
     List<Inquiry> findByParentTypeAndChildTypeOrderByCreatedAtDesc(InquiryParentType parent, InquiryChildType child);
-
-    @Query("""
-        SELECT i FROM Inquiry i JOIN i.user u
-        WHERE (:parentType IS NULL OR i.parentType = :parentType)
-          AND (:query IS NULL OR u.email LIKE CONCAT('%', :query, '%'))
-          AND (:fromDate IS NULL OR i.createdAt >= :fromDate)
-          AND (:toDate IS NULL OR i.createdAt <= :toDate)
-        ORDER BY i.createdAt DESC
-        """)
-    Page<Inquiry> findByAdminFilter(
-            @Param("parentType") InquiryParentType parentType,
-            @Param("query") String query,
-            @Param("fromDate") LocalDateTime fromDate,
-            @Param("toDate") LocalDateTime toDate,
-            Pageable pageable
-    );
 }

@@ -51,9 +51,8 @@ public class Inquiry {
     private String title;
 
     /** 본문 */
-    @Lob
     @NotNull
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     /** 작성자 (User UUID FK) */
@@ -67,7 +66,6 @@ public class Inquiry {
     private LocalDateTime createdAt;
 
     /** 관리자 답변 내용 */
-    @Lob
     @Column(name = "answer", columnDefinition = "TEXT")
     private String answer;
 

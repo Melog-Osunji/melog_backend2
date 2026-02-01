@@ -23,7 +23,7 @@ public class AdminNotification {
     @Column(nullable = false, length = 200)
     private String title;
 
-    @Lob
+    // @Lob 제거: PostgreSQL에서 @Lob은 OID(CLOB)로 매핑되어 TEXT 컬럼과 타입 불일치 발생
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
