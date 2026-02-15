@@ -61,3 +61,6 @@ Thumbs.db
 # Docker 관련
 *.pid
 *.tar
+
+
+!forClaude/**

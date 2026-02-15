@@ -51,9 +51,8 @@ public class Inquiry {
     private String title;
 
     /** 본문 */
-    @Lob
     @NotNull
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     /** 작성자 (User UUID FK) */
@@ -65,6 +64,36 @@ public class Inquiry {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /** 관리자 답변 내용 */
+    @Column(name = "answer", columnDefinition = "TEXT")
+    private String answer;
+
+    /** 답변 상태 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "answer_status", length = 20)
+    private AnswerStatus answerStatus = AnswerStatus.PENDING;
+
+    /** 답변 완료 일시 */
+    @Column(name = "answered_at")
+    private LocalDateTime answeredAt;
+
+    public enum AnswerStatus {
+        PENDING, DRAFT, ANSWERED
+    }
+
+    /** 임시 저장 */
+    public void saveDraft(String answer) {
+        this.answer = answer;
+        this.answerStatus = AnswerStatus.DRAFT;
+    }
+
+    /** 답변 전송 */
+    public void publishAnswer(String answer) {
+        this.answer = answer;
+        this.answerStatus = AnswerStatus.ANSWERED;
+        this.answeredAt = LocalDateTime.now();
+    }
 
     // 생성자
     public Inquiry(InquiryParentType parentType,
